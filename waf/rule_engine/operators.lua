@@ -6,6 +6,13 @@ local _M = {}
 local bit = require "bit"
 local re_find = ngx.re.find
 
+-- libinjection 语义检测（懒加载；.so 缺失时自动降级为不匹配，不影响其他运算符）
+-- 依赖 require 的 package.loaded 缓存，避免重复加载开销
+local function get_libinj()
+    local ok, m = pcall(require, "libinjection_ffi")
+    return ok and m or { available = false }
+end
+
 -- IPv4 字符串转 32 位整数
 local function ipv4_to_int(ip)
     local a, b, c, d = tostring(ip):match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
@@ -93,6 +100,20 @@ local operators = {
     -- 存在性
     EXISTS = function(value)
         return value ~= nil and tostring(value) ~= ""
+    end,
+
+    -- 语义检测：SQL 注入（libinjection 词法/语法分析，抗编码与注释绕过）
+    LIBINJECTION_SQLI = function(value)
+        local m = get_libinj()
+        if not m.available then return false end
+        return m.is_sqli(value)
+    end,
+
+    -- 语义检测：XSS（libinjection HTML5 解析）
+    LIBINJECTION_XSS = function(value)
+        local m = get_libinj()
+        if not m.available then return false end
+        return m.is_xss(value)
     end,
 }
 

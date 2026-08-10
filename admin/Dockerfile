@@ -14,7 +14,10 @@ WORKDIR /app
 COPY admin/ ./
 COPY --from=web /app/dist ./internal/webui/dist
 # WAF Lua 组件打包目录（供引导页下载、接入本机 OpenResty）
+# libinjection.so 为 glibc x86_64 预编译产物（libinjection BSD 许可，可用
+# scripts/build-libinjection.sh 在其他架构/环境重新编译）
 COPY waf/ ./waf-dist/
+COPY waf/libinjection/libinjection.so ./waf-dist/libinjection.so
 RUN go mod download && CGO_ENABLED=0 go build -o /out/waf-admin .
 
 # ---------- 阶段 3：运行 ----------

@@ -139,7 +139,8 @@ func (h *SetupHandler) InstallScript(c *gin.Context) {
 
 // nginxSnippet OpenResty 接入配置片段
 const nginxSnippet = `# OpenResty WAF 接入（管理后台自动生成，加入 nginx.conf 的 http {} 段）
-lua_package_path "/opt/waf/?.lua;;";
+lua_package_path  "/opt/waf/?.lua;;";
+lua_package_cpath "/opt/waf/?.so;;";
 lua_shared_dict waf_rule 20m;
 lua_shared_dict waf_counter 50m;
 init_by_lua_file /opt/waf/init.lua;
@@ -256,7 +257,8 @@ fi
 echo "[3/4] 生成 nginx 接入配置..."
 cat > "$INSTALL_DIR/waf-nginx.conf" <<EOF
 # OpenResty WAF 接入配置（复制到 nginx.conf 的 http {} 段）
-lua_package_path "$INSTALL_DIR/?.lua;;";
+lua_package_path  "$INSTALL_DIR/?.lua;;";
+lua_package_cpath "$INSTALL_DIR/?.so;;";
 lua_shared_dict waf_rule 20m;
 lua_shared_dict waf_counter 50m;
 init_by_lua_file $INSTALL_DIR/init.lua;

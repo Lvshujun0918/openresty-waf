@@ -95,3 +95,42 @@ t.test("is_valid: 校验运算符", function()
     t.ok(operators.is_valid("CIDR"))
     t.no(operators.is_valid("FOO"))
 end)
+
+-- ============ libinjection 语义检测 ============
+
+t.test("LIBINJECTION: .so 缺失时降级为不匹配", function()
+    package.loaded["libinjection_ffi"] = nil
+    package.preload["libinjection_ffi"] = nil
+    t.no(operators.eval("LIBINJECTION_SQLI", "1 or 1=1"))
+    t.no(operators.eval("LIBINJECTION_XSS", "<script>alert(1)</script>"))
+end)
+
+t.test("LIBINJECTION: 可用时按语义结果匹配", function()
+    package.loaded["libinjection_ffi"] = nil
+    package.preload["libinjection_ffi"] = function()
+        return {
+            available = true,
+            is_sqli = function(s)
+                if s == nil then return false end
+                return string.find(s, "or 1=1", 1, true) ~= nil
+            end,
+            is_xss = function(s)
+                if s == nil then return false end
+                return string.find(s, "<script>", 1, true) ~= nil
+            end,
+        }
+    end
+    t.ok(operators.eval("LIBINJECTION_SQLI", "1 or 1=1"))
+    t.no(operators.eval("LIBINJECTION_SQLI", "hello"))
+    t.ok(operators.eval("LIBINJECTION_XSS", "<script>alert(1)</script>"))
+    t.no(operators.eval("LIBINJECTION_XSS", "hello"))
+    -- nil 输入不匹配
+    t.no(operators.eval("LIBINJECTION_SQLI", nil))
+    package.loaded["libinjection_ffi"] = nil
+    package.preload["libinjection_ffi"] = nil
+end)
+
+t.test("is_valid: 语义运算符有效", function()
+    t.ok(operators.is_valid("LIBINJECTION_SQLI"))
+    t.ok(operators.is_valid("LIBINJECTION_XSS"))
+end)
