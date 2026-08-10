@@ -23,6 +23,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	ruleHandler := NewRuleHandler(db, mgr, cfg)
 	eventHandler := NewEventHandler(db, mgr, cfg)
 	setupHandler := NewSetupHandler(db, mgr, cfg)
+	configHandler := NewConfigHandler(db, mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -56,6 +57,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			// 攻击事件
 			authed.GET("/events", eventHandler.List)
 			authed.POST("/events/consume", eventHandler.Consume)
+
+			// WAF 运行配置
+			authed.GET("/config", configHandler.Get)
+			authed.PUT("/config", configHandler.Save)
 		}
 	}
 
