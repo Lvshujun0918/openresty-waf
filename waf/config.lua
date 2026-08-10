@@ -48,7 +48,8 @@ _M.dict = {
 -- Redis（规则热下发 / 攻击事件缓冲）
 -- ============================================================================
 _M.redis = {
-    host            = "127.0.0.1",
+    -- 支持环境变量覆盖（Docker 部署时指向 compose 的 redis 服务）
+    host            = os.getenv("WAF_REDIS_HOST") or "127.0.0.1",
     port            = 6379,
     db              = 0,
     password        = nil,   -- 无密码留 nil

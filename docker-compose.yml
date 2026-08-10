@@ -1,0 +1,67 @@
+# OpenResty WAF 一键部署
+#
+# 组成：
+#   redis  Redis（规则热下发 / 事件队列）
+#   admin  管理后台（Go+Gin+GORM，内嵌 Vue3 前端，单二进制）
+#   waf    OpenResty 网关（WAF Lua 引擎，前置检测并反代到 admin）
+#
+# 使用：
+#   docker compose up -d --build
+#   - 管理后台（直连）: http://<host>:8081
+#   - 经 WAF 网关访问 : http://<host>/    （含拦截/挑战/日志）
+#   - 默认账号 admin / admin123（可用 ADMIN_INIT_PASSWORD 覆盖）
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  admin:
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
+    restart: unless-stopped
+    environment:
+      ADMIN_ADDR: ":8081"
+      ADMIN_DB_TYPE: "sqlite"
+      ADMIN_DB_DSN: "/data/waf.db"
+      ADMIN_JWT_SECRET: "${ADMIN_JWT_SECRET:-openresty-waf-change-me}"
+      ADMIN_INIT_PASSWORD: "${ADMIN_INIT_PASSWORD:-admin123}"
+      REDIS_ADDR: "redis:6379"
+      WAF_RULE_VERSION_KEY: "waf:rule:version"
+      WAF_RULE_RULESET_KEY: "waf:rule:ruleset"
+      WAF_EVENT_KEY: "waf:event:list"
+    ports:
+      - "18081:8081"
+    volumes:
+      - admin-data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  waf:
+    image: openresty/openresty:alpine
+    restart: unless-stopped
+    environment:
+      WAF_REDIS_HOST: "redis"
+    ports:
+      - "80:80"
+    volumes:
+      - ./waf:/opt/waf:ro
+      - ./deploy/nginx-gateway.conf:/usr/local/openresty/nginx/conf/nginx.conf:ro
+      - waf-logs:/var/log/waf
+    depends_on:
+      - admin
+      - redis
+
+volumes:
+  redis-data:
+  admin-data:
+  waf-logs:

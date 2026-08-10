@@ -48,7 +48,49 @@ openresty-waf/
 
 ## 快速开始
 
-> 开发中，文档待完善。
+### Docker 一键部署（推荐）
+
+```bash
+docker compose up -d --build
+```
+
+| 入口 | 地址 | 说明 |
+|---|---|---|
+| 管理后台 | http://\<host\>:18081 | Go 后台 + Vue3 前端（单二进制，内嵌页面） |
+| WAF 网关 | http://\<host\>/ | OpenResty 前置检测，反代到管理后台 |
+| Redis | compose 内部 redis:6379 | 规则热下发 / 事件队列 |
+
+- 默认账号：`admin / admin123`（可用 `ADMIN_INIT_PASSWORD` 环境变量覆盖）
+- 修改 `ADMIN_JWT_SECRET` 后再生产使用
+
+### 手动部署
+
+**1. WAF 引擎（任意 OpenResty）**：在 `nginx.conf` 挂载
+
+```nginx
+lua_package_path "/opt/waf/?.lua;;";
+lua_shared_dict waf_rule    20m;
+lua_shared_dict waf_counter 50m;
+init_by_lua_file         /opt/waf/init.lua;
+init_worker_by_lua_file  /opt/waf/init.lua;   # 启用 Redis 规则热更新
+access_by_lua_file       /opt/waf/access.lua;
+log_by_lua_file          /opt/waf/log.lua;
+```
+
+**2. 管理后台**
+
+```bash
+cd admin && go build -o waf-admin . && ./waf-admin
+# 前端页面构建后可嵌入（见 admin/internal/webui）
+```
+
+**3. 管理前端（开发模式）**
+
+```bash
+cd web && npm install && npm run dev   # 默认代理 /api 到 :18081
+```
+
+更多：性能基准见 `docs/benchmark.md`，人机验证接入见 `docs/challenge.md`。
 
 ## License
 
