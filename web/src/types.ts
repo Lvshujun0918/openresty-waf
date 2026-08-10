@@ -47,6 +47,20 @@ export interface CcRule {
   updated_at?: string
 }
 
+export interface IpListSub {
+  id: number
+  name: string
+  url: string
+  type: 'whitelist' | 'blacklist'
+  interval_min: number
+  enabled: boolean
+  last_sync_at?: string | null
+  last_status?: string
+  last_count?: number
+  created_at?: string
+  updated_at?: string
+}
+
 export interface PageResult<T> {
   total: number
   page: number

@@ -30,12 +30,7 @@ function toStr(arr: unknown[] | undefined): string {
   return (arr || []).join(', ')
 }
 
-// 名单等数组字段的编辑缓冲
-const wlIps = ref('')
-const wlUrls = ref('')
-const wlUa = ref('')
-const blIps = ref('')
-const blUrls = ref('')
+// 上传字段编辑缓冲
 const denyExt = ref('')
 const denyMime = ref('')
 
@@ -68,11 +63,6 @@ async function load() {
     config.upload = config.upload || {}
     config.challenge = config.challenge || {}
     config.challenge.captcha = config.challenge.captcha || {}
-    wlIps.value = toStr(config.whitelist.ips)
-    wlUrls.value = toStr(config.whitelist.urls)
-    wlUa.value = toStr(config.whitelist.user_agents)
-    blIps.value = toStr(config.blacklist.ips)
-    blUrls.value = toStr(config.blacklist.urls)
     denyExt.value = toStr(config.upload.deny_ext)
     denyMime.value = toStr(config.upload.deny_mime)
   } catch (e: any) {
@@ -85,11 +75,6 @@ async function load() {
 async function save() {
   saving.value = true
   msg.value = ''
-  config.whitelist.ips = toList(wlIps.value)
-  config.whitelist.urls = toList(wlUrls.value)
-  config.whitelist.user_agents = toList(wlUa.value)
-  config.blacklist.ips = toList(blIps.value)
-  config.blacklist.urls = toList(blUrls.value)
   config.upload.deny_ext = toList(denyExt.value)
   config.upload.deny_mime = toList(denyMime.value)
   try {
@@ -188,29 +173,6 @@ onMounted(load)
         </CardContent>
       </Card>
 
-      <!-- 黑白名单 -->
-      <Card>
-        <CardHeader><CardTitle>黑白名单</CardTitle></CardHeader>
-        <CardContent class="grid grid-cols-2 gap-4">
-          <div class="space-y-1.5">
-            <Label>白名单 IP（逗号分隔，支持 CIDR）</Label>
-            <textarea v-model="wlIps" rows="3" class="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs" placeholder="127.0.0.1, 10.0.0.0/8" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>黑名单 IP（逗号分隔）</Label>
-            <textarea v-model="blIps" rows="3" class="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs" placeholder="1.2.3.4" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>白名单 URL（正则）</Label>
-            <textarea v-model="wlUrls" rows="2" class="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>白名单 UA（正则）</Label>
-            <textarea v-model="wlUa" rows="2" class="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs" />
-          </div>
-        </CardContent>
-      </Card>
-
       <!-- 上传 -->
       <Card>
         <CardHeader><CardTitle>文件上传</CardTitle></CardHeader>
@@ -222,51 +184,6 @@ onMounted(load)
           <div class="space-y-1.5">
             <Label>禁止 MIME（逗号分隔）</Label>
             <Input v-model="denyMime" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- 人机验证 -->
-      <Card>
-        <CardHeader>
-          <CardTitle>人机验证</CardTitle>
-          <CardDescription>模式 basic（自包含）/ geetest / gitee（需配置 captcha_id/key）</CardDescription>
-        </CardHeader>
-        <CardContent class="grid grid-cols-2 gap-4">
-          <label class="flex items-center gap-2 text-sm">
-            <input v-model="config.challenge.enabled" type="checkbox" class="h-4 w-4" /> 启用
-          </label>
-          <div class="space-y-1.5">
-            <Label>模式</Label>
-            <select v-model="config.challenge.mode" class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
-              <option value="basic">basic</option>
-              <option value="geetest">geetest</option>
-              <option value="gitee">gitee</option>
-            </select>
-          </div>
-          <div class="space-y-1.5">
-            <Label>放行时长（秒）</Label>
-            <Input v-model.number="config.challenge.cookie_ttl" type="number" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>签名密钥（生产务必修改）</Label>
-            <Input v-model="config.challenge.cookie_secret" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>验证页路径</Label>
-            <Input v-model="config.challenge.page_path" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>回调路径</Label>
-            <Input v-model="config.challenge.verify_path" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>captcha_id（高级模式）</Label>
-            <Input v-model="config.challenge.captcha.id" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>captcha_key（高级模式）</Label>
-            <Input v-model="config.challenge.captcha.key" />
           </div>
         </CardContent>
       </Card>

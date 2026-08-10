@@ -2,7 +2,7 @@
 import { RouterLink, RouterView } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
-import { Gauge, LogOut, Plug, ScrollText, Settings, ShieldAlert, ShieldCheck } from 'lucide-vue-next'
+import { Ban, Fingerprint, Gauge, LogOut, Plug, ScrollText, Settings, ShieldAlert, ShieldCheck } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 
 const auth = useAuthStore()
@@ -12,6 +12,8 @@ const navItems = [
   { to: '/rules', label: '规则管理', icon: ShieldCheck },
   { to: '/events', label: '攻击事件', icon: ScrollText },
   { to: '/cc', label: 'CC 防刷', icon: ShieldAlert },
+  { to: '/challenge', label: '人机验证', icon: Fingerprint },
+  { to: '/ip-lists', label: '黑白名单', icon: Ban },
   { to: '/config', label: '系统配置', icon: Settings },
   { to: '/guide', label: '接入指引', icon: Plug },
 ]
