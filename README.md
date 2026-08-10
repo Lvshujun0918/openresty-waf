@@ -48,47 +48,47 @@ openresty-waf/
 
 ## 快速开始
 
-### Docker 一键部署（推荐）
+### 管理后台（单容器一键启动）
 
 ```bash
 docker compose up -d --build
 ```
 
-| 入口 | 地址 | 说明 |
-|---|---|---|
-| 管理后台 | http://\<host\>:18081 | Go 后台 + Vue3 前端（单二进制，内嵌页面） |
-| WAF 网关 | http://\<host\>/ | OpenResty 前置检测，反代到管理后台 |
-| Redis | compose 内部 redis:6379 | 规则热下发 / 事件队列 |
+浏览器打开 http://\<host\>:18081（默认账号 `admin / admin123`，可用 `ADMIN_INIT_PASSWORD` 覆盖），
+首次使用会进入**引导页**：
 
-- 默认账号：`admin / admin123`（可用 `ADMIN_INIT_PASSWORD` 环境变量覆盖）
-- 修改 `ADMIN_JWT_SECRET` 后再生产使用
+1. **配置 Redis**：填写你已有 Redis 实例的连接信息（规则热下发 / 攻击事件队列），后台先做连通性测试。
+2. **接入本机 OpenResty**：在运行 OpenResty 的服务器上执行引导页给出的一键命令，
+   自动下载 WAF Lua 组件、生成 `config_local.lua`（Redis 连接）与 `nginx.conf` 接入片段，
+   挂载 `init/access/log` 三个阶段即可生效。
+
+```
+┌─────────────┐     引导接入      ┌──────────────────────────────┐
+│ 单容器管理后台 │ ───────────────► │ 本机已部署的 OpenResty          │
+│ (Go+Vue,18081)│   下载组件/脚本    │  + /opt/waf (Lua 组件)        │
+└──────┬──────┘                   │  + nginx.conf 挂载            │
+       │ 规则下发/事件消费          │                                │
+       ▼                          └──────────────┬───────────────┘
+  你已有的 Redis ◄───────────────────────────────┘ 事件上报/规则热更
+```
 
 ### 手动部署
 
-**1. WAF 引擎（任意 OpenResty）**：在 `nginx.conf` 挂载
+**1. 管理后台**：`cd admin && go build -o waf-admin . && ./waf-admin`，打开引导页完成配置。
+
+**2. WAF 引擎（接入本机任意 OpenResty）**：引导页下载组件到 `/opt/waf`，在 `nginx.conf` 挂载
 
 ```nginx
 lua_package_path "/opt/waf/?.lua;;";
 lua_shared_dict waf_rule    20m;
 lua_shared_dict waf_counter 50m;
 init_by_lua_file         /opt/waf/init.lua;
-init_worker_by_lua_file  /opt/waf/init.lua;   # 启用 Redis 规则热更新
+init_worker_by_lua_file  /opt/waf/init.lua;   # Redis 规则热更新
 access_by_lua_file       /opt/waf/access.lua;
 log_by_lua_file          /opt/waf/log.lua;
 ```
 
-**2. 管理后台**
-
-```bash
-cd admin && go build -o waf-admin . && ./waf-admin
-# 前端页面构建后可嵌入（见 admin/internal/webui）
-```
-
-**3. 管理前端（开发模式）**
-
-```bash
-cd web && npm install && npm run dev   # 默认代理 /api 到 :18081
-```
+**3. 管理前端（开发模式）**：`cd web && npm install && npm run dev`
 
 更多：性能基准见 `docs/benchmark.md`，人机验证接入见 `docs/challenge.md`。
 
