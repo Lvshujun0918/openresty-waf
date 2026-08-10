@@ -9,9 +9,9 @@ import (
 type Config struct {
 	Server Server
 	DB     DB
-	Redis  Redis
 	JWT    JWT
 	Rule   Rule
+	WAF    WAF
 }
 
 type Server struct {
@@ -23,15 +23,14 @@ type DB struct {
 	DSN  string // sqlite 文件路径 或 mysql DSN
 }
 
-type Redis struct {
-	Addr     string
-	Password string
-	DB       int
-}
-
 type JWT struct {
 	Secret string
 	Expire int // 过期时间（小时）
+}
+
+// WAF WAF 组件分发相关
+type WAF struct {
+	DistDir string // WAF Lua 组件打包目录（Docker 镜像内置 /opt/waf-dist）
 }
 
 // Rule Redis 规则下发相关键（与 waf/config.lua 的 rule_refresh 约定保持一致）
@@ -48,11 +47,6 @@ func Load() *Config {
 			Type: getEnv("ADMIN_DB_TYPE", "sqlite"),
 			DSN:  getEnv("ADMIN_DB_DSN", "waf.db"),
 		},
-		Redis: Redis{
-			Addr:     getEnv("REDIS_ADDR", "127.0.0.1:6379"),
-			Password: getEnv("REDIS_PASSWORD", ""),
-			DB:       getEnvInt("REDIS_DB", 0),
-		},
 		JWT: JWT{
 			Secret: getEnv("ADMIN_JWT_SECRET", "openresty-waf-change-me"),
 			Expire: getEnvInt("ADMIN_JWT_EXPIRE_HOURS", 24),
@@ -61,6 +55,9 @@ func Load() *Config {
 			VersionKey: getEnv("WAF_RULE_VERSION_KEY", "waf:rule:version"),
 			RulesetKey: getEnv("WAF_RULE_RULESET_KEY", "waf:rule:ruleset"),
 			EventKey:   getEnv("WAF_EVENT_KEY", "waf:event:list"),
+		},
+		WAF: WAF{
+			DistDir: getEnv("WAF_DIST_DIR", "/opt/waf-dist"),
 		},
 	}
 }

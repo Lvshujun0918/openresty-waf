@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
 	"openresty-waf/admin/internal/config"
@@ -22,13 +21,13 @@ type Ruleset struct {
 
 type RuleService struct {
 	db  *gorm.DB
-	rdb *redis.Client
+	mgr *RedisManager
 	cfg *config.Config
 	ctx context.Context
 }
 
-func NewRuleService(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *RuleService {
-	return &RuleService{db: db, rdb: rdb, cfg: cfg, ctx: context.Background()}
+func NewRuleService(db *gorm.DB, mgr *RedisManager, cfg *config.Config) *RuleService {
+	return &RuleService{db: db, mgr: mgr, cfg: cfg, ctx: context.Background()}
 }
 
 // toEngineRule 将 DB 规则转换为 Lua 引擎 DSL 对象
@@ -79,6 +78,10 @@ func (s *RuleService) BuildRuleset() (*Ruleset, error) {
 // Publish 发布规则集到 Redis，并自增版本号触发 Lua 引擎热更新。
 // 与 waf/config.lua 的 rule_refresh 键约定保持一致。
 func (s *RuleService) Publish() (*Ruleset, error) {
+	rdb := s.mgr.GetClient()
+	if rdb == nil {
+		return nil, errors.New("Redis 未配置，请先在引导页完成 Redis 配置")
+	}
 	rs, err := s.BuildRuleset()
 	if err != nil {
 		return nil, err
@@ -87,7 +90,7 @@ func (s *RuleService) Publish() (*Ruleset, error) {
 	if err != nil {
 		return nil, err
 	}
-	pipe := s.rdb.TxPipeline()
+	pipe := rdb.TxPipeline()
 	pipe.Set(s.ctx, s.cfg.Rule.RulesetKey, string(body), 0)
 	pipe.Incr(s.ctx, s.cfg.Rule.VersionKey)
 	if _, err := pipe.Exec(s.ctx); err != nil {

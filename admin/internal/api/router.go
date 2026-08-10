@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
 	"openresty-waf/admin/internal/config"
@@ -16,13 +15,14 @@ import (
 	"openresty-waf/admin/internal/webui"
 )
 
-func NewRouter(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
+func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.Engine {
 	r := gin.Default()
 
 	authHandler := NewAuthHandler(db, cfg)
 	authSvc := service.NewAuthService(db, cfg)
-	ruleHandler := NewRuleHandler(db, rdb, cfg)
-	eventHandler := NewEventHandler(db, rdb, cfg)
+	ruleHandler := NewRuleHandler(db, mgr, cfg)
+	eventHandler := NewEventHandler(db, mgr, cfg)
+	setupHandler := NewSetupHandler(db, mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -32,9 +32,18 @@ func NewRouter(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	{
 		api.POST("/auth/login", authHandler.Login)
 
+		// 引导相关（公开：状态/指引/组件下载）
+		api.GET("/setup/status", setupHandler.Status)
+		api.GET("/setup/guide", setupHandler.Guide)
+		api.GET("/setup/waf.tar.gz", setupHandler.DownloadWAF)
+		api.GET("/setup/install.sh", setupHandler.InstallScript)
+
 		authed := api.Group("", AuthMiddleware(authSvc))
 		{
 			authed.GET("/auth/me", authHandler.Me)
+
+			// 引导配置（登录后）
+			authed.POST("/setup/redis", setupHandler.SaveRedis)
 
 			// 规则管理
 			authed.GET("/rules", ruleHandler.List)

@@ -56,9 +56,13 @@ func main() {
 	db := database.Init(cfg)
 	ensureDefaultAdmin(db)
 	seedRules(db)
-	rdb := service.InitRedis(cfg)
 
-	r := api.NewRouter(cfg, db, rdb)
+	// 动态 Redis 客户端：启动无需 Redis，引导页配置后建立连接
+	mgr := service.NewRedisManager()
+	setupSvc := service.NewSetupService(db, mgr)
+	mgr.LoadFromSetup(setupSvc)
+
+	r := api.NewRouter(cfg, db, mgr)
 	log.Printf("WAF 管理后台启动，监听 %s", cfg.Server.Addr)
 	if err := r.Run(cfg.Server.Addr); err != nil {
 		log.Fatalf("服务启动失败: %v", err)

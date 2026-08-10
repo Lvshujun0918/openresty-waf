@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
 	"openresty-waf/admin/internal/config"
@@ -17,8 +16,8 @@ type RuleHandler struct {
 	svc *service.RuleService
 }
 
-func NewRuleHandler(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *RuleHandler {
-	return &RuleHandler{svc: service.NewRuleService(db, rdb, cfg)}
+func NewRuleHandler(db *gorm.DB, mgr *service.RedisManager, cfg *config.Config) *RuleHandler {
+	return &RuleHandler{svc: service.NewRuleService(db, mgr, cfg)}
 }
 
 // List GET /api/rules?group=&site_id=&keyword=

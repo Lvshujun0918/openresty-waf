@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -16,22 +17,26 @@ import (
 // WAF 侧 log.lua 以 redis 后端将事件 LPUSH 到队列，后台消费写入 DB。
 type EventService struct {
 	db  *gorm.DB
-	rdb *redis.Client
+	mgr *RedisManager
 	cfg *config.Config
 	ctx context.Context
 }
 
-func NewEventService(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *EventService {
-	return &EventService{db: db, rdb: rdb, cfg: cfg, ctx: context.Background()}
+func NewEventService(db *gorm.DB, mgr *RedisManager, cfg *config.Config) *EventService {
+	return &EventService{db: db, mgr: mgr, cfg: cfg, ctx: context.Background()}
 }
 
 // Consume 从 Redis 队列消费事件并写入 DB，返回本次消费条数。
 // 使用 RPop 逐条消费，坏数据跳过，单个失败不中断。
 func (s *EventService) Consume(limit int) (int, error) {
+	rdb := s.mgr.GetClient()
+	if rdb == nil {
+		return 0, errors.New("Redis 未配置，请先在引导页完成 Redis 配置")
+	}
 	key := s.cfg.Rule.EventKey
 	count := 0
 	for i := 0; i < limit; i++ {
-		raw, err := s.rdb.RPop(s.ctx, key).Result()
+		raw, err := rdb.RPop(s.ctx, key).Result()
 		if err == redis.Nil {
 			break // 队列已空
 		}

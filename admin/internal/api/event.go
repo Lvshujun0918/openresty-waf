@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
 	"openresty-waf/admin/internal/config"
@@ -16,8 +15,8 @@ type EventHandler struct {
 	svc *service.EventService
 }
 
-func NewEventHandler(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *EventHandler {
-	return &EventHandler{svc: service.NewEventService(db, rdb, cfg)}
+func NewEventHandler(db *gorm.DB, mgr *service.RedisManager, cfg *config.Config) *EventHandler {
+	return &EventHandler{svc: service.NewEventService(db, mgr, cfg)}
 }
 
 // List GET /api/events?page=&page_size=&group=&client_ip=&rule_id=
