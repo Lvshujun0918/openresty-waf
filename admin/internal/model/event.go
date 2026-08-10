@@ -12,7 +12,7 @@ type Event struct {
 	URI       string    `gorm:"type:text" json:"uri"`
 	RuleID    string    `gorm:"size:32;index" json:"rule_id"`
 	Group     string    `gorm:"size:32;index" json:"group"`
-	Message   string    `gorm:"size:255" json:"message"`
+	Message   string    `gorm:"size:255" json:"msg"` // 与 WAF 日志字段 msg 一致
 	Severity  int       `json:"severity"`
 	Status    int       `json:"status"`
 	CreatedAt time.Time `json:"created_at"`

@@ -16,6 +16,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 	authHandler := NewAuthHandler(db, cfg)
 	authSvc := service.NewAuthService(db, cfg)
 	ruleHandler := NewRuleHandler(db, rdb, cfg)
+	eventHandler := NewEventHandler(db, rdb, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -36,6 +37,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, rdb *redis.Client) *gin.Engine {
 			authed.DELETE("/rules/:id", ruleHandler.Delete)
 			authed.PATCH("/rules/:id/enabled", ruleHandler.SetEnabled)
 			authed.POST("/rules/publish", ruleHandler.Publish)
+
+			// 攻击事件
+			authed.GET("/events", eventHandler.List)
+			authed.POST("/events/consume", eventHandler.Consume)
 		}
 	}
 

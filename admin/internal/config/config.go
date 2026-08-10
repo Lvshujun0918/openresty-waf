@@ -38,6 +38,7 @@ type JWT struct {
 type Rule struct {
 	VersionKey string // 版本号键，自增触发 Lua 引擎热更新
 	RulesetKey string // 完整规则集 JSON 键
+	EventKey   string // 攻击事件队列键（WAF log.lua redis 后端 LPUSH）
 }
 
 func Load() *Config {
@@ -59,6 +60,7 @@ func Load() *Config {
 		Rule: Rule{
 			VersionKey: getEnv("WAF_RULE_VERSION_KEY", "waf:rule:version"),
 			RulesetKey: getEnv("WAF_RULE_RULESET_KEY", "waf:rule:ruleset"),
+			EventKey:   getEnv("WAF_EVENT_KEY", "waf:event:list"),
 		},
 	}
 }
