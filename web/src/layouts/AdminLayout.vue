@@ -7,16 +7,36 @@ import { cn } from '@/lib/utils'
 
 const auth = useAuthStore()
 
-const navItems = [
-  { to: '/dashboard', label: '仪表盘', icon: Gauge },
-  { to: '/rules', label: '规则管理', icon: ShieldCheck },
-  { to: '/events', label: '攻击事件', icon: ScrollText },
-  { to: '/traffic', label: '流量日志', icon: Activity },
-  { to: '/cc', label: 'CC 防刷', icon: ShieldAlert },
-  { to: '/challenge', label: '人机验证', icon: Fingerprint },
-  { to: '/ip-lists', label: '黑白名单', icon: Ban },
-  { to: '/config', label: '系统配置', icon: Settings },
-  { to: '/guide', label: '接入指引', icon: Plug },
+const navGroups = [
+  {
+    label: '总览',
+    items: [
+      { to: '/dashboard', label: '仪表盘', icon: Gauge },
+    ],
+  },
+  {
+    label: '防护策略',
+    items: [
+      { to: '/rules', label: '规则管理', icon: ShieldCheck },
+      { to: '/cc', label: 'CC 防刷', icon: ShieldAlert },
+      { to: '/challenge', label: '人机验证', icon: Fingerprint },
+      { to: '/ip-lists', label: '黑白名单', icon: Ban },
+    ],
+  },
+  {
+    label: '日志分析',
+    items: [
+      { to: '/events', label: '攻击事件', icon: ScrollText },
+      { to: '/traffic', label: '流量日志', icon: Activity },
+    ],
+  },
+  {
+    label: '系统',
+    items: [
+      { to: '/config', label: '系统配置', icon: Settings },
+      { to: '/guide', label: '接入指引', icon: Plug },
+    ],
+  },
 ]
 </script>
 
@@ -36,25 +56,32 @@ const navItems = [
       </div>
 
       <!-- 导航 -->
-      <nav class="flex-1 p-3 space-y-1">
-        <RouterLink v-for="item in navItems" :key="item.to" :to="item.to" v-slot="{ isActive }">
-          <div
-            :class="cn(
-              'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
-              isActive
-                ? 'bg-sidebar-muted text-white font-medium'
-                : 'text-sidebar-foreground/80 hover:bg-sidebar-muted/60 hover:text-sidebar-foreground',
-            )"
-          >
-            <!-- 激活指示条 -->
-            <span
-              v-if="isActive"
-              class="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-gradient-to-b from-brand-400 to-brand-500"
-            />
-            <component :is="item.icon" class="h-4 w-4" />
-            {{ item.label }}
+      <nav class="flex-1 p-3 space-y-4 overflow-y-auto">
+        <div v-for="group in navGroups" :key="group.label">
+          <div class="px-3 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/45">
+            {{ group.label }}
           </div>
-        </RouterLink>
+          <div class="space-y-1">
+            <RouterLink v-for="item in group.items" :key="item.to" :to="item.to" v-slot="{ isActive }">
+              <div
+                :class="cn(
+                  'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
+                  isActive
+                    ? 'bg-sidebar-muted text-white font-medium'
+                    : 'text-sidebar-foreground/80 hover:bg-sidebar-muted/60 hover:text-sidebar-foreground',
+                )"
+              >
+                <!-- 激活指示条 -->
+                <span
+                  v-if="isActive"
+                  class="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-gradient-to-b from-brand-400 to-brand-500"
+                />
+                <component :is="item.icon" class="h-4 w-4" />
+                {{ item.label }}
+              </div>
+            </RouterLink>
+          </div>
+        </div>
       </nav>
 
       <!-- 用户区 -->
