@@ -46,6 +46,22 @@ function _M.check(waf_ctx, cfg)
     return "challenge"
 end
 
+-- 手动触发路径匹配：uri 命中 trigger_paths 任一前缀（或完全相等）返回 true
+function _M.is_triggered(uri, paths)
+    if not paths or #paths == 0 then return false end
+    uri = uri or ""
+    for _, p in ipairs(paths) do
+        p = tostring(p)
+        if p ~= "" and uri == p then
+            return true
+        end
+        if p ~= "" and uri:sub(1, #p) == p then
+            return true
+        end
+    end
+    return false
+end
+
 -- 签发验证 cookie
 local function set_pass_cookie(cfg, ip)
     local ts = os.time()

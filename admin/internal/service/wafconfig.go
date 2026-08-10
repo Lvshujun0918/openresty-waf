@@ -123,6 +123,7 @@ h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
 			"enabled": true, "mode": "basic", "cookie_name": "waf_pass",
 			"cookie_secret": "openresty-waf-change-me", "cookie_ttl": 300,
 			"page_path": "/__waf_challenge__", "verify_path": "/__waf_challenge_verify__",
+			"trigger_paths": []string{},
 			"captcha": map[string]interface{}{
 				"id": "", "key": "",
 				"verify_api": "https://gcaptcha4.geetest.com/validate",

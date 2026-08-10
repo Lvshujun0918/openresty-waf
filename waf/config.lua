@@ -99,6 +99,8 @@ _M.challenge = {
     cookie_ttl    = 300,       -- 通过验证后的放行时长（秒）
     page_path     = "/__waf_challenge__",
     verify_path   = "/__waf_challenge_verify__",
+    -- 手动触发路径前缀（每项按前缀匹配）：命中且未通过验证时直接进入验证页，不受 CC 限制
+    trigger_paths = {},
     -- 高级验证码（geetest / gitee）配置
     captcha = {
         id         = "",       -- captcha_id

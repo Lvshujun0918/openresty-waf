@@ -101,7 +101,24 @@ if ruleset then
     end
 end
 
--- 3. CC 防刷
+-- 3. 人机验证手动触发路径：命中且未通过验证时直接进入验证页（不受 CC 限制）
+if cfg.challenge and cfg.challenge.enabled
+   and cfg.challenge.trigger_paths and #cfg.challenge.trigger_paths > 0 then
+    local ch = require "detectors.challenge"
+    if ch.is_triggered(ngx.var.uri or "", cfg.challenge.trigger_paths) then
+        if not ch.check(ctx, cfg) then
+            return  -- 已通过验证，放行
+        end
+        if ctx.mode == "active" then
+            ngx.redirect(cfg.challenge.page_path, ngx.HTTP_TEMPORARY_REDIRECT)
+            return
+        end
+        -- detect 模式：仅记录，放行
+        return
+    end
+end
+
+-- 4. CC 防刷
 if cfg.modules and cfg.modules.cc_check then
     local cc = require "detectors.cc"
     if cc.check(ctx, cfg) == "banned" then

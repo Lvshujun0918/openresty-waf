@@ -20,6 +20,7 @@ const loading = ref(true)
 const saving = ref(false)
 const msg = ref('')
 const error = ref('')
+const triggerPathsText = ref('')
 
 async function load() {
   loading.value = true
@@ -29,6 +30,8 @@ async function load() {
     Object.assign(cfg, d.config || {})
     cfg.challenge = cfg.challenge || {}
     cfg.challenge.captcha = cfg.challenge.captcha || {}
+    cfg.challenge.trigger_paths = cfg.challenge.trigger_paths || []
+    triggerPathsText.value = (cfg.challenge.trigger_paths as string[]).join('\n')
   } catch (e: any) {
     error.value = e.message || '配置加载失败'
   } finally {
@@ -41,6 +44,10 @@ async function save() {
   msg.value = ''
   error.value = ''
   try {
+    cfg.challenge.trigger_paths = triggerPathsText.value
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
     await api.put('/config', { config: cfg })
     msg.value = '已保存并下发，引擎将在数秒内热更新生效'
   } catch (e: any) {
@@ -100,6 +107,18 @@ onMounted(load)
           <div class="space-y-1.5">
             <Label>签名密钥（生产环境务必修改）</Label>
             <Input v-model="cfg.challenge.cookie_secret" />
+          </div>
+          <div class="space-y-1.5">
+            <Label>手动触发路径（每行一个前缀）</Label>
+            <textarea
+              v-model="triggerPathsText"
+              rows="4"
+              placeholder="/admin/&#10;/api/login"
+              class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            ></textarea>
+            <p class="text-xs text-muted-foreground">
+              命中这些路径前缀时，无论是否 CC 超限都会要求人机验证，通过后放行；留空则仅 CC 超限时触发
+            </p>
           </div>
         </CardContent>
       </Card>
