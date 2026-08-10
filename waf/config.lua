@@ -160,6 +160,13 @@ _M.upload = {
                   "application/x-msdownload" },
 }
 
+-- 全量流量记录（后台配置中心可开关；开启后每个请求上报一条，含命中标记）
+_M.traffic_log = {
+    enabled       = false,
+    retention_days = 7,           -- 后台按此天数自动清理过期记录
+    redis_key     = "waf:traffic:list",
+}
+
 -- 本地覆盖配置：部署时由安装脚本生成 config_local.lua（含 Redis 连接信息），
 -- 深合并覆盖上述默认值，避免直接改动本文件。
 -- 注意：模块名用下划线（config_local），点号会被 require 解析为路径分隔。

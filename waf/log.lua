@@ -58,11 +58,41 @@ end
 -- ============================================================================
 
 local ctx = ngx.ctx.waf_ctx
+local cfg = require("rule_engine.engine").get_active_config()
+
+-- ===== 全量流量记录（可选）：开启后每个请求上报一条（含是否命中攻击） =====
+local traffic = cfg.traffic_log
+if traffic and traffic.enabled then
+    local rule_ids = {}
+    if ctx and ctx.matched then
+        for _, m in ipairs(ctx.matched) do
+            rule_ids[#rule_ids + 1] = m.id
+        end
+    end
+    local rec = {
+        time          = os.date("!%Y-%m-%dT%H:%M:%SZ"),  -- RFC3339 UTC
+        client_ip     = ctx and ctx.client_ip or "",
+        method        = ctx and ctx.request and ctx.request.method or "",
+        host          = ctx and ctx.request and ctx.request.host or "",
+        uri           = ctx and ctx.request and ctx.request.uri or "",
+        status        = ngx.status,
+        user_agent    = ngx.var.http_user_agent or "",
+        attack        = ctx and ctx.matched and #ctx.matched > 0,
+        rule_ids      = table.concat(rule_ids, ","),
+        response_time = ctx and ((ngx.now() - ctx.start_time) * 1000) or 0,
+    }
+    local key = traffic.redis_key or "waf:traffic:list"
+    local ok, err = ngx.timer.at(0, push_to_redis, key, { cjson.encode(rec) })
+    if not ok then
+        ngx.log(ngx.ERR, "[waf] 调度流量记录上报失败: ", tostring(err))
+    end
+end
+
+-- ===== 攻击事件 =====
 if not ctx or not ctx.matched or #ctx.matched == 0 then
     return
 end
 
-local cfg = require("rule_engine.engine").get_active_config()
 if not (cfg.log and cfg.log.enabled) then
     return
 end

@@ -25,8 +25,10 @@ t.test("默认配置字段完整", function()
     t.eq(config.log.backend, "file")
     t.eq(config.log.redis_key, "waf:event:list")
     t.eq(config.whitelist.ips[1], "127.0.0.1")
-    t.ok(config.upload.deny_ext[1] == "php")
-end)
+    t.ok(config.upload.deny_ext[1] == "php")    -- 全量流量记录默认
+    t.no(config.traffic_log.enabled)
+    t.eq(config.traffic_log.retention_days, 7)
+    t.eq(config.traffic_log.redis_key, "waf:traffic:list")end)
 
 t.test("config_local 深合并：覆盖字段且保留其余", function()
     -- 通过 package.preload 模拟部署时生成的 config_local.lua
