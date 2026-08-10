@@ -37,10 +37,25 @@ func ensureDefaultAdmin(db *gorm.DB) {
 	log.Printf("已创建默认管理员 admin（初始密码: %s，请尽快修改）", password)
 }
 
+// seedRules 首次启动时导入内置规则种子（出厂基线防护）
+func seedRules(db *gorm.DB) {
+	var count int64
+	db.Model(&model.Rule{}).Count(&count)
+	if count > 0 {
+		return
+	}
+	if err := db.Create(&model.SeedRules).Error; err != nil {
+		log.Printf("导入内置规则种子失败: %v", err)
+		return
+	}
+	log.Printf("已导入 %d 条内置规则种子", len(model.SeedRules))
+}
+
 func main() {
 	cfg := config.Load()
 	db := database.Init(cfg)
 	ensureDefaultAdmin(db)
+	seedRules(db)
 	rdb := service.InitRedis(cfg)
 
 	r := api.NewRouter(cfg, db, rdb)
