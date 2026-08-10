@@ -97,15 +97,18 @@ func (h *SetupHandler) DownloadWAF(c *gin.Context) {
 		}
 		rel, _ := filepath.Rel(dir, path)
 		rel = filepath.ToSlash(rel)
-		if strings.Contains(rel, ".git/") {
+		// 跳过 .git 与测试目录（t/ 仅本地单测用，不随组件分发）
+		if strings.Contains(rel, ".git/") || rel == "t" || strings.HasPrefix(rel, "t/") {
 			return nil
 		}
 		data, rerr := os.ReadFile(path)
 		if rerr != nil {
 			return nil
 		}
+		// tar 内路径不加前缀目录：解压到安装目录（如 /opt/waf）后直接平铺，
+		// 使 init.lua 位于 /opt/waf/init.lua，与 nginx 配置引用一致。
 		hdr := &tar.Header{
-			Name: "waf/" + rel,
+			Name: rel,
 			Mode: int64(info.Mode().Perm()),
 			Size: int64(len(data)),
 		}
@@ -158,6 +161,17 @@ echo "[1/4] 下载 WAF 组件..."
 mkdir -p "$INSTALL_DIR"
 if ! curl -fsSL "$ADMIN_URL/api/setup/waf.tar.gz" | tar xz -C "$INSTALL_DIR"; then
   echo "下载失败，请确认管理后台地址可访问: $ADMIN_URL"
+  exit 1
+fi
+
+# 兼容旧版包结构：若解压后多了一层 waf/ 子目录则上移到安装目录
+if [ -f "$INSTALL_DIR/waf/init.lua" ] && [ ! -f "$INSTALL_DIR/init.lua" ]; then
+  echo "  检测到旧版包结构，整理目录..."
+  mv "$INSTALL_DIR/waf"/* "$INSTALL_DIR/"
+  rm -rf "$INSTALL_DIR/waf"
+fi
+if [ ! -f "$INSTALL_DIR/init.lua" ]; then
+  echo "组件解压异常：$INSTALL_DIR 下未找到 init.lua"
   exit 1
 fi
 

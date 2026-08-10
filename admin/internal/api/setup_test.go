@@ -1,11 +1,21 @@
 package api
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+
+	"openresty-waf/admin/internal/config"
+	"openresty-waf/admin/internal/service"
 )
 
 // TestSetup_Status 初始引导状态
@@ -125,5 +135,87 @@ func TestSetup_Downloads(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "waf.tar.gz") {
 		t.Error("install script missing download")
+	}
+}
+
+// TestSetup_DownloadWAFContent 打包内容：tar 内平铺（无 waf/ 前缀目录），
+// 排除测试目录 t/ 与 .git
+func TestSetup_DownloadWAFContent(t *testing.T) {
+	dir := t.TempDir()
+	write := func(p, content string) {
+		p = filepath.Join(dir, p)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("init.lua", "-- init")
+	write("rule_engine/engine.lua", "-- engine")
+	write("t/run.lua", "-- test")         // 应被排除
+	write(".git/config", "x")             // 应被排除
+	write("detectors/cc.lua", "-- cc")
+
+	cfg := config.Load()
+	cfg.WAF.DistDir = dir
+	db := newTestDB(t)
+	h := NewSetupHandler(db, service.NewRedisManager(), cfg)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/api/setup/waf.tar.gz", h.DownloadWAF)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/setup/waf.tar.gz", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("download: %d", w.Code)
+	}
+
+	gz, err := gzip.NewReader(w.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := tar.NewReader(gz)
+	var names []string
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		names = append(names, hdr.Name)
+	}
+
+	has := func(name string) bool {
+		for _, n := range names {
+			if n == name {
+				return true
+			}
+		}
+		return false
+	}
+
+	// 平铺结构：根目录直接含 init.lua 等，无 waf/ 前缀
+	if !has("init.lua") {
+		t.Errorf("missing init.lua, names=%v", names)
+	}
+	if !has("rule_engine/engine.lua") {
+		t.Errorf("missing rule_engine/engine.lua, names=%v", names)
+	}
+	if !has("detectors/cc.lua") {
+		t.Errorf("missing detectors/cc.lua, names=%v", names)
+	}
+	// 不应存在带 waf/ 前缀、t/ 或 .git 的条目
+	if has("waf/init.lua") {
+		t.Errorf("unexpected waf/ prefix, names=%v", names)
+	}
+	if has("t/run.lua") || has("t") {
+		t.Errorf("test dir should be excluded, names=%v", names)
+	}
+	if has(".git/config") {
+		t.Errorf(".git should be excluded, names=%v", names)
 	}
 }
