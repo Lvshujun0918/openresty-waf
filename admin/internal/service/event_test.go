@@ -45,35 +45,45 @@ func TestEventService_Consume(t *testing.T) {
 }
 
 func TestEventService_List(t *testing.T) {
+	// 空列表
 	db := newTestDB(t)
 	s := NewEventService(db, nil, newTestConfig())
 
-	db.Create(&model.Event{ClientIP: "1.2.3.4", Group: "sqli", RuleID: "1", Message: "m1"})
-	db.Create(&model.Event{ClientIP: "5.6.7.8", Group: "xss", RuleID: "2", Message: "m2"})
-	db.Create(&model.Event{ClientIP: "1.2.3.4", Group: "sqli", RuleID: "1", Message: "m3"})
+	db.Create(&model.Event{ClientIP: "1.2.3.4", Group: "sqli", RuleID: "1", Host: "a.example.com", Message: "m1"})
+	db.Create(&model.Event{ClientIP: "5.6.7.8", Group: "xss", RuleID: "2", Host: "b.example.com", Message: "m2"})
+	db.Create(&model.Event{ClientIP: "1.2.3.4", Group: "sqli", RuleID: "1", Host: "a.example.com", Message: "m3"})
 
-	evs, total, err := s.List("", "", "", 1, 10)
+	evs, total, err := s.List("", "", "", "", 1, 10)
 	if err != nil || total != 3 || len(evs) != 3 {
 		t.Fatalf("list all: total=%d len=%d err=%v", total, len(evs), err)
 	}
 
-	evs, total, _ = s.List("sqli", "", "", 1, 10)
+	evs, total, _ = s.List("sqli", "", "", "", 1, 10)
 	if total != 2 {
 		t.Fatalf("group filter total = %d", total)
 	}
 
-	evs, total, _ = s.List("", "5.6.7.8", "", 1, 10)
+	evs, total, _ = s.List("", "5.6.7.8", "", "", 1, 10)
 	if total != 1 || evs[0].Group != "xss" {
 		t.Fatalf("ip filter total = %d", total)
 	}
 
-	evs, total, _ = s.List("", "", "1", 1, 10)
+	evs, total, _ = s.List("", "", "1", "", 1, 10)
 	if total != 2 {
 		t.Fatalf("rule filter total = %d", total)
 	}
 
+	evs, total, _ = s.List("", "", "", "a.example.com", 1, 10)
+	if total != 2 {
+		t.Fatalf("host filter total = %d", total)
+	}
+	evs, total, _ = s.List("", "", "", "b.example.com", 1, 10)
+	if total != 1 || evs[0].Group != "xss" {
+		t.Fatalf("host filter b total = %d", total)
+	}
+
 	// 分页
-	evs, total, _ = s.List("", "", "", 1, 2)
+	evs, total, _ = s.List("", "", "", "", 1, 2)
 	if len(evs) != 2 {
 		t.Fatalf("page size 2 got %d", len(evs))
 	}

@@ -30,7 +30,7 @@ func (h *EventHandler) List(c *gin.Context) {
 		pageSize = 20
 	}
 	events, total, err := h.svc.List(
-		c.Query("group"), c.Query("client_ip"), c.Query("rule_id"), page, pageSize)
+		c.Query("group"), c.Query("client_ip"), c.Query("rule_id"), c.Query("host"), page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

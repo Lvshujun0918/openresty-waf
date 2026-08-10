@@ -58,8 +58,8 @@ func (s *EventService) Consume(limit int) (int, error) {
 	return count, nil
 }
 
-// List 分页查询攻击事件，支持 group / client_ip / rule_id 过滤
-func (s *EventService) List(group, clientIP, ruleID string, page, pageSize int) ([]model.Event, int64, error) {
+// List 分页查询攻击事件，支持 group / client_ip / rule_id / host 过滤
+func (s *EventService) List(group, clientIP, ruleID, host string, page, pageSize int) ([]model.Event, int64, error) {
 	q := s.db.Model(&model.Event{})
 	if group != "" {
 		q = q.Where("`group` = ?", group)
@@ -69,6 +69,9 @@ func (s *EventService) List(group, clientIP, ruleID string, page, pageSize int) 
 	}
 	if ruleID != "" {
 		q = q.Where("rule_id = ?", ruleID)
+	}
+	if host != "" {
+		q = q.Where("host LIKE ?", "%"+host+"%")
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
