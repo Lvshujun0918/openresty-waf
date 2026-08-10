@@ -66,15 +66,24 @@ func (h *SetupHandler) Guide(c *gin.Context) {
 	if adminURL == "" {
 		adminURL = "http://" + c.Request.Host
 	}
+	// 选项式参数：-a 地址 -d 库号，无密码时不传 -p，避免"无密码直接填库号"被误判为密码
 	installCmd := fmt.Sprintf(
-		"curl -fsSL %s/api/setup/install.sh | bash -s -- %s %s %s %d",
-		adminURL, adminURL, redisCfg.Addr, redisCfg.Password, redisCfg.DB)
+		"curl -fsSL %s/api/setup/install.sh | bash -s -- %s -a %s -d %d",
+		adminURL, adminURL, redisCfg.Addr, redisCfg.DB)
+	if redisCfg.Password != "" {
+		installCmd += " -p " + shQuote(redisCfg.Password)
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"redis":           redisCfg,
 		"install_command": installCmd,
 		"download_url":    adminURL + "/api/setup/waf.tar.gz",
 		"nginx_config":    nginxSnippet,
 	})
+}
+
+// shQuote 单引号包裹并转义，保证密码含特殊字符时在 bash 中安全传递
+func shQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // DownloadWAF GET /api/setup/waf.tar.gz 打包 WAF Lua 组件
@@ -146,19 +155,54 @@ init_worker_by_lua_file /opt/waf/init.lua;
 //     （如需同步覆盖 Redis 配置，执行 FORCE=1 bash install.sh ...）
 const installScript = `#!/bin/bash
 # OpenResty WAF 一键接入 / 更新脚本（管理后台引导页生成）
-# 用法: bash install.sh <管理后台地址> [Redis地址] [Redis密码] [RedisDB] [安装目录]
+# 用法（推荐，无歧义）:
+#   bash install.sh <管理后台地址> -a <Redis地址> [-p <Redis密码>] [-d <库号>] [-i <安装目录>]
+# 兼容旧式（需提供完整参数，避免密码/库号错位）:
+#   bash install.sh <管理后台地址> <Redis地址> <Redis密码> <RedisDB> [安装目录]
 # 更新组件时默认保留已有 config_local.lua；需重新生成 Redis 配置请加 FORCE=1
 set -euo pipefail
 
 ADMIN_URL="${1:-}"
-REDIS_ADDR="${2:-127.0.0.1:6379}"
-REDIS_PASSWORD="${3:-}"
-REDIS_DB="${4:-0}"
-INSTALL_DIR="${5:-/opt/waf}"
+shift || true
+
+# ---- 参数解析：优先选项式；兼容完整的位置式 ----
+REDIS_ADDR="127.0.0.1:6379"
+REDIS_PASSWORD=""
+REDIS_DB="0"
+INSTALL_DIR="/opt/waf"
+
+if [ "$#" -ge 1 ] && [ "${1#-}" = "$1" ]; then
+  # 位置式兼容（旧命令）：需提供完整的 <地址> <密码> <库号>，
+  # 少于 3 个值时无法区分「密码」和「数据库编号」，明确报错避免错位
+  case "$#" in
+    1|2)
+      echo "错误：位置式参数需完整提供 <Redis地址> <密码> <库号>，仅 $# 个无法区分，请改用选项式：" >&2
+      echo "  bash install.sh <管理后台地址> -a <Redis地址> [-p <密码>] [-d <库号>]" >&2
+      exit 1
+      ;;
+    *)
+      REDIS_ADDR="$1"
+      REDIS_PASSWORD="$2"
+      REDIS_DB="${3:-0}"
+      INSTALL_DIR="${4:-/opt/waf}"
+      ;;
+  esac
+else
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -a|--addr) REDIS_ADDR="${2:-}"; shift 2 ;;
+      -p|--password) REDIS_PASSWORD="${2:-}"; shift 2 ;;
+      -d|--db) REDIS_DB="${2:-0}"; shift 2 ;;
+      -i|--install-dir) INSTALL_DIR="${2:-/opt/waf}"; shift 2 ;;
+      *) echo "忽略未知选项: $1" >&2; shift ;;
+    esac
+  done
+fi
 
 if [ -z "$ADMIN_URL" ]; then
-  echo "用法: bash install.sh <管理后台地址> [Redis地址] [Redis密码] [RedisDB] [安装目录]"
-  echo "示例: bash install.sh http://192.168.1.10:18081 192.168.1.20:6379 '' 0 /opt/waf"
+  echo "用法: bash install.sh <管理后台地址> -a <Redis地址> [-p <密码>] [-d <库号>] [-i <安装目录>]"
+  echo "示例: bash install.sh http://192.168.1.10:18081 -a 192.168.1.20:6379 -d 8"
+  echo "兼容: bash install.sh <地址> <Redis地址> <密码> <库号> [安装目录]"
   exit 1
 fi
 

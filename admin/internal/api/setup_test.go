@@ -89,8 +89,14 @@ func TestSetup_SaveRedisAndGuide(t *testing.T) {
 	if g.Redis["addr"] != mr.Addr() {
 		t.Errorf("guide redis addr = %v", g.Redis["addr"])
 	}
-	if !strings.Contains(g.InstallCommand, mr.Addr()) {
-		t.Errorf("install command missing addr: %s", g.InstallCommand)
+	if !strings.Contains(g.InstallCommand, "-a "+mr.Addr()) {
+		t.Errorf("install command missing -a addr: %s", g.InstallCommand)
+	}
+	if !strings.Contains(g.InstallCommand, "-d 0") {
+		t.Errorf("install command missing -d db: %s", g.InstallCommand)
+	}
+	if strings.Contains(g.InstallCommand, "-p ") {
+		t.Errorf("install command should not include -p when no password: %s", g.InstallCommand)
 	}
 	if !strings.Contains(g.DownloadURL, "/api/setup/waf.tar.gz") {
 		t.Errorf("download url = %s", g.DownloadURL)
@@ -146,6 +152,31 @@ func TestSetup_Downloads(t *testing.T) {
 	}
 	if !strings.Contains(body, "nginx -s reload") {
 		t.Error("install script missing reload hint")
+	}
+	// 选项式参数解析：-a / -p / -d，并对歧义位置式报错
+	if !strings.Contains(body, "-a|--addr)") {
+		t.Error("install script missing -a option parsing")
+	}
+	if !strings.Contains(body, "-d|--db)") {
+		t.Error("install script missing -d option parsing")
+	}
+	if !strings.Contains(body, "无法区分") {
+		t.Error("install script missing ambiguous-arg error hint")
+	}
+}
+
+// TestShQuote 密码 shell 转义
+func TestShQuote(t *testing.T) {
+	cases := map[string]string{
+		"abc":   "'abc'",
+		"a b":   "'a b'",
+		"it's":  `'it'\''s'`,
+		"p@ss$": `'p@ss$'`,
+	}
+	for in, want := range cases {
+		if got := shQuote(in); got != want {
+			t.Errorf("shQuote(%q) = %s, want %s", in, got, want)
+		}
 	}
 }
 
