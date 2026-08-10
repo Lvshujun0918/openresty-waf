@@ -17,9 +17,17 @@ local function ipv4_to_int(ip)
 end
 
 local operators = {
-    -- 正则匹配（PCRE JIT，忽略大小写）
-    REGEX = function(value, pattern)
+    -- 正则匹配（优先使用预编译对象 compiled，避免每请求重复 PCRE 编译）
+    REGEX = function(value, pattern, compiled)
         if value == nil then return false end
+        if compiled then
+            local from, _, err = compiled:find(tostring(value))
+            if err then
+                ngx.log(ngx.WARN, "[waf] 正则执行错误: ", err, " pattern=", pattern)
+                return false
+            end
+            return from ~= nil
+        end
         local from, _, err = re_find(tostring(value), pattern, "joi")
         if err then
             ngx.log(ngx.WARN, "[waf] 正则编译/执行错误: ", err, " pattern=", pattern)
@@ -88,13 +96,13 @@ local operators = {
     end,
 }
 
--- 求值：name 为运算符名
-function _M.eval(name, value, pattern)
+-- 求值：name 为运算符名；compiled 为 REGEX 预编译对象（可选）
+function _M.eval(name, value, pattern, compiled)
     local fn = operators[name]
     if not fn then
         return false
     end
-    return fn(value, pattern)
+    return fn(value, pattern, compiled)
 end
 
 function _M.is_valid(name)

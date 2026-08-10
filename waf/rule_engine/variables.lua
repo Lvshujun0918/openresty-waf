@@ -37,8 +37,8 @@ local function push_specific(args, specific, out)
     end
 end
 
--- 提取变量，返回字符串数组
-function _M.collect(var)
+-- 实际提取逻辑（无缓存）
+local function collect_raw(var)
     local typ = var.type
     local specific = var.specific
     local parse = var.parse or {}
@@ -110,6 +110,30 @@ function _M.collect(var)
         push(out, ngx.req.get_body_data())
     end
 
+    return out
+end
+
+-- 提取变量（带请求级缓存）：同一请求内相同变量只解析一次，
+-- 显著降低多规则对 URI_ARGS / HEADERS / BODY 的重复提取开销。
+function _M.collect(var, ctx)
+    local key = tostring(var.type) .. "|" .. tostring(var.specific or "") .. "|" ..
+                tostring((var.parse or {})[1] or "values")
+
+    if ctx then
+        if ctx.var_cache then
+            local cached = ctx.var_cache[key]
+            if cached then
+                return cached
+            end
+        end
+        ctx.var_cache = ctx.var_cache or {}
+    end
+
+    local out = collect_raw(var)
+
+    if ctx then
+        ctx.var_cache[key] = out
+    end
     return out
 end
 

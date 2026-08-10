@@ -16,9 +16,12 @@ local transforms = require "rule_engine.transforms"
 local actions    = require "rule_engine.actions"
 
 -- 单条规则是否命中
-local function match_rule(rule)
+-- 说明：OpenResty 新版已移除 ngx.re.compile，正则走 ngx.re.find("joi")，
+-- 依赖 PCRE JIT 与 compile-once 缓存；此处优化点为请求级变量提取缓存
+-- （variables.collect 带 ctx），避免多规则重复解析 URI_ARGS/HEADERS/BODY。
+local function match_rule(rule, waf_ctx)
     for _, var in ipairs(rule.vars or {}) do
-        local values = variables.collect(var)
+        local values = variables.collect(var, waf_ctx)
         for _, value in ipairs(values) do
             local transformed = transforms.apply(value, rule.transforms)
             if operators.eval(rule.operator, transformed, rule.pattern) then
@@ -35,6 +38,7 @@ function _M.run(ruleset, phase, waf_ctx)
     waf_ctx = waf_ctx or {}
     waf_ctx.score = waf_ctx.score or 0
     waf_ctx.matched = waf_ctx.matched or {}
+    waf_ctx.var_cache = waf_ctx.var_cache or {}
 
     local rules = ruleset.rules or {}
     local i, n = 1, #rules
@@ -43,7 +47,7 @@ function _M.run(ruleset, phase, waf_ctx)
         local rule = rules[i]
 
         if rule.enabled and (not rule.phase or rule.phase == phase) then
-            if match_rule(rule) then
+            if match_rule(rule, waf_ctx) then
                 -- 记录命中（日志由 log 阶段统一落盘）
                 waf_ctx.matched[#waf_ctx.matched + 1] = {
                     id       = rule.id,
