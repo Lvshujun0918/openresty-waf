@@ -46,7 +46,14 @@ async function consume() {
   setTimeout(() => (message.value = ''), 3000)
 }
 
-onMounted(load)
+// 进入事件页自动消费一次 Redis 队列，再加载列表（后端同时有定时消费兜底）
+onMounted(async () => {
+  try {
+    await consume()
+  } catch {
+    await load()
+  }
+})
 </script>
 
 <template>
