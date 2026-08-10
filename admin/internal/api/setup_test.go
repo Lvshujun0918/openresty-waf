@@ -130,11 +130,22 @@ func TestSetup_Downloads(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("install.sh: %d", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "#!/bin/bash") {
+	body := w.Body.String()
+	if !strings.Contains(body, "#!/bin/bash") {
 		t.Error("install script missing shebang")
 	}
-	if !strings.Contains(w.Body.String(), "waf.tar.gz") {
+	if !strings.Contains(body, "waf.tar.gz") {
 		t.Error("install script missing download")
+	}
+	// 更新场景：保留已有 config_local.lua + FORCE=1 重新生成 + 提示 reload
+	if !strings.Contains(body, "config_local.lua") {
+		t.Error("install script missing config_local handling")
+	}
+	if !strings.Contains(body, "FORCE=1") {
+		t.Error("install script missing FORCE=1 regen option")
+	}
+	if !strings.Contains(body, "nginx -s reload") {
+		t.Error("install script missing reload hint")
 	}
 }
 
