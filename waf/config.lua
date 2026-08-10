@@ -154,4 +154,22 @@ _M.upload = {
                   "application/x-msdownload" },
 }
 
+-- 本地覆盖配置：部署时由安装脚本生成 config_local.lua（含 Redis 连接信息），
+-- 深合并覆盖上述默认值，避免直接改动本文件。
+-- 注意：模块名用下划线（config_local），点号会被 require 解析为路径分隔。
+local function merge_cfg(t, override)
+    for k, v in pairs(override) do
+        if type(v) == "table" and type(t[k]) == "table" then
+            merge_cfg(t[k], v)
+        else
+            t[k] = v
+        end
+    end
+end
+
+local ok_local, local_cfg = pcall(require, "config_local")
+if ok_local and type(local_cfg) == "table" then
+    merge_cfg(_M, local_cfg)
+end
+
 return _M
