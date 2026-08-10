@@ -1,5 +1,5 @@
 # ---------- 阶段 1：构建前端（web/dist） ----------
-FROM node:20-alpine AS web
+FROM node:24-alpine AS web
 WORKDIR /app
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
