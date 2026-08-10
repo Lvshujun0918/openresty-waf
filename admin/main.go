@@ -12,6 +12,7 @@ import (
 	"openresty-waf/admin/internal/config"
 	"openresty-waf/admin/internal/database"
 	"openresty-waf/admin/internal/model"
+	"openresty-waf/admin/internal/service"
 )
 
 // ensureDefaultAdmin 首次启动时创建默认管理员
@@ -40,8 +41,9 @@ func main() {
 	cfg := config.Load()
 	db := database.Init(cfg)
 	ensureDefaultAdmin(db)
+	rdb := service.InitRedis(cfg)
 
-	r := api.NewRouter(cfg, db)
+	r := api.NewRouter(cfg, db, rdb)
 	log.Printf("WAF 管理后台启动，监听 %s", cfg.Server.Addr)
 	if err := r.Run(cfg.Server.Addr); err != nil {
 		log.Fatalf("服务启动失败: %v", err)

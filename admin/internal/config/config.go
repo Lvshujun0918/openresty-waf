@@ -11,6 +11,7 @@ type Config struct {
 	DB     DB
 	Redis  Redis
 	JWT    JWT
+	Rule   Rule
 }
 
 type Server struct {
@@ -33,6 +34,12 @@ type JWT struct {
 	Expire int // 过期时间（小时）
 }
 
+// Rule Redis 规则下发相关键（与 waf/config.lua 的 rule_refresh 约定保持一致）
+type Rule struct {
+	VersionKey string // 版本号键，自增触发 Lua 引擎热更新
+	RulesetKey string // 完整规则集 JSON 键
+}
+
 func Load() *Config {
 	return &Config{
 		Server: Server{Addr: getEnv("ADMIN_ADDR", ":8081")},
@@ -48,6 +55,10 @@ func Load() *Config {
 		JWT: JWT{
 			Secret: getEnv("ADMIN_JWT_SECRET", "openresty-waf-change-me"),
 			Expire: getEnvInt("ADMIN_JWT_EXPIRE_HOURS", 24),
+		},
+		Rule: Rule{
+			VersionKey: getEnv("WAF_RULE_VERSION_KEY", "waf:rule:version"),
+			RulesetKey: getEnv("WAF_RULE_RULESET_KEY", "waf:rule:ruleset"),
 		},
 	}
 }
