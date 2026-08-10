@@ -102,3 +102,47 @@ func (s *TrafficService) GetStats() (total int64, attack int64, err error) {
 	}
 	return
 }
+
+// TrendPoint 某一天的请求/攻击计数（仪表盘趋势图）
+type TrendPoint struct {
+	Date   string `json:"date"`
+	Total  int64  `json:"total"`
+	Attack int64  `json:"attack"`
+}
+
+// Trend 返回最近 days 天按天聚合的请求/攻击趋势（缺失日期补 0，SQLite）
+func (s *TrafficService) Trend(days int) ([]TrendPoint, error) {
+	if days <= 0 || days > 90 {
+		days = 7
+	}
+	start := time.Now().Add(-time.Duration(days-1) * 24 * time.Hour)
+	type row struct {
+		Date   string
+		Total  int64
+		Attack int64
+	}
+	var rows []row
+	if err := s.db.Raw(`SELECT strftime('%Y-%m-%d', time) AS date,
+		COUNT(*) AS total,
+		COALESCE(SUM(CASE WHEN attack THEN 1 ELSE 0 END), 0) AS attack
+		FROM traffic_logs
+		WHERE time >= ?
+		GROUP BY strftime('%Y-%m-%d', time)
+		ORDER BY date`, start.Format("2006-01-02 15:04:05")).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	byDate := make(map[string]row, len(rows))
+	for _, r := range rows {
+		byDate[r.Date] = r
+	}
+	points := make([]TrendPoint, 0, days)
+	for i := 0; i < days; i++ {
+		d := time.Now().Add(-time.Duration(days-1-i) * 24 * time.Hour).Format("2006-01-02")
+		if r, ok := byDate[d]; ok {
+			points = append(points, TrendPoint{Date: d, Total: r.Total, Attack: r.Attack})
+		} else {
+			points = append(points, TrendPoint{Date: d})
+		}
+	}
+	return points, nil
+}

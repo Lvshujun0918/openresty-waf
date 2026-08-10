@@ -78,6 +78,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.POST("/traffic/consume", trafficHandler.Consume)
 			authed.POST("/traffic/cleanup", trafficHandler.Cleanup)
 			authed.GET("/traffic/stats", trafficHandler.Stats)
+			authed.GET("/traffic/trend", trafficHandler.Trend)
 
 			// 攻击事件
 			authed.GET("/events", eventHandler.List)

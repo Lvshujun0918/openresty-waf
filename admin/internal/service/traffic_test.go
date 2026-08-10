@@ -119,3 +119,35 @@ func TestTrafficService_Stats(t *testing.T) {
 		t.Errorf("stats: total=%d attack=%d err=%v", total, attack, err)
 	}
 }
+
+func TestTrafficService_Trend(t *testing.T) {
+	db := newTestDB(t)
+	s := NewTrafficService(db, NewRedisManager(), newTestConfig())
+	now := time.Now()
+	// 今天：2 请求 1 攻击；昨天：1 请求 0 攻击
+	db.Create(&model.TrafficLog{Time: now, ClientIP: "1.1.1.1", Attack: true})
+	db.Create(&model.TrafficLog{Time: now, ClientIP: "2.2.2.2", Attack: false})
+	db.Create(&model.TrafficLog{Time: now.Add(-24 * time.Hour), ClientIP: "3.3.3.3", Attack: false})
+
+	points, err := s.Trend(7)
+	if err != nil {
+		t.Fatalf("trend: %v", err)
+	}
+	if len(points) != 7 {
+		t.Fatalf("len = %d (expect 7)", len(points))
+	}
+	last := points[len(points)-1]
+	if last.Date != now.Format("2006-01-02") || last.Total != 2 || last.Attack != 1 {
+		t.Errorf("today point = %+v (expect total=2 attack=1)", last)
+	}
+	prev := points[len(points)-2]
+	if prev.Total != 1 || prev.Attack != 0 {
+		t.Errorf("yesterday point = %+v (expect total=1 attack=0)", prev)
+	}
+
+	// 参数保护：非正值回退 7 天
+	points2, err := s.Trend(0)
+	if err != nil || len(points2) != 7 {
+		t.Errorf("trend(0) = %d, err=%v (expect 7)", len(points2), err)
+	}
+}

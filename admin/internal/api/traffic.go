@@ -71,3 +71,14 @@ func (h *TrafficHandler) Stats(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"total": total, "attack": attack})
 }
+
+// Trend GET /api/traffic/trend?days=7 按天聚合趋势
+func (h *TrafficHandler) Trend(c *gin.Context) {
+	days, _ := strconv.Atoi(c.DefaultQuery("days", "7"))
+	points, err := h.svc.Trend(days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"days": days, "items": points})
+}
