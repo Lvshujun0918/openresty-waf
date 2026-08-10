@@ -15,6 +15,7 @@ const router = createRouter({
         { path: 'rules', name: 'rules', component: () => import('@/views/RulesView.vue') },
         { path: 'events', name: 'events', component: () => import('@/views/EventsView.vue') },
         { path: 'config', name: 'config', component: () => import('@/views/ConfigView.vue') },
+        { path: 'guide', name: 'guide', component: () => import('@/views/GuideView.vue') },
       ],
     },
   ],

@@ -2,7 +2,7 @@
 import { RouterLink, RouterView } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
-import { Gauge, LogOut, ScrollText, Settings, ShieldCheck } from 'lucide-vue-next'
+import { Gauge, LogOut, Plug, ScrollText, Settings, ShieldCheck } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 </script>
@@ -39,6 +39,12 @@ const auth = useAuthStore()
           class="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
         >
           <Settings class="h-4 w-4" /> 系统配置
+        </RouterLink>
+        <RouterLink
+          to="/guide"
+          class="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
+        >
+          <Plug class="h-4 w-4" /> 接入指引
         </RouterLink>
       </nav>
       <div class="p-3 border-t flex items-center justify-between">
