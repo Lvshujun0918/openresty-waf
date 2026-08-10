@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { api } from '@/api'
 import type { Rule } from '@/types'
-import { RULE_GROUPS } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,24 +16,90 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
+// ---------- 友好选项 ----------
+const GROUP_OPTIONS = [
+  ['sqli', 'SQL 注入'], ['xss', 'XSS 跨站'], ['rce', '远程执行'], ['lfi', '文件包含'],
+  ['ssrf', 'SSRF'], ['protocol', '协议异常'], ['leak', '信息泄露'], ['scanner', '扫描器'],
+  ['custom', '自定义'],
+] as const
+
+const TARGET_OPTIONS = [
+  ['URI', 'URL 路径'], ['REQUEST_URI', '完整 URI'], ['URI_ARGS', 'GET 参数'],
+  ['POST_ARGS', 'POST 参数'], ['HEADERS', '请求头'], ['COOKIE', 'Cookie'],
+  ['BODY', '请求体'], ['METHOD', '请求方法'],
+] as const
+
+const MATCH_OPTIONS = [
+  ['CONTAINS', '包含文本'], ['REGEX', '正则匹配'], ['EQUALS', '完全等于'],
+  ['STARTS_WITH', '以…开头'], ['ENDS_WITH', '以…结尾'], ['PM', '词语命中(任一)'],
+  ['CIDR', 'IP 网段'], ['EXISTS', '存在即可'],
+  ['LIBINJECTION_SQLI', 'SQL 注入语义检测'], ['LIBINJECTION_XSS', 'XSS 语义检测'],
+] as const
+
+const TRANSFORM_OPTIONS = [
+  ['url_decode', 'URL 解码'], ['to_lowercase', '转小写'],
+  ['remove_comments', '去除 SQL 注释'], ['compress_whitespace', '压缩空白'],
+  ['normalize_path', '规范化路径'],
+] as const
+
+const ACTION_OPTIONS = [
+  ['BLOCK', '拦截（返回状态码）'], ['LOG_ONLY', '仅记录不拦截'], ['ACCEPT', '放行跳过后续'],
+] as const
+
+// ---------- DSL 双向转换 ----------
+function targetsToVars(targets: string[], specific: string, includeKeys: boolean): string {
+  const vars: any[] = []
+  const parse = includeKeys ? ['keys'] : undefined
+  for (const t of targets) {
+    const v: any = { type: t }
+    if (specific && (t === 'HEADERS' || t === 'COOKIE' || t === 'URI_ARGS' || t === 'POST_ARGS')) {
+      v.specific = specific
+    }
+    if (parse) v.parse = parse
+    vars.push(v)
+  }
+  return JSON.stringify(vars)
+}
+
+function varsToTargets(varsStr: string): { targets: string[]; specific: string; includeKeys: boolean } {
+  let vars: any[] = []
+  try {
+    vars = JSON.parse(varsStr || '[]')
+  } catch {
+    vars = []
+  }
+  const targets: string[] = []
+  let specific = ''
+  let includeKeys = false
+  for (const v of vars) {
+    if (v && typeof v.type === 'string' && !targets.includes(v.type)) targets.push(v.type)
+    if (v?.specific) specific = v.specific
+    if (v?.parse?.includes('keys')) includeKeys = true
+  }
+  return { targets, specific, includeKeys }
+}
+
+// ---------- 状态 ----------
 const rules = ref<Rule[]>([])
 const loading = ref(false)
 const message = ref('')
 const editing = ref<Rule | null>(null)
 const showForm = ref(false)
 
-// 表单状态
-const form = ref({
+const form = reactive({
   id: 0,
   rule_id: '',
   name: '',
   group: 'custom',
   severity: 2,
   enabled: true,
-  operator: 'REGEX',
+  matchType: 'CONTAINS',
   pattern: '',
-  transforms: '["url_decode","to_lowercase"]',
-  vars: '[{"type":"URI_ARGS"},{"type":"POST_ARGS"},{"type":"BODY"}]',
+  targets: ['URI_ARGS', 'POST_ARGS', 'BODY'] as string[],
+  specific: '',
+  includeKeys: false,
+  transforms: ['url_decode', 'to_lowercase'] as string[],
+  action: 'BLOCK',
   status: 403,
   message: '',
 })
@@ -47,49 +112,69 @@ async function load() {
 
 function startCreate() {
   editing.value = null
-  form.value = {
+  Object.assign(form, {
     id: 0, rule_id: '', name: '', group: 'custom', severity: 2, enabled: true,
-    operator: 'REGEX', pattern: '', transforms: '["url_decode","to_lowercase"]',
-    vars: '[{"type":"URI_ARGS"},{"type":"POST_ARGS"},{"type":"BODY"}]',
-    status: 403, message: '',
-  }
+    matchType: 'CONTAINS', pattern: '', targets: ['URI_ARGS', 'POST_ARGS', 'BODY'],
+    specific: '', includeKeys: false, transforms: ['url_decode', 'to_lowercase'],
+    action: 'BLOCK', status: 403, message: '',
+  })
   showForm.value = true
 }
 
 function startEdit(r: Rule) {
   editing.value = r
-  form.value = {
-    id: r.id, rule_id: r.rule_id, name: r.name, group: r.group, severity: r.severity,
-    enabled: r.enabled, operator: r.operator, pattern: r.pattern,
-    transforms: r.transforms, vars: r.vars, status: r.status, message: r.message,
+  const vt = varsToTargets(r.vars)
+  let transforms: string[] = []
+  try {
+    transforms = JSON.parse(r.transforms || '[]')
+  } catch {
+    transforms = []
   }
+  Object.assign(form, {
+    id: r.id, rule_id: r.rule_id, name: r.name, group: r.group, severity: r.severity,
+    enabled: r.enabled, matchType: r.operator, pattern: r.pattern,
+    targets: vt.targets.length ? vt.targets : ['URI_ARGS'],
+    specific: vt.specific, includeKeys: vt.includeKeys, transforms,
+    action: 'BLOCK', status: r.status, message: r.message,
+  })
   showForm.value = true
 }
 
 async function save() {
-  if (!form.value.rule_id || !form.value.pattern) {
-    message.value = 'rule_id 与 pattern 不能为空'
+  message.value = ''
+  if (form.targets.length === 0) {
+    message.value = '请至少选择一个检测目标'
     return
   }
-  // 校验 JSON
-  try {
-    JSON.parse(form.value.transforms)
-    JSON.parse(form.value.vars)
-  } catch {
-    message.value = 'transforms / vars 需为合法 JSON'
+  if (form.matchType !== 'LIBINJECTION_SQLI' && form.matchType !== 'LIBINJECTION_XSS' && !form.pattern) {
+    message.value = '请输入匹配值'
     return
   }
-  const payload: any = { ...form.value }
-  payload.status = Number(payload.status)
-  const actions = JSON.stringify({
-    disrupt: 'BLOCK',
-    status: Number(form.value.status),
-    msg: form.value.message,
-  })
+  if (!form.name) form.name = form.pattern.slice(0, 40) || '自定义规则'
+  if (!form.rule_id) form.rule_id = '9' + String(Date.now()).slice(-5)
+
+  const payload: any = {
+    rule_id: form.rule_id,
+    name: form.name,
+    group: form.group,
+    severity: Number(form.severity),
+    enabled: form.enabled,
+    operator: form.matchType,
+    pattern: form.pattern,
+    transforms: JSON.stringify(form.transforms),
+    vars: targetsToVars(form.targets, form.specific, form.includeKeys),
+    status: Number(form.status),
+    message: form.message,
+    actions: JSON.stringify({
+      disrupt: form.action,
+      status: Number(form.status),
+      msg: form.message,
+    }),
+  }
   if (editing.value) {
-    await api.put(`/rules/${editing.value.id}`, { ...payload, actions })
+    await api.put(`/rules/${editing.value.id}`, payload)
   } else {
-    await api.post('/rules', { ...payload, actions })
+    await api.post('/rules', payload)
   }
   showForm.value = false
   message.value = '已保存（需点击"发布规则"生效）'
@@ -122,7 +207,7 @@ onMounted(load)
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-semibold">规则管理</h1>
-        <p class="text-sm text-muted-foreground">共 {{ rules.length }} 条规则</p>
+        <p class="text-sm text-muted-foreground">共 {{ rules.length }} 条规则（内置 + 自定义），改后需发布生效</p>
       </div>
       <div class="flex gap-2">
         <Button variant="outline" @click="publish">发布规则</Button>
@@ -132,56 +217,25 @@ onMounted(load)
 
     <p v-if="message" class="text-sm text-muted-foreground">{{ message }}</p>
 
-    <!-- 新增/编辑表单 -->
+    <!-- 新增/编辑表单（友好式） -->
     <Card v-if="showForm" class="border-primary/40">
       <CardHeader>
-        <CardTitle>{{ editing ? '编辑规则' : '新增规则' }}</CardTitle>
-        <CardDescription>规则字段与 Lua 引擎 DSL 对应，保存后需发布生效</CardDescription>
+        <CardTitle>{{ editing ? '编辑规则' : '新增自定义规则' }}</CardTitle>
+        <CardDescription>
+          用白话配置即可，无需了解 Lua DSL；语义检测（SQLi/XSS）依赖 libinjection 组件
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div class="grid gap-4 md:grid-cols-2">
-          <div class="space-y-1.5">
-            <Label>规则 ID</Label>
-            <Input v-model="form.rule_id" placeholder="如 30001" />
-          </div>
+      <CardContent class="space-y-5">
+        <div class="grid gap-4 md:grid-cols-3">
           <div class="space-y-1.5">
             <Label>规则名称</Label>
-            <Input v-model="form.name" placeholder="如 自定义 UA 拦截" />
+            <Input v-model="form.name" placeholder="如 拦截 /admin 暴力枚举" />
           </div>
           <div class="space-y-1.5">
-            <Label>分组</Label>
+            <Label>攻击类型</Label>
             <select v-model="form.group" class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
-              <option v-for="g in RULE_GROUPS" :key="g" :value="g">{{ g }}</option>
+              <option v-for="[k, label] in GROUP_OPTIONS" :key="k" :value="k">{{ label }}</option>
             </select>
-          </div>
-          <div class="space-y-1.5">
-            <Label>运算符</Label>
-            <select v-model="form.operator" class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
-              <option value="REGEX">REGEX</option>
-              <option value="CIDR">CIDR</option>
-              <option value="PM">PM</option>
-              <option value="EQUALS">EQUALS</option>
-              <option value="CONTAINS">CONTAINS</option>
-              <option value="STARTS_WITH">STARTS_WITH</option>
-              <option value="ENDS_WITH">ENDS_WITH</option>
-            </select>
-          </div>
-          <div class="space-y-1.5 md:col-span-2">
-            <Label>匹配模式（正则 / 值）</Label>
-            <textarea
-              v-model="form.pattern"
-              rows="3"
-              class="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-sm"
-              placeholder="如 \b(sleep|benchmark)\s*\("
-            />
-          </div>
-          <div class="space-y-1.5">
-            <Label>拦截状态码</Label>
-            <Input v-model="form.status" type="number" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>提示消息</Label>
-            <Input v-model="form.message" placeholder="命中后的日志消息" />
           </div>
           <div class="space-y-1.5">
             <Label>严重级别</Label>
@@ -191,24 +245,95 @@ onMounted(load)
               <option :value="3">3 - 高</option>
             </select>
           </div>
-          <div class="flex items-end gap-2">
-            <label class="flex items-center gap-2 text-sm">
-              <input v-model="form.enabled" type="checkbox" class="h-4 w-4" />
-              启用
+        </div>
+
+        <!-- 检测目标 -->
+        <div class="space-y-2">
+          <Label>检测目标（对哪些内容检查）</Label>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <label
+              v-for="[k, label] in TARGET_OPTIONS"
+              :key="k"
+              class="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm cursor-pointer"
+            >
+              <input v-model="form.targets" type="checkbox" :value="k" class="h-4 w-4" />
+              {{ label }}
             </label>
           </div>
-          <div class="space-y-1.5">
-            <Label>变量（JSON）</Label>
-            <textarea v-model="form.vars" rows="2" class="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>变换（JSON）</Label>
-            <textarea v-model="form.transforms" rows="2" class="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs" />
+          <div class="flex flex-wrap items-end gap-4">
+            <div class="space-y-1.5">
+              <Label>指定字段（可选，如 user-agent / session）</Label>
+              <Input v-model="form.specific" placeholder="留空=全部" class="w-64" />
+            </div>
+            <label class="flex items-center gap-2 pb-2 text-sm">
+              <input v-model="form.includeKeys" type="checkbox" class="h-4 w-4" />
+              同时检查参数名（键）
+            </label>
           </div>
         </div>
-        <div class="mt-4 flex gap-2">
-          <Button @click="save">保存</Button>
-          <Button variant="outline" @click="showForm = false">取消</Button>
+
+        <!-- 匹配方式 -->
+        <div class="grid gap-4 md:grid-cols-4">
+          <div class="space-y-1.5">
+            <Label>匹配方式</Label>
+            <select v-model="form.matchType" class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
+              <option v-for="[k, label] in MATCH_OPTIONS" :key="k" :value="k">{{ label }}</option>
+            </select>
+          </div>
+          <div class="space-y-1.5 md:col-span-3">
+            <Label>匹配值</Label>
+            <textarea
+              v-model="form.pattern"
+              rows="2"
+              class="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-sm"
+              placeholder="包含文本 / 正则 / IP 段，如：admin/login"
+              :disabled="form.matchType === 'LIBINJECTION_SQLI' || form.matchType === 'LIBINJECTION_XSS' || form.matchType === 'EXISTS'"
+            />
+          </div>
+        </div>
+
+        <!-- 预处理 -->
+        <div class="space-y-2">
+          <Label>预处理（防绕过，可多选）</Label>
+          <div class="flex flex-wrap gap-2">
+            <label
+              v-for="[k, label] in TRANSFORM_OPTIONS"
+              :key="k"
+              class="flex items-center gap-2 rounded-md border border-border/60 px-3 py-1.5 text-sm cursor-pointer"
+            >
+              <input v-model="form.transforms" type="checkbox" :value="k" class="h-4 w-4" />
+              {{ label }}
+            </label>
+          </div>
+        </div>
+
+        <!-- 动作 -->
+        <div class="grid gap-4 md:grid-cols-3">
+          <div class="space-y-1.5">
+            <Label>命中动作</Label>
+            <select v-model="form.action" class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
+              <option v-for="[k, label] in ACTION_OPTIONS" :key="k" :value="k">{{ label }}</option>
+            </select>
+          </div>
+          <div class="space-y-1.5" v-if="form.action === 'BLOCK'">
+            <Label>状态码</Label>
+            <Input v-model.number="form.status" type="number" />
+          </div>
+          <div class="space-y-1.5 md:col-span-2">
+            <Label>提示消息（命中后记录）</Label>
+            <Input v-model="form.message" placeholder="如 检测到恶意请求" />
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <label class="flex items-center gap-2 text-sm">
+            <input v-model="form.enabled" type="checkbox" class="h-4 w-4" />
+            启用
+          </label>
+          <div class="ml-auto flex gap-2">
+            <Button @click="save">保存规则</Button>
+            <Button variant="outline" @click="showForm = false">取消</Button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -222,7 +347,7 @@ onMounted(load)
               <TableHead>ID</TableHead>
               <TableHead>名称</TableHead>
               <TableHead>分组</TableHead>
-              <TableHead>运算符</TableHead>
+              <TableHead>匹配</TableHead>
               <TableHead>状态</TableHead>
               <TableHead class="w-40">操作</TableHead>
             </TableRow>
@@ -230,7 +355,7 @@ onMounted(load)
           <TableBody>
             <TableRow v-for="r in rules" :key="r.id">
               <TableCell class="font-mono text-xs">{{ r.rule_id }}</TableCell>
-              <TableCell class="text-sm">{{ r.name }}</TableCell>
+              <TableCell class="max-w-[240px] truncate text-sm">{{ r.name }}</TableCell>
               <TableCell><Badge variant="secondary">{{ r.group }}</Badge></TableCell>
               <TableCell class="font-mono text-xs">{{ r.operator }}</TableCell>
               <TableCell>
