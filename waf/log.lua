@@ -16,7 +16,7 @@ local function build_events(ctx)
     local events = {}
     for _, m in ipairs(ctx.matched or {}) do
         events[#events + 1] = {
-            time      = os.date("%Y-%m-%dT%H:%M:%S"),
+            time      = os.date("!%Y-%m-%dT%H:%M:%SZ"),  -- RFC3339 UTC
             ts        = ngx.now(),
             client_ip = ctx.client_ip,
             method    = ctx.request and ctx.request.method,
@@ -45,6 +45,16 @@ local function write_file(cfg, line)
     f:close()
 end
 
+-- redis 后端：经 ngx.timer 异步推送（log 阶段禁用 TCP cosocket，
+-- 定时器回调中可用），不阻塞请求收尾。
+local function push_to_redis(premature, key, payloads)
+    if premature then return end
+    local storage = require "storage"
+    for _, raw in ipairs(payloads) do
+        storage.redis_lpush(key, raw)
+    end
+end
+
 -- ============================================================================
 
 local ctx = ngx.ctx.waf_ctx
@@ -62,8 +72,13 @@ local backend = cfg.log.backend or "file"
 
 if backend == "redis" then
     local key = cfg.log.redis_key or "waf:event:list"
+    local payloads = {}
     for _, ev in ipairs(events) do
-        storage.redis_lpush(key, cjson.encode(ev))
+        payloads[#payloads + 1] = cjson.encode(ev)
+    end
+    local ok, err = ngx.timer.at(0, push_to_redis, key, payloads)
+    if not ok then
+        ngx.log(ngx.ERR, "[waf] 调度事件上报失败: ", tostring(err))
     end
 else
     for _, ev in ipairs(events) do
