@@ -4,6 +4,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -61,6 +62,22 @@ func main() {
 	mgr := service.NewRedisManager()
 	setupSvc := service.NewSetupService(db, mgr)
 	mgr.LoadFromSetup(setupSvc)
+
+	// 后台定时消费攻击事件队列（每 3 秒），引擎推送到 Redis 的事件实时落库，
+	// 前端事件页无需手动触发即可看到最新拦截记录。
+	eventSvc := service.NewEventService(db, mgr, cfg)
+	go func() {
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if mgr.GetClient() == nil {
+				continue // Redis 未配置（引导前）静默
+			}
+			if _, err := eventSvc.Consume(100); err != nil {
+				log.Printf("消费攻击事件失败: %v", err)
+			}
+		}
+	}()
 
 	r := api.NewRouter(cfg, db, mgr)
 	log.Printf("WAF 管理后台启动，监听 %s", cfg.Server.Addr)
