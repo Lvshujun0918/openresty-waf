@@ -25,6 +25,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	eventHandler := NewEventHandler(db, mgr, cfg)
 	setupHandler := NewSetupHandler(db, mgr, cfg)
 	configHandler := NewConfigHandler(db, mgr, cfg)
+	ipListHandler := NewIpListHandler(db, mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -62,6 +63,14 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.DELETE("/cc-rules/:id", ccRuleHandler.Delete)
 			authed.PATCH("/cc-rules/:id/enabled", ccRuleHandler.SetEnabled)
 			authed.POST("/cc-rules/publish", ccRuleHandler.Publish)
+
+			// IP 列表订阅（远程威胁情报 IP 列表）
+			authed.GET("/ip-list-subs", ipListHandler.List)
+			authed.POST("/ip-list-subs", ipListHandler.Create)
+			authed.PUT("/ip-list-subs/:id", ipListHandler.Update)
+			authed.DELETE("/ip-list-subs/:id", ipListHandler.Delete)
+			authed.PATCH("/ip-list-subs/:id/enabled", ipListHandler.SetEnabled)
+			authed.POST("/ip-list-subs/:id/sync", ipListHandler.Sync)
 
 			// 攻击事件
 			authed.GET("/events", eventHandler.List)

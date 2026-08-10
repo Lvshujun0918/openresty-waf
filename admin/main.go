@@ -79,6 +79,19 @@ func main() {
 		}
 	}()
 
+	// 远程 IP 列表订阅定时同步（每分钟检查到期订阅）
+	ipListSvc := service.NewIpListService(db, mgr, cfg)
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			if mgr.GetClient() == nil {
+				continue
+			}
+			ipListSvc.SyncAll()
+		}
+	}()
+
 	r := api.NewRouter(cfg, db, mgr)
 	log.Printf("WAF 管理后台启动，监听 %s", cfg.Server.Addr)
 	if err := r.Run(cfg.Server.Addr); err != nil {
