@@ -79,8 +79,13 @@ async function save() {
     message.value = 'transforms / vars 需为合法 JSON'
     return
   }
-  const payload = { ...form.value }
-  const actions = JSON.stringify({ disrupt: 'BLOCK', status: form.value.status, msg: form.value.message })
+  const payload: any = { ...form.value }
+  payload.status = Number(payload.status)
+  const actions = JSON.stringify({
+    disrupt: 'BLOCK',
+    status: Number(form.value.status),
+    msg: form.value.message,
+  })
   if (editing.value) {
     await api.put(`/rules/${editing.value.id}`, { ...payload, actions })
   } else {
@@ -172,7 +177,7 @@ onMounted(load)
           </div>
           <div class="space-y-1.5">
             <Label>拦截状态码</Label>
-            <Input v-model.number="form.status" type="number" />
+            <Input v-model="form.status" type="number" />
           </div>
           <div class="space-y-1.5">
             <Label>提示消息</Label>

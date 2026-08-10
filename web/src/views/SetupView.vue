@@ -116,7 +116,7 @@ onMounted(async () => {
             </div>
             <div class="space-y-2">
               <Label>数据库编号</Label>
-              <Input v-model.number="db" type="number" />
+              <Input v-model="db" type="number" />
             </div>
           </div>
           <p v-if="error" class="text-sm text-destructive">{{ error }}</p>
