@@ -19,6 +19,7 @@ const router = createRouter({
         { path: 'cc', name: 'cc', component: () => import('@/views/CcRulesView.vue') },
         { path: 'challenge', name: 'challenge', component: () => import('@/views/ChallengeView.vue') },
         { path: 'ip-lists', name: 'ip-lists', component: () => import('@/views/IpListView.vue') },
+        { path: 'traffic', name: 'traffic', component: () => import('@/views/TrafficView.vue') },
       ],
     },
   ],

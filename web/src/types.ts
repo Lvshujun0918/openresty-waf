@@ -61,6 +61,21 @@ export interface IpListSub {
   updated_at?: string
 }
 
+export interface TrafficItem {
+  id: number
+  time: string
+  client_ip: string
+  method: string
+  host: string
+  uri: string
+  status: number
+  user_agent: string
+  attack: boolean
+  rule_ids: string
+  response_time: number
+  created_at?: string
+}
+
 export interface PageResult<T> {
   total: number
   page: number
