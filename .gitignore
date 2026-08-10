@@ -1,0 +1,32 @@
+# ===== Go (admin) =====
+admin/bin/
+admin/*.test
+admin/*.out
+*.exe
+
+# ===== Node (web) =====
+node_modules/
+web/node_modules/
+web/dist/
+web/.vite/
+*.tsbuildinfo
+
+# ===== 日志 =====
+*.log
+logs/
+waf/logs/
+
+# ===== 本地配置 / 数据 =====
+*.local.json
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# ===== 编辑器 / 系统 =====
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
