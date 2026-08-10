@@ -72,6 +72,20 @@ docker compose up -d --build
   你已有的 Redis ◄───────────────────────────────┘ 事件上报/规则热更
 ```
 
+### 使用 GHCR 镜像
+
+main 分支 / `v*` 标签 push 后，GitHub Actions 自动构建并推送到
+`ghcr.io/<owner>/openresty-waf`（支持 amd64 / arm64 多架构）：
+
+```bash
+docker pull ghcr.io/<owner>/openresty-waf:latest
+docker run -d --name waf-admin -p 18081:8081 \
+  -v waf-data:/data \
+  -e ADMIN_INIT_PASSWORD=your-password \
+  -e ADMIN_JWT_SECRET=your-secret \
+  ghcr.io/<owner>/openresty-waf:latest
+```
+
 ### 手动部署
 
 **1. 管理后台**：`cd admin && go build -o waf-admin . && ./waf-admin`，打开引导页完成配置。

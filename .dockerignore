@@ -1,0 +1,13 @@
+# Docker 构建上下文忽略
+# 注意：保留 admin/internal/webui/dist（embed 占位），仅排除 web/dist 构建产物
+
+**/node_modules/
+web/dist/
+**/.git/
+**/*.db
+**/*.sqlite*
+**/*.log
+.DS_Store
+plan/
+docs/
+deploy/
