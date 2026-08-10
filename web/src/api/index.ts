@@ -31,3 +31,16 @@ export const api = {
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body ?? {}) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 }
+
+export interface SetupStatus {
+  done: boolean
+  redis_configured: boolean
+  redis_addr?: string
+}
+
+export interface SetupGuide {
+  redis: { addr: string; password: string; db: number }
+  install_command: string
+  download_url: string
+  nginx_config: string
+}

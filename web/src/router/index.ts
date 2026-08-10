@@ -5,6 +5,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },
+    { path: '/setup', name: 'setup', component: () => import('@/views/SetupView.vue') },
     {
       path: '/',
       component: () => import('@/layouts/AdminLayout.vue'),
@@ -18,13 +19,23 @@ const router = createRouter({
   ],
 })
 
-// 全局路由守卫：未登录跳转登录页
-router.beforeEach((to) => {
+// 全局路由守卫：登录 / 首次引导
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (to.name !== 'login' && !auth.token) {
     return { name: 'login' }
   }
   if (to.name === 'login' && auth.token) {
+    return { name: 'dashboard' }
+  }
+  // 已登录：非引导页先确认引导状态
+  if (auth.token && to.name !== 'setup') {
+    await auth.checkSetup()
+    if (!auth.setupDone) {
+      return { name: 'setup' }
+    }
+  }
+  if (to.name === 'setup' && auth.setupDone && auth.token) {
     return { name: 'dashboard' }
   }
 })
