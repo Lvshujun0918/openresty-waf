@@ -14,6 +14,7 @@ const router = createRouter({
         { path: 'dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
         { path: 'rules', name: 'rules', component: () => import('@/views/RulesView.vue') },
         { path: 'events', name: 'events', component: () => import('@/views/EventsView.vue') },
+        { path: 'config', name: 'config', component: () => import('@/views/ConfigView.vue') },
       ],
     },
   ],
