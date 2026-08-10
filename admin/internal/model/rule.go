@@ -20,6 +20,7 @@ type Rule struct {
 	Message    string    `gorm:"size:255" json:"message"`     // 便捷字段，Actions 中的提示
 	SiteID     uint      `gorm:"index;default:0" json:"site_id"` // 0 表示全局规则
 	SortOrder  int       `gorm:"default:0" json:"sort_order"`
+	IsSeed     bool      `gorm:"default:false" json:"is_seed"` // 内置种子标记（升级时自动替换）
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }

@@ -38,18 +38,39 @@ func ensureDefaultAdmin(db *gorm.DB) {
 	log.Printf("已创建默认管理员 admin（初始密码: %s，请尽快修改）", password)
 }
 
-// seedRules 首次启动时导入内置规则种子（出厂基线防护）
+// seedRules 导入内置规则种子（带版本管理：版本变化时自动替换旧种子，保留用户自定义规则）
 func seedRules(db *gorm.DB) {
-	var count int64
-	db.Model(&model.Rule{}).Count(&count)
-	if count > 0 {
+	const key = "seed_version"
+	var row model.Setup
+	current := ""
+	if err := db.Where("key = ?", key).First(&row).Error; err == nil {
+		current = row.Value
+	}
+	if current == model.SeedVersion {
 		return
+	}
+
+	// 升级/首次：删除旧内置种子（新机制 is_seed 标记 + 旧版本 ID 集合），导入新种子
+	if err := db.Where("is_seed = ? OR rule_id IN ?", true, model.LegacySeedIDs).
+		Delete(&model.Rule{}).Error; err != nil {
+		log.Printf("清理旧内置规则失败: %v", err)
+		return
+	}
+	for i := range model.SeedRules {
+		model.SeedRules[i].IsSeed = true
 	}
 	if err := db.Create(&model.SeedRules).Error; err != nil {
 		log.Printf("导入内置规则种子失败: %v", err)
 		return
 	}
-	log.Printf("已导入 %d 条内置规则种子", len(model.SeedRules))
+	if row.ID == 0 {
+		if err := db.Create(&model.Setup{Key: key, Value: model.SeedVersion}).Error; err != nil {
+			log.Printf("记录种子版本失败: %v", err)
+		}
+	} else if err := db.Model(&row).Update("value", model.SeedVersion).Error; err != nil {
+		log.Printf("更新种子版本失败: %v", err)
+	}
+	log.Printf("已导入 %d 条内置规则种子 (v%s)", len(model.SeedRules), model.SeedVersion)
 }
 
 func main() {
