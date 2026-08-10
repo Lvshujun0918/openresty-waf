@@ -21,6 +21,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	authHandler := NewAuthHandler(db, cfg)
 	authSvc := service.NewAuthService(db, cfg)
 	ruleHandler := NewRuleHandler(db, mgr, cfg)
+	ccRuleHandler := NewCcRuleHandler(db, mgr, cfg)
 	eventHandler := NewEventHandler(db, mgr, cfg)
 	setupHandler := NewSetupHandler(db, mgr, cfg)
 	configHandler := NewConfigHandler(db, mgr, cfg)
@@ -53,6 +54,14 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.DELETE("/rules/:id", ruleHandler.Delete)
 			authed.PATCH("/rules/:id/enabled", ruleHandler.SetEnabled)
 			authed.POST("/rules/publish", ruleHandler.Publish)
+
+			// CC 防刷规则（按 host + 路径精细化配置）
+			authed.GET("/cc-rules", ccRuleHandler.List)
+			authed.POST("/cc-rules", ccRuleHandler.Create)
+			authed.PUT("/cc-rules/:id", ccRuleHandler.Update)
+			authed.DELETE("/cc-rules/:id", ccRuleHandler.Delete)
+			authed.PATCH("/cc-rules/:id/enabled", ccRuleHandler.SetEnabled)
+			authed.POST("/cc-rules/publish", ccRuleHandler.Publish)
 
 			// 攻击事件
 			authed.GET("/events", eventHandler.List)

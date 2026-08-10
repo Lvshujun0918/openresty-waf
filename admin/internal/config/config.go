@@ -45,6 +45,8 @@ type Rule struct {
 	VersionKey string // 版本号键，自增触发 Lua 引擎热更新
 	RulesetKey string // 完整规则集 JSON 键
 	EventKey   string // 攻击事件队列键（WAF log.lua redis 后端 LPUSH）
+	CcRulesKey string // CC 规则集键（host/path 精细化 CC 防刷）
+	CcVersionKey string // CC 规则版本键，自增触发热更新
 }
 
 func Load() *Config {
@@ -59,9 +61,11 @@ func Load() *Config {
 			Expire: getEnvInt("ADMIN_JWT_EXPIRE_HOURS", 24),
 		},
 		Rule: Rule{
-			VersionKey: getEnv("WAF_RULE_VERSION_KEY", "waf:rule:version"),
-			RulesetKey: getEnv("WAF_RULE_RULESET_KEY", "waf:rule:ruleset"),
-			EventKey:   getEnv("WAF_EVENT_KEY", "waf:event:list"),
+			VersionKey:   getEnv("WAF_RULE_VERSION_KEY", "waf:rule:version"),
+			RulesetKey:   getEnv("WAF_RULE_RULESET_KEY", "waf:rule:ruleset"),
+			EventKey:     getEnv("WAF_EVENT_KEY", "waf:event:list"),
+			CcRulesKey:   getEnv("WAF_CC_RULES_KEY", "waf:cc:rules"),
+			CcVersionKey: getEnv("WAF_CC_VERSION_KEY", "waf:cc:version"),
 		},
 		WAF: WAF{
 			DistDir: getEnv("WAF_DIST_DIR", "/opt/waf-dist"),

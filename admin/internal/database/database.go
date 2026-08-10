@@ -18,7 +18,7 @@ func Init(cfg *config.Config) *gorm.DB {
 	}
 
 	if err := db.AutoMigrate(&model.User{}, &model.Rule{}, &model.Site{},
-		&model.Event{}, &model.Setup{}); err != nil {
+		&model.Event{}, &model.Setup{}, &model.CcRule{}); err != nil {
 		log.Fatalf("数据库迁移失败: %v", err)
 	}
 
