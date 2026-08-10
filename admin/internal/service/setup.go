@@ -89,6 +89,16 @@ func (s *SetupService) SaveRedisConfig(addr, password string, db int) error {
 	if addr == "" {
 		return errors.New("Redis 地址不能为空")
 	}
+	// 幂等保护：已有配置且地址一致时，密码留空视为保持原密码，
+	// db 为 0 视为未修改（避免前端未回显库号导致误覆盖为非目标库）
+	if existing, ok := s.GetRedisConfig(); ok && existing.Addr == addr {
+		if password == "" {
+			password = existing.Password
+		}
+		if db == 0 && existing.DB != 0 {
+			db = existing.DB
+		}
+	}
 	cfg := &RedisConfig{Addr: addr, Password: password, DB: db}
 	if err := testRedis(cfg); err != nil {
 		return err
