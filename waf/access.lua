@@ -68,6 +68,18 @@ end
 
 local ctx = new_ctx(cfg)
 
+-- 0. 挑战相关路径（验证页 / 回调），不参与规则检测
+if cfg.challenge and cfg.challenge.enabled then
+    local uri = ngx.var.uri or ""
+    if uri == cfg.challenge.page_path then
+        require("detectors.challenge").serve_page(ctx, cfg)
+        return
+    elseif uri == cfg.challenge.verify_path then
+        require("detectors.challenge").serve_verify(ctx, cfg)
+        return
+    end
+end
+
 -- 1. IP 黑白名单
 local ip_result = ip_check(ctx, cfg)
 if ip_result == "whitelisted" then
@@ -94,6 +106,16 @@ if cfg.modules and cfg.modules.cc_check then
     local cc = require "detectors.cc"
     if cc.check(ctx, cfg) == "banned" then
         if ctx.mode == "active" then
+            -- 人机验证：已通过验证（check 返回 nil）则解除封禁放行；否则进入验证页
+            if cfg.challenge and cfg.challenge.enabled then
+                local ch = require "detectors.challenge"
+                if not ch.check(ctx, cfg) then
+                    cc.unban(ctx, cfg)
+                    return  -- 验证通过，放行
+                end
+                ngx.redirect(cfg.challenge.page_path, ngx.HTTP_TEMPORARY_REDIRECT)
+                return
+            end
             ngx.exit(503)
         end
         -- detect 模式：仅记录

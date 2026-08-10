@@ -55,4 +55,12 @@ function _M.check(waf_ctx, cfg)
     return nil
 end
 
+-- 解除该 IP 封禁（人机验证通过后放行）
+function _M.unban(waf_ctx, cfg)
+    local ip = waf_ctx.client_ip
+    if not ip or ip == "" then return end
+    local key = (cfg.cc.ban_key_prefix or "waf:cc:ban:") .. ip
+    storage.set_shared(config.dict.counter, key, nil)
+end
+
 return _M

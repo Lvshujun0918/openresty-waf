@@ -78,6 +78,30 @@ _M.cc = {
 }
 
 -- ============================================================================
+-- 人机验证
+--   mode = "basic"     基础 JS Challenge（自包含，无第三方依赖）
+--   mode = "geetest"   极验验证码（GT4）
+--   mode = "gitee"     Gitee 验证码（与极验 GT4 协议兼容）
+-- 触发时机：CC 超限且请求未通过验证时，返回验证页而非直接拦截。
+-- ============================================================================
+_M.challenge = {
+    enabled       = true,
+    mode          = "basic",   -- "basic" | "geetest" | "gitee"
+    cookie_name   = "waf_pass",
+    cookie_secret = "openresty-waf-change-me",   -- 生产环境务必修改
+    cookie_ttl    = 300,       -- 通过验证后的放行时长（秒）
+    page_path     = "/__waf_challenge__",
+    verify_path   = "/__waf_challenge_verify__",
+    -- 高级验证码（geetest / gitee）配置
+    captcha = {
+        id         = "",       -- captcha_id
+        key        = "",       -- captcha_key
+        verify_api = "https://gcaptcha4.geetest.com/validate",
+        sdk        = "https://static.geetest.com/v4/gt4.js",
+    },
+}
+
+-- ============================================================================
 -- 拦截响应
 -- ============================================================================
 _M.block = {
