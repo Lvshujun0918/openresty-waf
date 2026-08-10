@@ -20,7 +20,8 @@ local function new_ctx(cfg)
         request         = {
             method = ngx.req.get_method() or "",
             host   = ngx.var.host or "",
-            uri    = ngx.var.request_uri or "",
+            uri    = ngx.var.request_uri or "",   -- 含 query string
+            path   = ngx.var.uri or "",           -- 不含 query string
         },
     }
     ngx.ctx.waf_ctx = ctx
@@ -88,6 +89,17 @@ if ruleset then
     end
 end
 
--- 3. 扩展检测器（CC 防刷、人机验证、语义增强等）在 detectors 模块中接入：
---    require("detectors.cc").check(ctx, cfg)
+-- 3. CC 防刷
+if cfg.modules and cfg.modules.cc_check then
+    local cc = require "detectors.cc"
+    if cc.check(ctx, cfg) == "banned" then
+        if ctx.mode == "active" then
+            ngx.exit(503)
+        end
+        -- detect 模式：仅记录
+        return
+    end
+end
+
+-- 4. 扩展检测器（人机验证、语义增强、上传检测等）后续接入：
 --    require("detectors.challenge").check(ctx, cfg)
