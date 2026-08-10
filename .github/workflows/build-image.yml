@@ -24,9 +24,41 @@ permissions:
   packages: write
 
 jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Go 后台单元测试
+        working-directory: admin
+        run: go test ./...
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 前端 Vitest 单元测试
+        working-directory: web
+        run: |
+          npm ci
+          npm test
+
+      - name: WAF Lua 引擎单元测试
+        run: |
+          docker run --rm -v "$PWD/waf:/waf" openresty/openresty:alpine luajit /waf/t/run.lua
+
   build:
     name: Build & push
     runs-on: ubuntu-latest
+    needs: test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
