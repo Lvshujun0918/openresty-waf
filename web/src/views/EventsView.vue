@@ -22,6 +22,7 @@ const page = ref(1)
 const pageSize = ref(20)
 const group = ref('')
 const clientIp = ref('')
+const host = ref('')
 const loading = ref(false)
 const message = ref('')
 
@@ -33,6 +34,7 @@ async function load() {
   })
   if (group.value) params.set('group', group.value)
   if (clientIp.value) params.set('client_ip', clientIp.value)
+  if (host.value) params.set('host', host.value)
   const res = await api.get<PageResult<EventItem>>(`/events?${params}`)
   events.value = res.items
   total.value = res.total
@@ -82,6 +84,10 @@ onMounted(async () => {
           <Label>客户端 IP</Label>
           <Input v-model="clientIp" placeholder="如 192.168.1.1" class="w-48" />
         </div>
+        <div class="space-y-1.5">
+          <Label>域名 (Host)</Label>
+          <Input v-model="host" placeholder="如 example.com" class="w-48" />
+        </div>
         <Button @click="page = 1; load()" :disabled="loading">查询</Button>
         <span v-if="message" class="text-sm text-muted-foreground">{{ message }}</span>
       </CardContent>
@@ -93,6 +99,7 @@ onMounted(async () => {
           <TableHeader>
             <TableRow>
               <TableHead>时间</TableHead>
+              <TableHead>域名</TableHead>
               <TableHead>IP</TableHead>
               <TableHead>方法</TableHead>
               <TableHead>URI</TableHead>
@@ -104,6 +111,7 @@ onMounted(async () => {
           <TableBody>
             <TableRow v-for="e in events" :key="e.id">
               <TableCell class="whitespace-nowrap text-xs">{{ e.time }}</TableCell>
+              <TableCell class="max-w-[140px] truncate text-xs">{{ e.host || '-' }}</TableCell>
               <TableCell class="font-mono text-xs">{{ e.client_ip }}</TableCell>
               <TableCell class="text-xs">{{ e.method }}</TableCell>
               <TableCell class="max-w-[200px] truncate font-mono text-xs">{{ e.uri }}</TableCell>
@@ -112,7 +120,7 @@ onMounted(async () => {
               <TableCell class="max-w-[240px] truncate text-xs">{{ e.msg }}</TableCell>
             </TableRow>
             <TableRow v-if="events.length === 0">
-              <TableCell colspan="7" class="py-8 text-center text-muted-foreground">
+              <TableCell colspan="8" class="py-8 text-center text-muted-foreground">
                 暂无数据，可先触发一次攻击或点击"消费 Redis 队列"
               </TableCell>
             </TableRow>

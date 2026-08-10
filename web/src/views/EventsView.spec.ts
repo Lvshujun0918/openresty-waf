@@ -19,6 +19,7 @@ const pageResult = {
       time: '2026-08-10T10:00:00Z',
       client_ip: '1.2.3.4',
       method: 'GET',
+      host: 'a.example.com',
       uri: '/?id=1 union select 1',
       rule_id: '20001',
       group: 'sqli',
@@ -56,6 +57,33 @@ describe('EventsView 攻击事件页', () => {
 
     expect(apiMock.get).toHaveBeenCalled()
     expect(w.text()).toContain('1.2.3.4')
+  })
+
+  it('显示域名列', async () => {
+    apiMock.post.mockResolvedValueOnce({ status: 'ok', consumed: 0 })
+    apiMock.get.mockResolvedValueOnce(pageResult)
+
+    const w = mount(EventsView)
+    await flushPromises()
+
+    expect(w.text()).toContain('a.example.com')
+  })
+
+  it('按域名过滤查询', async () => {
+    apiMock.post.mockResolvedValue({ status: 'ok', consumed: 0 })
+    // onMounted 自动消费 + 点击查询都会调用 load，用持续返回值
+    apiMock.get.mockResolvedValue(pageResult)
+
+    const w = mount(EventsView)
+    await flushPromises()
+
+    const hostInput = w.findAll('input').find((i) => (i.element as HTMLInputElement).placeholder.includes('example.com'))
+    expect(hostInput).toBeTruthy()
+    await hostInput!.setValue('a.example.com')
+    await w.findAll('button').find((b) => b.text() === '查询')!.trigger('click')
+    await flushPromises()
+
+    expect(apiMock.get).toHaveBeenLastCalledWith(expect.stringContaining('host=a.example.com'))
   })
 
   it('手动点击消费按钮触发消费', async () => {
