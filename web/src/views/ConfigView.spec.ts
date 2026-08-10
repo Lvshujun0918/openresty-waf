@@ -41,9 +41,6 @@ describe('ConfigView 系统配置页', () => {
     expect(w.text()).toContain('系统配置')
     // 运行模式 select 回显
     expect((w.find('select').element as HTMLSelectElement).value).toBe('active')
-    // CC 输入框回显
-    const rateInput = w.findAll('input').find((i) => (i.element as HTMLInputElement).value === '100/60')
-    expect(rateInput).toBeTruthy()
   })
 
   it('加载失败不崩溃并提示错误', async () => {

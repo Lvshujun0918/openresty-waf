@@ -16,6 +16,7 @@ const router = createRouter({
         { path: 'events', name: 'events', component: () => import('@/views/EventsView.vue') },
         { path: 'config', name: 'config', component: () => import('@/views/ConfigView.vue') },
         { path: 'guide', name: 'guide', component: () => import('@/views/GuideView.vue') },
+        { path: 'cc', name: 'cc', component: () => import('@/views/CcRulesView.vue') },
       ],
     },
   ],

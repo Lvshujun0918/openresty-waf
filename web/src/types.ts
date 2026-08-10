@@ -34,6 +34,19 @@ export interface EventItem {
   created_at?: string
 }
 
+export interface CcRule {
+  id: number
+  name: string
+  host: string
+  path: string
+  rate: string
+  ban_duration: number
+  enabled: boolean
+  sort_order: number
+  created_at?: string
+  updated_at?: string
+}
+
 export interface PageResult<T> {
   total: number
   page: number

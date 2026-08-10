@@ -148,21 +148,6 @@ onMounted(load)
         </CardContent>
       </Card>
 
-      <!-- CC -->
-      <Card>
-        <CardHeader><CardTitle>CC 防刷</CardTitle></CardHeader>
-        <CardContent class="grid grid-cols-2 gap-4 max-w-lg">
-          <div class="space-y-1.5">
-            <Label>频率（次数/秒）</Label>
-            <Input v-model="config.cc.rate" placeholder="100/60" />
-          </div>
-          <div class="space-y-1.5">
-            <Label>封禁时长（秒）</Label>
-            <Input v-model.number="config.cc.ban_duration" type="number" />
-          </div>
-        </CardContent>
-      </Card>
-
       <!-- 拦截响应 -->
       <Card>
         <CardHeader><CardTitle>拦截响应</CardTitle></CardHeader>
