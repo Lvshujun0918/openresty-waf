@@ -26,6 +26,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	setupHandler := NewSetupHandler(db, mgr, cfg)
 	configHandler := NewConfigHandler(db, mgr, cfg)
 	ipListHandler := NewIpListHandler(db, mgr, cfg)
+	trafficHandler := NewTrafficHandler(db, mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -71,6 +72,12 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.DELETE("/ip-list-subs/:id", ipListHandler.Delete)
 			authed.PATCH("/ip-list-subs/:id/enabled", ipListHandler.SetEnabled)
 			authed.POST("/ip-list-subs/:id/sync", ipListHandler.Sync)
+
+			// 全量流量记录
+			authed.GET("/traffic", trafficHandler.List)
+			authed.POST("/traffic/consume", trafficHandler.Consume)
+			authed.POST("/traffic/cleanup", trafficHandler.Cleanup)
+			authed.GET("/traffic/stats", trafficHandler.Stats)
 
 			// 攻击事件
 			authed.GET("/events", eventHandler.List)

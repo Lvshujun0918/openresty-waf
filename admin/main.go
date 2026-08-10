@@ -113,6 +113,44 @@ func main() {
 		}
 	}()
 
+	// 全量流量记录：定时消费队列实时落库 + 按配置保留天数自动清理过期记录
+	trafficSvc := service.NewTrafficService(db, mgr, cfg)
+	wafCfgSvc := service.NewWafConfigService(db, mgr, cfg)
+	go func() {
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if mgr.GetClient() == nil {
+				continue
+			}
+			if _, err := trafficSvc.Consume(100); err != nil {
+				log.Printf("消费流量记录失败: %v", err)
+			}
+		}
+	}()
+	go func() {
+		ticker := time.NewTicker(6 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			if mgr.GetClient() == nil {
+				continue
+			}
+			days := 7
+			if cfgMap, err := wafCfgSvc.Get(); err == nil {
+				if tl, ok := cfgMap["traffic_log"].(map[string]interface{}); ok {
+					if v, ok := tl["retention_days"].(float64); ok && v > 0 {
+						days = int(v)
+					}
+				}
+			}
+			if n, err := trafficSvc.Cleanup(days); err != nil {
+				log.Printf("清理流量记录失败: %v", err)
+			} else if n > 0 {
+				log.Printf("已清理 %d 天前的流量记录 %d 条", days, n)
+			}
+		}
+	}()
+
 	r := api.NewRouter(cfg, db, mgr)
 	log.Printf("WAF 管理后台启动，监听 %s", cfg.Server.Addr)
 	if err := r.Run(cfg.Server.Addr); err != nil {

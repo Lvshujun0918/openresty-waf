@@ -129,5 +129,8 @@ h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
 				"sdk":        "https://static.geetest.com/v4/gt4.js",
 			},
 		},
+		"traffic_log": map[string]interface{}{
+			"enabled": false, "retention_days": 7, "redis_key": "waf:traffic:list",
+		},
 	}
 }
