@@ -55,25 +55,40 @@ end
 -- Redis（cosocket，仅请求阶段 / worker 定时器内可用，init 阶段不可用）
 -- ============================================================================
 
-local function connect_redis()
-    local red = redis:new()
-    red:set_timeouts(config.redis.timeout, config.redis.timeout, config.redis.timeout)
+-- 生效的 Redis 连接配置：优先共享内存 active_config（含后台下发），
+-- 回退到 config.lua（含 config_local 部署覆盖）
+local function effective_redis()
+    local d = ngx.shared[config.dict.rules]
+    if d then
+        local raw = d:get("active_config")
+        local cfg = raw and cjson.decode(raw)
+        if cfg and cfg.redis then
+            return cfg.redis
+        end
+    end
+    return config.redis
+end
 
-    local ok, err = red:connect(config.redis.host, config.redis.port)
+local function connect_redis()
+    local rc = effective_redis()
+    local red = redis:new()
+    red:set_timeouts(rc.timeout, rc.timeout, rc.timeout)
+
+    local ok, err = red:connect(rc.host, rc.port)
     if not ok then
         return nil, "redis connect failed: " .. tostring(err)
     end
 
-    if config.redis.password then
-        local ok2, err2 = red:auth(config.redis.password)
+    if rc.password then
+        local ok2, err2 = red:auth(rc.password)
         if not ok2 then
             red:close()
             return nil, "redis auth failed: " .. tostring(err2)
         end
     end
 
-    if config.redis.db and config.redis.db > 0 then
-        local ok3, err3 = red:select(config.redis.db)
+    if rc.db and rc.db > 0 then
+        local ok3, err3 = red:select(rc.db)
         if not ok3 then
             red:close()
             return nil, "redis select failed: " .. tostring(err3)

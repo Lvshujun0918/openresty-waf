@@ -62,8 +62,11 @@ _M.redis = {
 _M.rule_refresh = {
     enabled       = true,
     interval      = 5,      -- 轮询间隔（秒）
-    version_key   = "waf:rule:version",     -- 全局版本号
+    version_key   = "waf:rule:version",     -- 规则集全局版本号
     ruleset_key   = "waf:rule:ruleset",     -- 完整规则集（JSON）
+    -- 运行配置热更新（后台统一管理，取代直接改本文件）
+    config_version_key = "waf:config:version",
+    config_data_key    = "waf:config:data",
     event_key     = "waf:event:list",       -- 攻击事件队列（LPUSH）
     stat_key      = "waf:stat:counter",     -- 统计计数
 }

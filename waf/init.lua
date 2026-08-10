@@ -15,9 +15,10 @@ local builtin = require "ruleset.builtin"
 
 local _M = {}
 
-local RULES_KEY   = "active_ruleset"   -- 当前生效规则集（JSON 字符串）
-local VERSION_KEY = "ruleset_version"  -- 当前生效版本号
-local CONFIG_KEY  = "active_config"    -- 当前生效配置（JSON 字符串）
+local RULES_KEY       = "active_ruleset"   -- 当前生效规则集（JSON 字符串）
+local VERSION_KEY     = "ruleset_version"  -- 当前生效版本号
+local CONFIG_KEY      = "active_config"    -- 当前生效配置（JSON 字符串）
+local CFG_VERSION_KEY = "config_version"   -- 配置版本号
 
 local function log(level, msg)
     ngx.log(level, "[waf] ", msg)
@@ -32,11 +33,21 @@ local function publish_config()
     end
 end
 
--- 从 Redis 拉取规则集并原子切换（worker 定时器回调）
--- 原子性：先写 ruleset，再写 version；读取方以 version 为准，不会读到中间态。
-local function refresh_from_redis(premature)
-    if premature then return end
+-- 深合并：override 覆盖 t（表递归），返回 t
+local function merge_cfg(t, override)
+    for k, v in pairs(override or {}) do
+        if type(v) == "table" and type(t[k]) == "table" then
+            merge_cfg(t[k], v)
+        else
+            t[k] = v
+        end
+    end
+    return t
+end
 
+-- 从 Redis 拉取规则集并原子切换
+-- 原子性：先写 ruleset，再写 version；读取方以 version 为准，不会读到中间态。
+local function refresh_rules()
     local version, err = storage.redis_get(config.rule_refresh.version_key)
     if err then
         log(ngx.WARN, "读取规则版本失败: " .. tostring(err))
@@ -70,6 +81,55 @@ local function refresh_from_redis(premature)
     else
         log(ngx.WARN, "规则集热更新写入失败: " .. tostring(ok1) .. "/" .. tostring(ok2))
     end
+end
+
+-- 从 Redis 拉取后台下发的运行配置并热更新生效配置
+-- 后台配置深合并到当前生效配置（未下发字段保留默认，如 redis 连接）
+local function refresh_config()
+    local version, err = storage.redis_get(config.rule_refresh.config_version_key)
+    if err then
+        log(ngx.WARN, "读取配置版本失败: " .. tostring(err))
+        return
+    end
+    if not version then
+        return  -- 后台尚未下发配置
+    end
+
+    local current = storage.get_shared(config.dict.rules, CFG_VERSION_KEY)
+    if current == version then
+        return  -- 版本未变化
+    end
+
+    local body, err2 = storage.redis_get(config.rule_refresh.config_data_key)
+    if err2 or not body then
+        log(ngx.WARN, "读取配置失败: " .. tostring(err2))
+        return
+    end
+    local overrides = storage.decode(body)
+    if type(overrides) ~= "table" then
+        log(ngx.WARN, "Redis 返回的配置非法，忽略本次更新")
+        return
+    end
+
+    -- 基于当前生效配置深合并，避免覆盖未下发字段（redis 连接等）
+    local raw = storage.get_shared(config.dict.rules, CONFIG_KEY)
+    local base = storage.decode(raw) or config
+    local merged = merge_cfg(base, overrides)
+
+    local ok1 = storage.set_shared(config.dict.rules, CONFIG_KEY, storage.encode(merged))
+    local ok2 = storage.set_shared(config.dict.rules, CFG_VERSION_KEY, version)
+    if ok1 and ok2 then
+        log(ngx.INFO, "配置已热更新至版本: " .. tostring(version))
+    else
+        log(ngx.WARN, "配置热更新写入失败: " .. tostring(ok1) .. "/" .. tostring(ok2))
+    end
+end
+
+-- worker 定时器主回调：规则 + 运行配置热更新
+local function refresh_from_redis(premature)
+    if premature then return end
+    refresh_rules()
+    refresh_config()
 end
 
 -- init 阶段：加载配置与内置规则
