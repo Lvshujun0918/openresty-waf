@@ -7,7 +7,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Settings } from 'lucide-vue-next'
 
-const config = reactive<any>({})
+const config = reactive<any>({
+  mode: 'active',
+  modules: {},
+  cc: {},
+  block: {},
+  log: {},
+  whitelist: {},
+  blacklist: {},
+  upload: {},
+  challenge: { captcha: {} },
+})
 const loading = ref(false)
 const saving = ref(false)
 const msg = ref('')
@@ -46,25 +56,30 @@ const modules = [
 
 async function load() {
   loading.value = true
-  const d = await api.get<{ config: any }>('/api/config')
-  Object.assign(config, d.config)
-  config.modules = config.modules || {}
-  config.cc = config.cc || {}
-  config.block = config.block || {}
-  config.log = config.log || {}
-  config.whitelist = config.whitelist || {}
-  config.blacklist = config.blacklist || {}
-  config.upload = config.upload || {}
-  config.challenge = config.challenge || {}
-  config.challenge.captcha = config.challenge.captcha || {}
-  wlIps.value = toStr(config.whitelist.ips)
-  wlUrls.value = toStr(config.whitelist.urls)
-  wlUa.value = toStr(config.whitelist.user_agents)
-  blIps.value = toStr(config.blacklist.ips)
-  blUrls.value = toStr(config.blacklist.urls)
-  denyExt.value = toStr(config.upload.deny_ext)
-  denyMime.value = toStr(config.upload.deny_mime)
-  loading.value = false
+  try {
+    const d = await api.get<{ config: any }>('/config')
+    Object.assign(config, d.config || {})
+    config.modules = config.modules || {}
+    config.cc = config.cc || {}
+    config.block = config.block || {}
+    config.log = config.log || {}
+    config.whitelist = config.whitelist || {}
+    config.blacklist = config.blacklist || {}
+    config.upload = config.upload || {}
+    config.challenge = config.challenge || {}
+    config.challenge.captcha = config.challenge.captcha || {}
+    wlIps.value = toStr(config.whitelist.ips)
+    wlUrls.value = toStr(config.whitelist.urls)
+    wlUa.value = toStr(config.whitelist.user_agents)
+    blIps.value = toStr(config.blacklist.ips)
+    blUrls.value = toStr(config.blacklist.urls)
+    denyExt.value = toStr(config.upload.deny_ext)
+    denyMime.value = toStr(config.upload.deny_mime)
+  } catch (e: any) {
+    msg.value = e.message || '配置加载失败'
+  } finally {
+    loading.value = false
+  }
 }
 
 async function save() {
@@ -78,7 +93,7 @@ async function save() {
   config.upload.deny_ext = toList(denyExt.value)
   config.upload.deny_mime = toList(denyMime.value)
   try {
-    await api.put('/api/config', { config })
+    await api.put('/config', { config })
     msg.value = '已保存并下发，引擎将在数秒内热更新生效'
   } catch (e: any) {
     msg.value = e.message || '保存失败'
