@@ -67,6 +67,9 @@ _M.rule_refresh = {
     -- 运行配置热更新（后台统一管理，取代直接改本文件）
     config_version_key = "waf:config:version",
     config_data_key    = "waf:config:data",
+    -- CC 防刷精细化规则（按 host + 路径配置不同阈值）
+    cc_rules_key      = "waf:cc:rules",     -- CC 规则集（JSON）
+    cc_version_key    = "waf:cc:version",   -- CC 规则版本号
     event_key     = "waf:event:list",       -- 攻击事件队列（LPUSH）
     stat_key      = "waf:stat:counter",     -- 统计计数
 }
