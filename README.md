@@ -75,7 +75,7 @@ docker compose up -d --build
 ### 使用 GHCR 镜像
 
 main 分支 / `v*` 标签 push 后，GitHub Actions 自动构建并推送到
-`ghcr.io/<owner>/openresty-waf`（支持 amd64 / arm64 多架构）：
+`ghcr.io/<owner>/openresty-waf`（linux/amd64）：
 
 ```bash
 docker pull ghcr.io/<owner>/openresty-waf:latest
