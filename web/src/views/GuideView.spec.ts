@@ -10,8 +10,8 @@ const apiMock = vi.hoisted(() => ({
 vi.mock('@/api', () => ({ api: apiMock }))
 
 const guide = {
-  redis: { addr: '192.168.100.4:16379', password: '', db: 0 },
-  install_command: 'curl -fsSL http://localhost/api/setup/install.sh | bash -s -- http://localhost 192.168.100.4:16379  0',
+  redis: { addr: '192.168.100.4:16379', password: '', db: 8 },
+  install_command: 'curl -fsSL http://localhost/api/setup/install.sh | bash -s -- http://localhost -a 192.168.100.4:16379 -d 8',
   download_url: 'http://localhost/api/setup/waf.tar.gz',
   nginx_config: 'lua_package_path "/opt/waf/?.lua;;";\ninit_by_lua_file /opt/waf/init.lua;',
 }
@@ -76,5 +76,18 @@ describe('GuideView 接入指引页', () => {
     await flushPromises()
 
     expect(w.text()).toContain('Redis 连接失败')
+  })
+
+  it('已配置时回显已保存的库号', async () => {
+    apiMock.get
+      .mockResolvedValueOnce({ done: true, redis_configured: true, redis_addr: '192.168.100.4:16379' })
+      .mockResolvedValueOnce(guide)
+
+    const w = mount(GuideView)
+    await flushPromises()
+
+    const dbInput = w.findAll('input').find((i) => (i.element as HTMLInputElement).type === 'number')
+    expect(dbInput).toBeTruthy()
+    expect((dbInput!.element as HTMLInputElement).value).toBe('8')
   })
 })

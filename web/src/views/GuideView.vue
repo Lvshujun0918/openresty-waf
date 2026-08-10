@@ -36,6 +36,10 @@ async function load() {
       guide.value = await api.get<SetupGuide>(
         `/setup/guide?admin=${encodeURIComponent(window.location.origin)}`,
       )
+      // 回显已保存的库号，避免表单默认 0 在再次保存时误覆盖
+      if (guide.value?.redis) {
+        db.value = guide.value.redis.db ?? db.value
+      }
     } catch (e: any) {
       error.value = e.message || '加载接入指引失败'
     }
