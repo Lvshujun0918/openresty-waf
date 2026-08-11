@@ -10,6 +10,7 @@ import { Settings } from 'lucide-vue-next'
 const config = reactive<any>({
   mode: 'active',
   modules: {},
+  detection: {},
   cc: {},
   block: {},
   log: {},
@@ -21,6 +22,7 @@ const config = reactive<any>({
 const loading = ref(false)
 const saving = ref(false)
 const msg = ref('')
+const excludePaths = ref('')
 
 // 数组 <-> 逗号字符串
 function toList(s: string): string[] {
@@ -55,6 +57,7 @@ async function load() {
     const d = await api.get<{ config: any }>('/config')
     Object.assign(config, d.config || {})
     config.modules = config.modules || {}
+    config.detection = config.detection || {}
     config.cc = config.cc || {}
     config.block = config.block || {}
     config.log = config.log || {}
@@ -65,6 +68,7 @@ async function load() {
     config.challenge.captcha = config.challenge.captcha || {}
     denyExt.value = toStr(config.upload.deny_ext)
     denyMime.value = toStr(config.upload.deny_mime)
+    excludePaths.value = toStr(config.detection.exclude_paths)
   } catch (e: any) {
     msg.value = e.message || '配置加载失败'
   } finally {
@@ -77,6 +81,8 @@ async function save() {
   msg.value = ''
   config.upload.deny_ext = toList(denyExt.value)
   config.upload.deny_mime = toList(denyMime.value)
+  config.detection = config.detection || {}
+  config.detection.exclude_paths = toList(excludePaths.value)
   try {
     await api.put('/config', { config })
     msg.value = '已保存并下发，引擎将在数秒内热更新生效'
@@ -130,6 +136,28 @@ onMounted(load)
             <input v-model="config.modules[key]" type="checkbox" class="h-4 w-4" />
             {{ label }}
           </label>
+        </CardContent>
+      </Card>
+
+      <!-- 豁免路径（降低误报） -->
+      <Card>
+        <CardHeader>
+          <CardTitle>检测豁免路径</CardTitle>
+          <CardDescription>命中这些路径前缀的请求跳过规则检测（IP 黑白名单 / CC 防刷仍生效），用于规避 JSON API 误报</CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-3">
+          <div class="space-y-1.5">
+            <Label>路径前缀（逗号分隔）</Label>
+            <textarea
+              v-model="excludePaths"
+              rows="3"
+              placeholder="/api/auth/, /api/public/"
+              class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            ></textarea>
+            <p class="text-xs text-muted-foreground">
+              例如登录/注册/统计等误报接口可在此豁免；libinjection 语义检测与 CRS 关键字规则仍作用于其他路径
+            </p>
+          </div>
         </CardContent>
       </Card>
 
