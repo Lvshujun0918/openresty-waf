@@ -23,6 +23,9 @@ export interface EventItem {
   id: number
   time: string
   client_ip: string
+  country?: string
+  province?: string
+  city?: string
   method: string
   host: string
   uri: string
@@ -65,6 +68,9 @@ export interface TrafficItem {
   id: number
   time: string
   client_ip: string
+  country?: string
+  province?: string
+  city?: string
   method: string
   host: string
   uri: string

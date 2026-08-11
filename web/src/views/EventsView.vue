@@ -112,7 +112,10 @@ onMounted(async () => {
             <TableRow v-for="e in events" :key="e.id">
               <TableCell class="whitespace-nowrap text-xs">{{ e.time }}</TableCell>
               <TableCell class="max-w-[140px] truncate text-xs">{{ e.host || '-' }}</TableCell>
-              <TableCell class="font-mono text-xs">{{ e.client_ip }}</TableCell>
+              <TableCell class="text-xs">
+                <div class="font-mono">{{ e.client_ip }}</div>
+                <div v-if="e.country" class="text-[11px] text-muted-foreground">{{ [e.country, e.province, e.city].filter(Boolean).join(' ') }}</div>
+              </TableCell>
               <TableCell class="text-xs">{{ e.method }}</TableCell>
               <TableCell class="max-w-[200px] truncate font-mono text-xs">{{ e.uri }}</TableCell>
               <TableCell><Badge variant="destructive">{{ e.group }}</Badge></TableCell>
