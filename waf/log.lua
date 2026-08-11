@@ -11,9 +11,20 @@
 local storage = require "storage"
 local cjson   = require "cjson.safe"
 
+-- 查询 IP 归属（数据可用时；log 阶段微秒级，失败返回 nil 优雅降级）
+local function lookup_geo(ip)
+    if not ip or ip == "" then return nil end
+    local ok, geo = pcall(function()
+        return require("ip_region").lookup(ip)
+    end)
+    if ok and geo then return geo end
+    return nil
+end
+
 -- 组装事件列表（数据在 access 阶段已缓存到 ctx，log 阶段不依赖请求对象）
 local function build_events(ctx)
     local events = {}
+    local geo = lookup_geo(ctx.client_ip)
     for _, m in ipairs(ctx.matched or {}) do
         events[#events + 1] = {
             time      = os.date("!%Y-%m-%dT%H:%M:%SZ"),  -- RFC3339 UTC
@@ -27,6 +38,9 @@ local function build_events(ctx)
             msg       = m.msg,
             severity  = m.severity,
             status    = ngx.status,
+            country   = geo and geo.country or "",
+            province  = geo and geo.province or "",
+            city      = geo and geo.city or "",
         }
     end
     return events
@@ -69,6 +83,7 @@ if traffic and traffic.enabled then
             rule_ids[#rule_ids + 1] = m.id
         end
     end
+    local geo = lookup_geo(ctx and ctx.client_ip or nil)
     local rec = {
         time          = os.date("!%Y-%m-%dT%H:%M:%SZ"),  -- RFC3339 UTC
         client_ip     = ctx and ctx.client_ip or "",
@@ -80,6 +95,9 @@ if traffic and traffic.enabled then
         attack        = ctx and ctx.matched and #ctx.matched > 0,
         rule_ids      = table.concat(rule_ids, ","),
         response_time = ctx and ((ngx.now() - ctx.start_time) * 1000) or 0,
+        country       = geo and geo.country or "",
+        province      = geo and geo.province or "",
+        city          = geo and geo.city or "",
     }
     local key = traffic.redis_key or "waf:traffic:list"
     local ok, err = ngx.timer.at(0, push_to_redis, key, { cjson.encode(rec) })

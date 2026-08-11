@@ -176,6 +176,12 @@ end
 function _M.init()
     publish_config()
 
+    -- IP 地理信息库（可选：/opt/waf/ip2region.xdb 缺失时优雅降级，不阻断启动）
+    pcall(function()
+        local ip_region = require "ip_region"
+        ip_region.init()
+    end)
+
     local ok, err = storage.set_shared(config.dict.rules, RULES_KEY,
                                       storage.encode(builtin))
     if not ok then
