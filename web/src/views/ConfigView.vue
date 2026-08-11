@@ -23,6 +23,7 @@ const loading = ref(false)
 const saving = ref(false)
 const msg = ref('')
 const excludePaths = ref('')
+const paranoiaLevel = ref('1')
 
 // 数组 <-> 逗号字符串
 function toList(s: string): string[] {
@@ -69,6 +70,7 @@ async function load() {
     denyExt.value = toStr(config.upload.deny_ext)
     denyMime.value = toStr(config.upload.deny_mime)
     excludePaths.value = toStr(config.detection.exclude_paths)
+    paranoiaLevel.value = String(config.detection.paranoia_level ?? 1)
   } catch (e: any) {
     msg.value = e.message || '配置加载失败'
   } finally {
@@ -83,6 +85,7 @@ async function save() {
   config.upload.deny_mime = toList(denyMime.value)
   config.detection = config.detection || {}
   config.detection.exclude_paths = toList(excludePaths.value)
+  config.detection.paranoia_level = Number(paranoiaLevel.value)
   try {
     await api.put('/config', { config })
     msg.value = '已保存并下发，引擎将在数秒内热更新生效'
@@ -142,12 +145,24 @@ onMounted(load)
       <!-- 豁免路径（降低误报） -->
       <Card>
         <CardHeader>
-          <CardTitle>检测豁免路径</CardTitle>
-          <CardDescription>命中这些路径前缀的请求跳过规则检测（IP 黑白名单 / CC 防刷仍生效），用于规避 JSON API 误报</CardDescription>
+          <CardTitle>检测策略</CardTitle>
+          <CardDescription>CRS 偏执级别与规则检测豁免</CardDescription>
         </CardHeader>
-        <CardContent class="space-y-3">
+        <CardContent class="space-y-4">
+          <div class="space-y-1.5 max-w-xs">
+            <Label>CRS 偏执级别</Label>
+            <select v-model="paranoiaLevel" class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
+              <option value="1">PL1 · 核心规则（低误报，推荐）</option>
+              <option value="2">PL2 · 含启发式检测</option>
+              <option value="3">PL3 · 更严格</option>
+              <option value="4">PL4 · 最严格（高误报风险）</option>
+            </select>
+            <p class="text-xs text-muted-foreground">
+              档位越高启用的 CRS 规则越多、检出越高但误报越高；建议默认 PL1
+            </p>
+          </div>
           <div class="space-y-1.5">
-            <Label>路径前缀（逗号分隔）</Label>
+            <Label>检测豁免路径（逗号分隔）</Label>
             <textarea
               v-model="excludePaths"
               rows="3"
@@ -155,7 +170,7 @@ onMounted(load)
               class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             ></textarea>
             <p class="text-xs text-muted-foreground">
-              例如登录/注册/统计等误报接口可在此豁免；libinjection 语义检测与 CRS 关键字规则仍作用于其他路径
+              命中这些路径前缀时跳过规则检测（IP 黑白名单 / CC 仍生效），用于规避 JSON API 误报
             </p>
           </div>
         </CardContent>
