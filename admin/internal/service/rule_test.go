@@ -75,6 +75,55 @@ func TestRuleService_BuildRuleset(t *testing.T) {
 	}
 }
 
+func TestRuleParanoiaLevel(t *testing.T) {
+	cases := map[string]int{
+		// PL1：关键字/语义/自定义
+		"942110": 1, "10001": 1, "940001": 1, "941130": 1, "931110": 1,
+		"921170": 1, "20001": 1,
+		// PL2：SQL 启发式（探测/特殊字符/认证绕过）
+		"942340": 2, "942370": 2, "942430": 2, "942490": 2, "942420": 2,
+		// PL2：XSS 混淆/编码
+		"941360": 2, "941370": 2, "941380": 2,
+		// 非法/非数字
+		"abc": 1, "": 1,
+	}
+	for id, want := range cases {
+		if got := model.RuleParanoiaLevel(id); got != want {
+			t.Errorf("RuleParanoiaLevel(%q) = %d, want %d", id, got, want)
+		}
+	}
+}
+
+func TestRuleService_BuildRuleset_Paranoia(t *testing.T) {
+	db := newTestDB(t)
+	s := NewRuleService(db, nil, newTestConfig())
+
+	db.Create(&model.Rule{RuleID: "942110", Operator: "REGEX", Pattern: "a", Enabled: true}) // PL1
+	db.Create(&model.Rule{RuleID: "942430", Operator: "REGEX", Pattern: "b", Enabled: true}) // PL2
+	db.Create(&model.Rule{RuleID: "10001", Operator: "REGEX", Pattern: "c", Enabled: true})  // 自定义 PL1
+
+	// 无 waf_config → 默认 PL1 → 只发布 PL1 两条
+	rs, err := s.BuildRuleset()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rs.Rules) != 2 {
+		t.Fatalf("PL1 应发布 2 条, got %d", len(rs.Rules))
+	}
+
+	// 配置 PL2 → 发布 3 条
+	if err := db.Create(&model.Setup{Key: SetupKeyWafConfig, Value: `{"detection":{"paranoia_level":2}}`}).Error; err != nil {
+		t.Fatal(err)
+	}
+	rs, err = s.BuildRuleset()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rs.Rules) != 3 {
+		t.Fatalf("PL2 应发布 3 条, got %d", len(rs.Rules))
+	}
+}
+
 func TestRuleService_CRUD(t *testing.T) {
 	db := newTestDB(t)
 	s := NewRuleService(db, nil, newTestConfig())

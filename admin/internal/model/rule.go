@@ -1,6 +1,31 @@
 package model
 
-import "time"
+import (
+	"strconv"
+	"time"
+)
+
+// RuleParanoiaLevel 返回 CRS 规则所属偏执级别（1-4）。
+// 非 CRS / 用户自定义规则返回 1（始终在最低档位参与检测）。
+// 高档位规则：SQL 注入启发式（认证绕过探测 / classic probings / 特殊字符异常）、
+// XSS 混淆/编码类——误报高，仅在用户调高档位时启用。
+func RuleParanoiaLevel(ruleID string) int {
+	id, err := strconv.Atoi(ruleID)
+	if err != nil {
+		return 1
+	}
+	switch {
+	case (id >= 942340 && id <= 942349) ||
+		(id >= 942370 && id <= 942379) ||
+		(id >= 942420 && id <= 942439) ||
+		(id >= 942490 && id <= 942499):
+		return 2
+	case id >= 941350 && id <= 941399:
+		return 2
+	default:
+		return 1
+	}
+}
 
 // Rule 拦截规则，字段与 Lua 规则引擎 DSL 一一对应，可序列化后经 Redis 下发。
 type Rule struct {

@@ -87,8 +87,9 @@ func defaultWafConfig() map[string]interface{} {
 			"semisense": false,
 		},
 		"detection": map[string]interface{}{
-			"exclude_paths": []string{},
-			"geo":           true,
+			"exclude_paths":  []string{},
+			"geo":            true,
+			"paranoia_level": 1,
 		},
 		"cc": map[string]interface{}{
 			"rate": "100/60", "ban_duration": 300,

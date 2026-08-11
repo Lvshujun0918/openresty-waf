@@ -59,20 +59,44 @@ func (s *RuleService) toEngineRule(r model.Rule) map[string]interface{} {
 }
 
 // BuildRuleset 从数据库构建待下发规则集（仅启用的规则，按站点与排序）
+// 按 CRS 偏执级别过滤：仅下发 paranoia_level <= 当前配置档位的规则
 func (s *RuleService) BuildRuleset() (*Ruleset, error) {
 	var rules []model.Rule
 	if err := s.db.Where("enabled = ?", true).
 		Order("site_id asc, sort_order asc, id asc").Find(&rules).Error; err != nil {
 		return nil, err
 	}
+	level := s.currentParanoiaLevel()
 	rs := &Ruleset{
 		Version: fmt.Sprintf("v%d", time.Now().UnixNano()),
 		Rules:   make([]map[string]interface{}, 0, len(rules)),
 	}
 	for _, r := range rules {
+		if model.RuleParanoiaLevel(r.RuleID) > level {
+			continue // 高档位规则，当前档位不参与检测
+		}
 		rs.Rules = append(rs.Rules, s.toEngineRule(r))
 	}
 	return rs, nil
+}
+
+// currentParanoiaLevel 读取后台运行配置中的 CRS 偏执级别（1-4，缺省 1）
+func (s *RuleService) currentParanoiaLevel() int {
+	var row struct{ Value string }
+	if err := s.db.Model(&model.Setup{}).Select("value").
+		Where("key = ?", SetupKeyWafConfig).Scan(&row).Error; err != nil || row.Value == "" {
+		return 1
+	}
+	var cfg map[string]interface{}
+	if err := json.Unmarshal([]byte(row.Value), &cfg); err != nil {
+		return 1
+	}
+	if det, ok := cfg["detection"].(map[string]interface{}); ok {
+		if v, ok := det["paranoia_level"].(float64); ok && v >= 1 && v <= 4 {
+			return int(v)
+		}
+	}
+	return 1
 }
 
 // Publish 发布规则集到 Redis，并自增版本号触发 Lua 引擎热更新。
