@@ -103,7 +103,9 @@ h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
 </body></html>`,
 		},
 		"log": map[string]interface{}{
-			"enabled": true, "backend": "file", "dir": "/var/log/waf",
+			// 默认走 Redis：攻击事件由后台消费展示（与 config_local 部署模式一致）；
+			// 需要本地文件可在此改为 "file"
+			"enabled": true, "backend": "redis", "dir": "/var/log/waf",
 			"format": "json", "level": "info", "redis_key": "waf:event:list",
 		},
 		"whitelist": map[string]interface{}{
