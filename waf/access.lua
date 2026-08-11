@@ -95,9 +95,23 @@ end
 -- 2. 规则引擎（URL / Args / Cookie / Header / Body 等规则）
 local ruleset = engine.get_ruleset()
 if ruleset then
-    local result = engine.run(ruleset, "access", ctx)
-    if result == "blocked" or result == "accepted" then
-        return
+    -- 豁免路径：命中前缀时跳过规则检测（用于规避 JSON API 误报）
+    local exempt = false
+    local ep = cfg.detection and cfg.detection.exclude_paths
+    if ep and #ep > 0 then
+        local uri = ngx.var.uri or ""
+        for _, p in ipairs(ep) do
+            if p ~= "" and (uri == p or uri:sub(1, #p) == p) then
+                exempt = true
+                break
+            end
+        end
+    end
+    if not exempt then
+        local result = engine.run(ruleset, "access", ctx)
+        if result == "blocked" or result == "accepted" then
+            return
+        end
     end
 end
 

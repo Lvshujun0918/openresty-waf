@@ -64,6 +64,44 @@ t.test("POST_ARGS: body 参数", function()
     t.eq(out[1], "admin' OR 1=1")
 end)
 
+t.test("POST_ARGS: JSON body 逐字段提取", function()
+    ngx_reset()
+    ngx.req._post = nil
+    ngx.req._body = '{"email":"x@163.com","password":"secret","nested":{"q":"<script>"},"tags":["a","b"]}'
+    ngx.var.content_type = "application/json; charset=utf-8"
+    local out = variables.collect({ type = "POST_ARGS" }, {})
+    -- 字段值：email / password / nested.q / tags 两个元素 = 5 个值
+    t.eq(#out, 5)
+    local set = {}
+    for _, v in ipairs(out) do set[v] = true end
+    t.ok(set["x@163.com"], "email 值")
+    t.ok(set["secret"], "password 值")
+    t.ok(set["<script>"], "嵌套值")
+    t.ok(set["a"] and set["b"], "数组元素")
+    -- 不包含 JSON 语法片段
+    t.no(set['"email"'])
+    t.no(set['{"email"'])
+end)
+
+t.test("POST_ARGS: JSON content-type 但 body 非 JSON 回退默认", function()
+    ngx_reset()
+    ngx.req._post = { username = "admin" }
+    ngx.req._body = "username=admin"
+    ngx.var.content_type = "application/json"
+    local out = variables.collect({ type = "POST_ARGS" }, {})
+    -- 非 JSON body 解析失败 → 回退 get_post_args
+    t.eq(out[1], "admin")
+end)
+
+t.test("POST_ARGS: 非 JSON content-type 保持默认", function()
+    ngx_reset()
+    ngx.req._post = { username = "admin" }
+    ngx.req._body = "username=admin"
+    ngx.var.content_type = "application/x-www-form-urlencoded"
+    local out = variables.collect({ type = "POST_ARGS" }, {})
+    t.eq(out[1], "admin")
+end)
+
 t.test("HEADERS: 全部与 specific", function()
     ngx_reset()
     ngx.req._headers = { ["user-agent"] = "sqlmap/1.0", host = "x.com" }

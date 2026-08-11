@@ -106,6 +106,15 @@ local operators = {
     LIBINJECTION_SQLI = function(value)
         local m = get_libinj()
         if not m.available then return false end
+        -- JSON 结构化：只对字段值做语义分析，避免 JSON 语法被误判
+        local util = require "rule_engine.util"
+        local ok, vals = util.try_parse_json(value)
+        if ok then
+            for _, v in ipairs(vals) do
+                if m.is_sqli(v) then return true end
+            end
+            return false
+        end
         return m.is_sqli(value)
     end,
 
@@ -113,6 +122,15 @@ local operators = {
     LIBINJECTION_XSS = function(value)
         local m = get_libinj()
         if not m.available then return false end
+        -- JSON 结构化：只对字段值做语义分析
+        local util = require "rule_engine.util"
+        local ok, vals = util.try_parse_json(value)
+        if ok then
+            for _, v in ipairs(vals) do
+                if m.is_xss(v) then return true end
+            end
+            return false
+        end
         return m.is_xss(value)
     end,
 }

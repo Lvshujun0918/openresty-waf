@@ -71,11 +71,34 @@ local function collect_raw(var)
 
     elseif typ == "POST_ARGS" then
         ngx.req.read_body()
-        local args = ngx.req.get_post_args()
-        if specific and specific ~= "" then
-            push_specific(args, specific, out)
+        local body = ngx.req.get_body_data()
+        -- JSON body 结构化：解析为字段值后检测，避免 JSON 语法（引号/冒号）被误判
+        local json_vals
+        local ct = ngx.var.content_type or ""
+        if body and ct:find("application/json", 1, true) then
+            local util = require "rule_engine.util"
+            local ok, vals = util.try_parse_json(body, include_keys)
+            if ok then
+                json_vals = vals
+            end
+        end
+        if json_vals then
+            if not (specific and specific ~= "") then
+                for _, v in ipairs(json_vals) do
+                    push(out, v)
+                end
+            else
+                -- specific 场景：JSON 展平值不含字段名映射，回退默认解析
+                local args = ngx.req.get_post_args()
+                push_specific(args, specific, out)
+            end
         else
-            collect_args(args, out, include_keys)
+            local args = ngx.req.get_post_args()
+            if specific and specific ~= "" then
+                push_specific(args, specific, out)
+            else
+                collect_args(args, out, include_keys)
+            end
         end
 
     elseif typ == "HEADERS" then

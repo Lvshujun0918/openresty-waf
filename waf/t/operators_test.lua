@@ -130,6 +130,32 @@ t.test("LIBINJECTION: 可用时按语义结果匹配", function()
     package.preload["libinjection_ffi"] = nil
 end)
 
+t.test("LIBINJECTION: JSON 结构化只检测字段值", function()
+    package.loaded["libinjection_ffi"] = nil
+    package.preload["libinjection_ffi"] = function()
+        return {
+            available = true,
+            is_sqli = function(s)
+                if s == nil then return false end
+                return string.find(tostring(s), "union", 1, true) ~= nil
+            end,
+            is_xss = function(s)
+                if s == nil then return false end
+                return string.find(tostring(s), "<script>", 1, true) ~= nil
+            end,
+        }
+    end
+    -- JSON 语法（引号/冒号/字段名）不误报
+    t.no(operators.eval("LIBINJECTION_SQLI", '{"email":"x@163.com","password":"hello","image_captcha_id":"61945958-3ec8-4d50-8e04-c24153cdd87c"}'))
+    -- 字段值含注入特征 → 命中
+    t.ok(operators.eval("LIBINJECTION_SQLI", '{"q":"1 union select 2"}'))
+    t.ok(operators.eval("LIBINJECTION_XSS", '{"q":"<script>alert(1)</script>"}'))
+    -- 非 JSON 原样检测
+    t.ok(operators.eval("LIBINJECTION_SQLI", "1 union select 2"))
+    package.loaded["libinjection_ffi"] = nil
+    package.preload["libinjection_ffi"] = nil
+end)
+
 t.test("is_valid: 语义运算符有效", function()
     t.ok(operators.is_valid("LIBINJECTION_SQLI"))
     t.ok(operators.is_valid("LIBINJECTION_XSS"))
