@@ -7,6 +7,9 @@ type Event struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Time      time.Time `gorm:"index" json:"time"`   // 攻击时间
 	ClientIP  string    `gorm:"size:64;index" json:"client_ip"`
+	Country   string    `gorm:"size:64" json:"country"`
+	Province  string    `gorm:"size:64" json:"province"`
+	City      string    `gorm:"size:64" json:"city"`
 	Method    string    `gorm:"size:16" json:"method"`
 	Host      string    `gorm:"size:255" json:"host"`
 	URI       string    `gorm:"type:text" json:"uri"`

@@ -88,6 +88,7 @@ func defaultWafConfig() map[string]interface{} {
 		},
 		"detection": map[string]interface{}{
 			"exclude_paths": []string{},
+			"geo":           true,
 		},
 		"cc": map[string]interface{}{
 			"rate": "100/60", "ban_duration": 300,
