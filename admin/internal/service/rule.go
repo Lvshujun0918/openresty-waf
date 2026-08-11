@@ -44,6 +44,12 @@ func (s *RuleService) toEngineRule(r model.Rule) map[string]interface{} {
 			"msg":     r.Message,
 		}
 	}
+	// 仲裁优先级：用户自定义规则（salience 100）可覆盖内置/CRS 规则（salience 10），
+	// 使「放行/豁免规则」能压过内置拦截
+	salience := 10
+	if !r.IsSeed {
+		salience = 100
+	}
 	return map[string]interface{}{
 		"id":         r.RuleID,
 		"group":      r.Group,
@@ -55,6 +61,7 @@ func (s *RuleService) toEngineRule(r model.Rule) map[string]interface{} {
 		"pattern":    r.Pattern,
 		"transforms": transforms,
 		"actions":    actions,
+		"salience":   salience,
 	}
 }
 
