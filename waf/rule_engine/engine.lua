@@ -34,6 +34,8 @@ end
 
 -- 执行一个规则集（当前阶段）
 -- 返回 "blocked" / "accepted" / "matched" / nil
+-- 动作仲裁：收集全部命中 → 高 salience 优先；同级按 拦截 > 放行 > 记录。
+-- 使「用户放行规则（高 salience）」可以覆盖「内置/CRS 拦截规则」。
 function _M.run(ruleset, phase, waf_ctx)
     waf_ctx = waf_ctx or {}
     waf_ctx.score = waf_ctx.score or 0
@@ -42,6 +44,8 @@ function _M.run(ruleset, phase, waf_ctx)
 
     local rules = ruleset.rules or {}
     local i, n = 1, #rules
+    -- 命中动作收集（仲裁用）
+    local hits = {}
 
     while i <= n do
         local rule = rules[i]
@@ -57,13 +61,17 @@ function _M.run(ruleset, phase, waf_ctx)
                 }
 
                 local action = rule.actions or {}
-                local result = actions.execute(waf_ctx, action, rule)
+                local disrupt = action.disrupt
 
-                if result == "accepted" then
-                    return "accepted"
-                end
-                if result == "blocked" then
-                    return "blocked"
+                -- SCORE：累计异常分，不参与动作仲裁（最后阈值判定）
+                if disrupt == "SCORE" then
+                    waf_ctx.score = (waf_ctx.score or 0) + (tonumber(action.value) or 1)
+                elseif disrupt and disrupt ~= "LOG_ONLY" then
+                    -- 其余动作（BLOCK/DROP/ALLOW/ACCEPT/REDIRECT）收集后仲裁
+                    hits[#hits + 1] = {
+                        actions  = action,
+                        salience = tonumber(rule.salience) or 10,
+                    }
                 end
 
                 -- 跳转处理
@@ -77,6 +85,33 @@ function _M.run(ruleset, phase, waf_ctx)
             end
         else
             i = i + 1
+        end
+    end
+
+    -- 动作仲裁：最高 salience 的命中集内，按 拦截(3) > 放行(2) > 记录(1) 取最终动作
+    if #hits > 0 then
+        local top = hits[1].salience
+        for k = 2, #hits do
+            if hits[k].salience > top then top = hits[k].salience end
+        end
+        local rank = { BLOCK = 3, DROP = 3, ALLOW = 2, ACCEPT = 2, REDIRECT = 2 }
+        local best, best_rank
+        for _, h in ipairs(hits) do
+            if h.salience == top then
+                local r = rank[h.actions.disrupt] or 1
+                if not best_rank or r > best_rank then
+                    best, best_rank = h, r
+                end
+            end
+        end
+        if best then
+            local result = actions.execute(waf_ctx, best.actions, nil)
+            if result == "accepted" then
+                return "accepted"
+            end
+            if result == "blocked" then
+                return "blocked"
+            end
         end
     end
 

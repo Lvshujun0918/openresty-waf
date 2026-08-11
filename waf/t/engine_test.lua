@@ -50,7 +50,7 @@ t.test("命中 + BLOCK + detect 模式仅记录", function()
     t.eq(#ctx.matched, 1)
 end)
 
-t.test("命中 + ACCEPT → accepted 且跳过后续规则", function()
+t.test("仲裁：同优先级下 BLOCK 优先于 ACCEPT", function()
     ngx_reset()
     ngx.var.uri = "/union select"
     local rs = {
@@ -60,11 +60,33 @@ t.test("命中 + ACCEPT → accepted 且跳过后续规则", function()
         },
     }
     local ctx = { mode = "active" }
+    t.exits(function() engine.run(rs, "access", ctx) end, 403, "BLOCK")
+    -- 两条命中均被记录（供审计）
+    t.eq(#ctx.matched, 2)
+end)
+
+t.test("仲裁：用户 ALLOW 高 salience 覆盖种子 BLOCK", function()
+    ngx_reset()
+    ngx.var.uri = "/union select"
+    local rs = {
+        rules = {
+            rule({ id = "1", actions = { disrupt = "BLOCK" }, salience = 10 }),
+            rule({ id = "2", actions = { disrupt = "ALLOW" }, salience = 100 }),
+        },
+    }
+    local ctx = { mode = "active" }
     local res = engine.run(rs, "access", ctx)
     t.eq(res, "accepted")
-    -- 规则 2 不应被执行
-    t.eq(#ctx.matched, 1)
-    t.eq(ctx.matched[1].id, "1")
+    t.eq(#ctx.matched, 2)
+end)
+
+t.test("命中 + ALLOW → accepted 放行", function()
+    ngx_reset()
+    ngx.var.uri = "/union select"
+    local rs = { rules = { rule({ actions = { disrupt = "ALLOW" } }) } }
+    local ctx = { mode = "active" }
+    local res = engine.run(rs, "access", ctx)
+    t.eq(res, "accepted")
 end)
 
 t.test("phase 过滤：非当前阶段规则跳过", function()

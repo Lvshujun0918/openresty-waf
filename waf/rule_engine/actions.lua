@@ -53,6 +53,10 @@ function _M.execute(waf_ctx, action, rule)
     elseif disrupt == "ACCEPT" then
         return "accepted"
 
+    elseif disrupt == "ALLOW" then
+        -- 放行：不拦截（配合高 salience 可覆盖低优先级拦截规则）
+        return "accepted"
+
     elseif disrupt == "REDIRECT" then
         if mode == "active" then
             ngx.redirect(action.location or "/", ngx.HTTP_MOVED_TEMPORARILY)
