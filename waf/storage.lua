@@ -109,6 +109,11 @@ function _M.redis_get(key)
     local val, err2 = red:get(key)
     release(red)
     if err2 then return nil, err2 end
+    -- lua-resty-redis 对不存在的键返回 ngx.null（userdata），统一归一为 nil。
+    -- 否则调用方把 ngx.null 误判为"有值"，会继续读取并因 JSON 解析失败误报"规则集非法"。
+    if val == ngx.null then
+        return nil
+    end
     return val
 end
 
