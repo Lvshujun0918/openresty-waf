@@ -86,6 +86,9 @@ func defaultWafConfig() map[string]interface{} {
 			"challenge": true, "protocol_check": true, "leak_check": true,
 			"semisense": false,
 		},
+		"detection": map[string]interface{}{
+			"exclude_paths": []string{},
+		},
 		"cc": map[string]interface{}{
 			"rate": "100/60", "ban_duration": 300,
 			"ban_key_prefix": "waf:cc:ban:", "counter_prefix": "waf:cc:cnt:",

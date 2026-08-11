@@ -713,7 +713,7 @@ var SeedRulesCRS = []Rule{
 	{RuleID: `942420`, Name: `Restricted SQL Character Anomaly Detection (cookies): # of special characters exceeded (8)`, Group: `sqli`, Phase: "access", Severity: 2, Enabled: true,
 		Operator: `REGEX`, Pattern: "((?:(?:[!-\\+\\-:->@\\[\\]\\^`\\{-~]|\\x{c2}\\x{b4}|\\x{e2}\\x80[\\x98\\x99])[^!-\\+\\-:->@\\[\\]\\^`\\{-~]*?){8})",
 		Transforms: "[]", Vars: "[{\"type\":\"COOKIE\"},{\"type\":\"COOKIE\",\"parse\":[\"keys\"]}]",
-		Actions: "{\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"Restricted SQL Character Anomaly Detection (cookies): # of special characters exceeded (8)\"}", Status: 403, Message: `Restricted SQL Character Anomaly Detection (cookies): # of special characters exceeded (8)`, SortOrder: 176},
+		Actions: "{\"disrupt\":\"LOG_ONLY\",\"status\":403,\"msg\":\"Restricted SQL Character Anomaly Detection (cookies): # of special characters exceeded (8)\"}", Status: 0, Message: `Restricted SQL Character Anomaly Detection (cookies): # of special characters exceeded (8)`, SortOrder: 176},
 	{RuleID: `942460`, Name: `Meta-Character Anomaly Detection Alert - Repetitive Non-Word Characters`, Group: `sqli`, Phase: "access", Severity: 2, Enabled: true,
 		Operator: `REGEX`, Pattern: `\W{4}`,
 		Transforms: "[]", Vars: "[{\"type\":\"URI_ARGS\"},{\"type\":\"POST_ARGS\"}]",
