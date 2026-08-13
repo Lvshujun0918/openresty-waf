@@ -22,6 +22,7 @@ export interface Rule {
 export interface EventItem {
   id: number
   time: string
+  req_id?: string
   client_ip: string
   country?: string
   province?: string
@@ -30,6 +31,7 @@ export interface EventItem {
   host: string
   uri: string
   rule_id: string
+  rule_ids?: string
   group: string
   msg: string
   severity: number
@@ -67,6 +69,7 @@ export interface IpListSub {
 export interface TrafficItem {
   id: number
   time: string
+  req_id?: string
   client_ip: string
   country?: string
   province?: string

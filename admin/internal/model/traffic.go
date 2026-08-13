@@ -7,6 +7,7 @@ import "time"
 type TrafficLog struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
 	Time         time.Time `gorm:"index" json:"time"`       // 请求时间（RFC3339 UTC）
+	ReqID        string    `gorm:"size:64;index" json:"req_id"` // 每请求唯一 ID
 	ClientIP     string    `gorm:"size:64;index" json:"client_ip"`
 	Country      string    `gorm:"size:64" json:"country"`
 	Province     string    `gorm:"size:64" json:"province"`

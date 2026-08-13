@@ -38,7 +38,7 @@ const message = ref('')
 
 function fmtTime(t: string) {
   if (!t) return '-'
-  return t.replace('T', ' ').replace(/\.\d+/, '').replace('Z', '')
+  return t.replace('T', ' ').replace(/\.\d+/, '').replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '')
 }
 function geoText(e: TrafficItem) {
   return [e.country, e.province, e.city].filter(Boolean).join(' ')

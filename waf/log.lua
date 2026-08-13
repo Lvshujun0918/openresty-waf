@@ -21,29 +21,52 @@ local function lookup_geo(ip)
     return nil
 end
 
--- 组装事件列表（数据在 access 阶段已缓存到 ctx，log 阶段不依赖请求对象）
-local function build_events(ctx)
-    local events = {}
+-- 本地时区偏移（如 +08:00），保证入库时间为本地时间而非 UTC
+local function tz_offset()
+    local now = os.time()
+    local utc = os.time(os.date("!*t", now))
+    local diff = os.difftime(now, utc)
+    local sign = diff < 0 and "-" or "+"
+    local a = math.abs(diff)
+    return string.format("%s%02d:%02d", sign, math.floor(a / 3600), math.floor((a % 3600) / 60))
+end
+
+-- 本地时间戳（RFC3339 带时区偏移）
+local function ts_now()
+    return os.date("%Y-%m-%dT%H:%M:%S") .. tz_offset()
+end
+
+-- 组装单条攻击事件：一个请求最多一条（即使命中多条规则）。
+-- 主命中取 severity 最高者（同级别取先命中），rule_ids 列出全部命中。
+local function build_event(ctx)
     local geo = lookup_geo(ctx.client_ip)
-    for _, m in ipairs(ctx.matched or {}) do
-        events[#events + 1] = {
-            time      = os.date("!%Y-%m-%dT%H:%M:%SZ"),  -- RFC3339 UTC
-            ts        = ngx.now(),
-            client_ip = ctx.client_ip,
-            method    = ctx.request and ctx.request.method,
-            host      = ctx.request and ctx.request.host,
-            uri       = ctx.request and ctx.request.uri,
-            rule_id   = m.id,
-            group     = m.group,
-            msg       = m.msg,
-            severity  = m.severity,
-            status    = ngx.status,
-            country   = geo and geo.country or "",
-            province  = geo and geo.province or "",
-            city      = geo and geo.city or "",
-        }
+    local matches = ctx.matched or {}
+    local primary = matches[1]
+    local rule_ids = {}
+    for _, m in ipairs(matches) do
+        rule_ids[#rule_ids + 1] = m.id
+        if primary == nil or (m.severity or 0) > (primary.severity or 0) then
+            primary = m
+        end
     end
-    return events
+    return {
+        time      = ts_now(),   -- 本地时间（带时区偏移）
+        req_id    = ctx.req_id or "",
+        ts        = ngx.now(),
+        client_ip = ctx.client_ip,
+        method    = ctx.request and ctx.request.method,
+        host      = ctx.request and ctx.request.host,
+        uri       = ctx.request and ctx.request.uri,
+        rule_id   = primary and primary.id,
+        rule_ids  = table.concat(rule_ids, ","),
+        group     = primary and primary.group,
+        msg       = primary and primary.msg,
+        severity  = primary and primary.severity,
+        status    = ngx.status,
+        country   = geo and geo.country or "",
+        province  = geo and geo.province or "",
+        city      = geo and geo.city or "",
+    }
 end
 
 -- file 后端：按天追加写
@@ -85,7 +108,8 @@ if traffic and traffic.enabled then
     end
     local geo = lookup_geo(ctx and ctx.client_ip or nil)
     local rec = {
-        time          = os.date("!%Y-%m-%dT%H:%M:%SZ"),  -- RFC3339 UTC
+        time          = ts_now(),  -- 本地时间（带时区偏移）
+        req_id        = ctx and ctx.req_id or "",
         client_ip     = ctx and ctx.client_ip or "",
         method        = ctx and ctx.request and ctx.request.method or "",
         host          = ctx and ctx.request and ctx.request.host or "",
@@ -115,21 +139,15 @@ if not (cfg.log and cfg.log.enabled) then
     return
 end
 
-local events = build_events(ctx)
+local event = build_event(ctx)
 local backend = cfg.log.backend or "file"
 
 if backend == "redis" then
     local key = cfg.log.redis_key or "waf:event:list"
-    local payloads = {}
-    for _, ev in ipairs(events) do
-        payloads[#payloads + 1] = cjson.encode(ev)
-    end
-    local ok, err = ngx.timer.at(0, push_to_redis, key, payloads)
+    local ok, err = ngx.timer.at(0, push_to_redis, key, { cjson.encode(event) })
     if not ok then
         ngx.log(ngx.ERR, "[waf] 调度事件上报失败: ", tostring(err))
     end
 else
-    for _, ev in ipairs(events) do
-        write_file(cfg, cjson.encode(ev))
-    end
+    write_file(cfg, cjson.encode(event))
 end

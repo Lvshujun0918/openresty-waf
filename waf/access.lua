@@ -8,9 +8,23 @@ local engine    = require "rule_engine.engine"
 local storage   = require "storage"
 local operators = require "rule_engine.operators"
 
+-- 每请求唯一 ID：worker pid + 毫秒时间戳 + 连接序号 + 请求内自增
+local req_seq = 0
+local function gen_req_id()
+    req_seq = (req_seq + 1) % 0xFFFF
+    return string.format(
+        "%d-%d-%d-%d",
+        ngx.worker.pid(),
+        math.floor(ngx.now() * 1000),
+        tonumber(ngx.var.connection or 0) % 0x100000000,
+        req_seq
+    )
+end
+
 -- 初始化请求上下文（写入 ngx.ctx，供 log 等后续阶段使用）
 local function new_ctx(cfg)
     local ctx = {
+        req_id          = gen_req_id(),
         mode            = cfg.mode or "active",
         score           = 0,
         score_threshold = cfg.score_threshold or 5,

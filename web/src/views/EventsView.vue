@@ -41,10 +41,10 @@ const groupMeta: Record<string, { label: string; color: string }> = {
 }
 const groupOptions = ['sqli', 'xss', 'rce', 'lfi', 'ssrf', 'protocol', 'leak', 'scanner', 'custom']
 
-// 时间格式化：2026-08-13T08:00:00Z → 08-13 08:00:00
+// 时间格式化：2026-08-13T18:28:43+08:00 → 08-13 18:28:43
 function fmtTime(t: string) {
   if (!t) return '-'
-  return t.replace('T', ' ').replace(/\.\d+/, '').replace('Z', '')
+  return t.replace('T', ' ').replace(/\.\d+/, '').replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '')
 }
 
 // 动作判定（事件 status 为 HTTP 状态码：403 即被拦截）
@@ -137,6 +137,7 @@ onMounted(async () => {
           <TableHeader>
             <TableRow>
               <TableHead>时间</TableHead>
+              <TableHead>请求 ID</TableHead>
               <TableHead>攻击来源</TableHead>
               <TableHead>攻击类型</TableHead>
               <TableHead>命中规则</TableHead>
@@ -148,6 +149,9 @@ onMounted(async () => {
           <TableBody>
             <TableRow v-for="e in events" :key="e.id">
               <TableCell class="whitespace-nowrap text-xs text-muted-foreground">{{ fmtTime(e.time) }}</TableCell>
+              <TableCell>
+                <span class="font-mono text-[11px] text-muted-foreground" :title="e.req_id || ''">{{ (e.req_id || '-').slice(-12) }}</span>
+              </TableCell>
               <TableCell>
                 <div class="font-mono text-xs">{{ e.client_ip }}</div>
                 <div v-if="e.country" class="flex items-center gap-1 text-[11px] text-muted-foreground">
@@ -183,7 +187,7 @@ onMounted(async () => {
               </TableCell>
             </TableRow>
             <TableRow v-if="events.length === 0">
-              <TableCell colspan="7" class="py-8 text-center text-muted-foreground">
+              <TableCell colspan="8" class="py-8 text-center text-muted-foreground">
                 暂无数据，可先触发一次攻击或点击"消费 Redis 队列"
               </TableCell>
             </TableRow>

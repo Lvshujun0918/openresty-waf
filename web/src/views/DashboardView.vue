@@ -135,6 +135,12 @@ function formatNum(n: number) {
   return String(n)
 }
 
+// 时间格式化：2026-08-13T18:28:43+08:00 → 08-13 18:28:43
+function fmtTime(t: string) {
+  if (!t) return '-'
+  return t.replace('T', ' ').replace(/\.\d+/, '').replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '')
+}
+
 // 归属地文本拼接
 function geoText(c?: string, p?: string, ct?: string) {
   return [c, p, ct].filter(Boolean).join(' ')
@@ -442,7 +448,7 @@ onMounted(load)
             </TableHeader>
             <TableBody>
               <TableRow v-for="e in recentEvents" :key="e.id">
-                <TableCell class="whitespace-nowrap text-xs text-muted-foreground">{{ e.time }}</TableCell>
+                <TableCell class="whitespace-nowrap text-xs text-muted-foreground">{{ fmtTime(e.time) }}</TableCell>
                 <TableCell>
                   <div class="font-mono text-xs">{{ e.client_ip }}</div>
                   <div v-if="e.country" class="text-[11px] text-muted-foreground">{{ geoText(e.country, e.province, e.city) }}</div>
