@@ -58,7 +58,7 @@ func (s *TriggerRuleService) Update(id uint, r *model.TriggerRule) error {
 	return s.db.Model(&model.TriggerRule{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"name": r.Name, "kind": r.Kind, "match_logic": r.MatchLogic,
 		"enabled": r.Enabled, "sort_order": r.SortOrder, "conditions": r.Conditions,
-		"updated_at": time.Now(),
+		"config": r.Config, "updated_at": time.Now(),
 	}).Error
 }
 
@@ -86,12 +86,13 @@ func (s *TriggerRuleService) Publish() (*TriggerRuleset, error) {
 	}
 	// 条件序列化：把每条规则的 Conditions JSON 字符串解析为数组，供引擎直接使用
 	type outRule struct {
-		ID         uint                        `json:"id"`
-		Name       string                      `json:"name"`
-		Kind       string                      `json:"kind"`
-		MatchLogic string                      `json:"match_logic"`
-		Enabled    bool                        `json:"enabled"`
-		Conditions []model.TriggerCondition    `json:"conditions"`
+		ID         uint                     `json:"id"`
+		Name       string                   `json:"name"`
+		Kind       string                   `json:"kind"`
+		MatchLogic string                   `json:"match_logic"`
+		Enabled    bool                     `json:"enabled"`
+		Conditions []model.TriggerCondition `json:"conditions"`
+		Config     map[string]interface{}   `json:"config"`
 	}
 	out := make([]outRule, 0, len(rules))
 	for _, r := range rules {
@@ -99,9 +100,13 @@ func (s *TriggerRuleService) Publish() (*TriggerRuleset, error) {
 		if r.Conditions != "" {
 			_ = json.Unmarshal([]byte(r.Conditions), &conds)
 		}
+		var cfg map[string]interface{}
+		if r.Config != "" {
+			_ = json.Unmarshal([]byte(r.Config), &cfg)
+		}
 		out = append(out, outRule{
 			ID: r.ID, Name: r.Name, Kind: r.Kind, MatchLogic: r.MatchLogic,
-			Enabled: r.Enabled, Conditions: conds,
+			Enabled: r.Enabled, Conditions: conds, Config: cfg,
 		})
 	}
 	rs := &TriggerRuleset{Version: fmt.Sprintf("v%d", time.Now().UnixNano()), Rules: nil}

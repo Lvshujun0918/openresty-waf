@@ -40,28 +40,6 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
-    name: 'cc',
-    path: '/cc',
-    component: 'layout.base$view.cc',
-    meta: {
-      title: 'cc',
-      i18nKey: 'route.cc',
-      icon: 'mdi:gauge',
-      order: 6
-    }
-  },
-  {
-    name: 'challenge',
-    path: '/challenge',
-    component: 'layout.base$view.challenge',
-    meta: {
-      title: 'challenge',
-      i18nKey: 'route.challenge',
-      icon: 'mdi:robot',
-      order: 7
-    }
-  },
-  {
     name: 'config',
     path: '/config',
     component: 'layout.base$view.config',
@@ -69,7 +47,7 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'config',
       i18nKey: 'route.config',
       icon: 'mdi:cog',
-      order: 10
+      order: 9
     }
   },
   {
@@ -102,7 +80,7 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'guide',
       i18nKey: 'route.guide',
       icon: 'mdi:book-open-variant',
-      order: 11
+      order: 10
     }
   },
   {
@@ -138,7 +116,7 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'ip-lists',
       i18nKey: 'route.ip-lists',
       icon: 'mdi:account-group',
-      order: 9
+      order: 8
     }
   },
   {
@@ -176,6 +154,17 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'trigger-records',
+    path: '/trigger-records',
+    component: 'layout.base$view.trigger-records',
+    meta: {
+      title: 'trigger-records',
+      i18nKey: 'route.trigger-records',
+      icon: 'mdi:history',
+      order: 7
+    }
+  },
+  {
     name: 'trigger-rules',
     path: '/trigger-rules',
     component: 'layout.base$view.trigger-rules',
@@ -183,7 +172,7 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'trigger-rules',
       i18nKey: 'route.trigger-rules',
       icon: 'mdi:filter-variant',
-      order: 8
+      order: 6
     }
   }
 ];

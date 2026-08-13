@@ -143,6 +143,16 @@ export function consumeChallenges() {
   return request<{ status: string; consumed: number }>({ url: '/challenges/consume', method: 'post' });
 }
 
+/** CC 触发事件列表 */
+export function fetchCcLogs(params: Record<string, string | number>) {
+  return request<Api.Waf.PageResult<Api.Waf.CcLogItem>>({ url: '/cc-logs', params });
+}
+
+/** 消费 CC 触发队列 */
+export function consumeCcLogs() {
+  return request<{ status: string; consumed: number }>({ url: '/cc-logs/consume', method: 'post' });
+}
+
 /** 触发规则列表 */
 export function fetchTriggerRules(params: Record<string, string | number> = {}) {
   return request<{ items: Api.Waf.TriggerRule[] }>({ url: '/trigger-rules', params });

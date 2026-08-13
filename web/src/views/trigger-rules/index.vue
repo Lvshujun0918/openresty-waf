@@ -28,9 +28,9 @@ import {
 const message = useMessage();
 
 const kindMeta: Record<string, { label: string; type: 'primary' | 'success' | 'warning' | 'error'; desc: string }> = {
-  challenge: { label: '人机验证', type: 'primary', desc: '命中后需先通过人机验证（JS 挑战 / 验证码）才可访问，验证方式在「人机验证」页配置' },
+  challenge: { label: '人机验证', type: 'primary', desc: '命中后需先通过人机验证（JS 挑战 / 验证码）才可访问，验证模式可在此规则内单独配置' },
   exempt: { label: '豁免检测', type: 'success', desc: '命中后跳过全部规则检测，直接放行（用于可信来源 / 静态资源等）' },
-  cc: { label: 'CC 限流', type: 'warning', desc: '命中后参与频率限制，超限自动封禁 IP，阈值与封禁时长在「CC 限流」页配置' }
+  cc: { label: 'CC 限流', type: 'warning', desc: '命中后参与频率限制，超限自动封禁 IP，频率阈值与封禁时长可在此规则内单独配置' }
 };
 const fieldMeta: Record<string, { label: string }> = {
   host: { label: '域名' },
@@ -154,6 +154,21 @@ const columns = [
       )
   },
   {
+    title: '动作配置',
+    key: 'config',
+    width: 150,
+    render: (row: Api.Waf.TriggerRule) => {
+      const cfg = parseConfig(row.config);
+      if (row.kind === 'cc') {
+        return h('span', { class: 'font-mono text-xs' }, `${cfg.rate || '100/60'} · 封禁${cfg.ban_duration || 300}s`);
+      }
+      if (row.kind === 'challenge') {
+        return h('span', { class: 'font-mono text-xs' }, String(cfg.mode || 'basic'));
+      }
+      return h('span', { class: 'text-xs text-[rgb(125,125,125)]' }, '-');
+    }
+  },
+  {
     title: '启用',
     key: 'enabled',
     width: 70,
@@ -183,7 +198,50 @@ const editOpen = ref(false);
 const saving = ref(false);
 const editingId = ref<number | null>(null);
 const form = reactive({ name: '', kind: 'challenge', match_logic: 'and', enabled: true, sort_order: 0 });
+// 规则级动作配置
+const ccConfig = reactive({ rate_count: 100, rate_seconds: 60, ban_duration: 300 });
+const challengeMode = ref('basic');
 const conditions = ref<Cond[]>([]);
+
+function parseConfig(raw?: string): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const obj = JSON.parse(raw);
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
+function applyConfig(raw?: string, kind = '') {
+  const cfg = parseConfig(raw);
+  if (kind === 'cc') {
+    const m = String(cfg.rate || '100/60').match(/^(\d+)\/(\d+)$/);
+    ccConfig.rate_count = m ? Number(m[1]) : 100;
+    ccConfig.rate_seconds = m ? Number(m[2]) : 60;
+    ccConfig.ban_duration = Number(cfg.ban_duration) || 300;
+  } else if (kind === 'challenge') {
+    challengeMode.value = String(cfg.mode || 'basic');
+  }
+}
+
+function buildConfig(kind: string): string {
+  if (kind === 'cc') {
+    return JSON.stringify({ rate: `${ccConfig.rate_count}/${ccConfig.rate_seconds}`, ban_duration: ccConfig.ban_duration });
+  }
+  if (kind === 'challenge') {
+    return JSON.stringify({ mode: challengeMode.value });
+  }
+  return '';
+}
+
+function resetConfigDefaults(kind: string) {
+  if (kind === 'cc') {
+    Object.assign(ccConfig, { rate_count: 100, rate_seconds: 60, ban_duration: 300 });
+  } else if (kind === 'challenge') {
+    challengeMode.value = 'basic';
+  }
+}
 
 const fieldOptions = Object.keys(fieldMeta).map(k => ({ label: fieldMeta[k].label, value: k }));
 const allOpOptions = Object.keys(opMeta).map(k => ({ label: opMeta[k].label, value: k }));
@@ -210,6 +268,7 @@ function addCondition() {
 function openCreate() {
   editingId.value = null;
   Object.assign(form, { name: '', kind: 'challenge', match_logic: 'and', enabled: true, sort_order: 0 });
+  resetConfigDefaults(form.kind);
   conditions.value = [emptyCond()];
   editOpen.value = true;
 }
@@ -223,9 +282,15 @@ function openEdit(row: Api.Waf.TriggerRule) {
     enabled: row.enabled,
     sort_order: row.sort_order
   });
+  resetConfigDefaults(row.kind);
+  applyConfig(row.config, row.kind);
   conditions.value = parseConditions(row.conditions);
   if (conditions.value.length === 0) conditions.value = [emptyCond()];
   editOpen.value = true;
+}
+
+function onKindChange(kind: string) {
+  resetConfigDefaults(kind);
 }
 
 async function save() {
@@ -244,7 +309,8 @@ async function save() {
     match_logic: form.match_logic,
     enabled: form.enabled,
     sort_order: form.sort_order,
-    conditions: JSON.stringify(validConds)
+    conditions: JSON.stringify(validConds),
+    config: buildConfig(form.kind)
   };
   saving.value = true;
   try {
@@ -313,11 +379,39 @@ onMounted(load);
             <NSelect
               v-model:value="form.kind"
               :options="Object.keys(kindMeta).map(k => ({ label: kindMeta[k].label, value: k }))"
+              @update:value="onKindChange"
             />
             <div class="mt-2 rounded bg-[rgb(245,245,245)] px-3 py-2 text-xs text-[rgb(80,80,80)]">
               {{ kindMeta[form.kind]?.desc }}
             </div>
           </div>
+        </NFormItem>
+
+        <!-- CC 限流规则级配置 -->
+        <NFormItem v-if="form.kind === 'cc'" label="频率限制">
+          <NSpace align="center" :wrap="true">
+            <span class="text-sm text-[rgb(125,125,125)]">每</span>
+            <NInputNumber v-model:value="ccConfig.rate_seconds" :min="1" class="w-24" />
+            <span class="text-sm text-[rgb(125,125,125)]">秒内最多</span>
+            <NInputNumber v-model:value="ccConfig.rate_count" :min="1" class="w-28" />
+            <span class="text-sm text-[rgb(125,125,125)]">次</span>
+          </NSpace>
+        </NFormItem>
+        <NFormItem v-if="form.kind === 'cc'" label="封禁时长(s)">
+          <NInputNumber v-model:value="ccConfig.ban_duration" :min="1" class="w-32" />
+          <span class="ml-2 text-xs text-[rgb(125,125,125)]">超限后封禁该 IP 的秒数</span>
+        </NFormItem>
+
+        <!-- 人机验证规则级配置 -->
+        <NFormItem v-if="form.kind === 'challenge'" label="验证模式">
+          <NSpace>
+            <NTag :type="challengeMode === 'basic' ? 'primary' : 'default'" bordered class="cursor-pointer" @click="challengeMode = 'basic'">
+              basic（JS/Cookie 挑战）
+            </NTag>
+            <NTag :type="challengeMode === 'geetest' ? 'primary' : 'default'" bordered class="cursor-pointer" @click="challengeMode = 'geetest'">
+              geetest（极验验证码）
+            </NTag>
+          </NSpace>
         </NFormItem>
         <NFormItem label="排序">
           <NInputNumber v-model:value="form.sort_order" :min="0" />

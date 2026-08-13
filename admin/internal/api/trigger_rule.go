@@ -39,6 +39,7 @@ type triggerRuleReq struct {
 	Enabled    bool   `json:"enabled"`
 	SortOrder  int    `json:"sort_order"`
 	Conditions string `json:"conditions"`
+	Config     string `json:"config"`
 }
 
 // Create POST /api/trigger-rules
@@ -54,6 +55,7 @@ func (h *TriggerRuleHandler) Create(c *gin.Context) {
 	r := &model.TriggerRule{
 		Name: req.Name, Kind: req.Kind, MatchLogic: req.MatchLogic,
 		Enabled: req.Enabled, SortOrder: req.SortOrder, Conditions: req.Conditions,
+		Config: req.Config,
 	}
 	if err := h.svc.Create(r); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -77,6 +79,7 @@ func (h *TriggerRuleHandler) Update(c *gin.Context) {
 	r := &model.TriggerRule{
 		Name: req.Name, Kind: req.Kind, MatchLogic: req.MatchLogic,
 		Enabled: req.Enabled, SortOrder: req.SortOrder, Conditions: req.Conditions,
+		Config: req.Config,
 	}
 	if err := h.svc.Update(uint(id), r); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

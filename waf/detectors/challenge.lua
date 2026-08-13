@@ -35,9 +35,11 @@ local function verify_pass(cookie_val, ip, cfg)
 end
 
 -- 检查请求是否已通过验证：通过返回 nil，需要挑战返回 "challenge"
-function _M.check(waf_ctx, cfg)
+-- force=true 时忽略全局 enabled 开关（触发规则命中的场景：规则级配置即可生效）
+function _M.check(waf_ctx, cfg, force)
     local ch = cfg.challenge
-    if not ch or not ch.enabled then return nil end
+    if not ch then return nil end
+    if not force and not ch.enabled then return nil end
     local cookie = ngx.var.http_cookie or ""
     local val = cookie:match(ch.cookie_name .. "=([^;]+)")
     if val and verify_pass(val, waf_ctx.client_ip, ch) then
@@ -196,19 +198,25 @@ local function tz_offset()
     return string.format("%s%02d:%02d", sign, math.floor(a / 3600), math.floor((a % 3600) / 60))
 end
 
--- 记录一次人机验证事件
+-- 记录一次人机验证事件（含详细参数，供后台「触发记录」详情展示）
 -- action: "issue"（下发挑战页）| "pass"（验证通过）| "fail"（验证失败）
 local function record(waf_ctx, action)
     local client_ip = waf_ctx and waf_ctx.client_ip or ngx.var.remote_addr or ""
     local ok, geo = pcall(function()
         return require("ip_region").lookup(client_ip)
     end)
+    local evidence = (waf_ctx and waf_ctx.evidence) or {}
     local rec = {
         time       = os.date("%Y-%m-%dT%H:%M:%S") .. tz_offset(),
         req_id     = waf_ctx and waf_ctx.req_id or "",
         client_ip  = client_ip,
         action     = action,
+        method     = waf_ctx and waf_ctx.request and waf_ctx.request.method or "",
+        host       = waf_ctx and waf_ctx.request and waf_ctx.request.host or "",
         uri        = ngx.var.request_uri or "",
+        rule_name  = waf_ctx and waf_ctx.trigger_rule or "",
+        headers    = cjson.encode(evidence.headers or {}),
+        body       = evidence.body or "",
         country    = ok and geo and geo.country or "",
         province   = ok and geo and geo.province or "",
         city       = ok and geo and geo.city or "",
@@ -237,6 +245,22 @@ function _M.serve_page(waf_ctx, cfg)
     if redirect ~= "" then
         redirect = ngx.unescape_uri(redirect)
     end
+    -- 触发规则名（access.lua 重定向时携带，用于「触发记录」展示）
+    local rule_name = ngx.var.arg_rule or ""
+    if rule_name ~= "" then
+        rule_name = ngx.unescape_uri(rule_name)
+        waf_ctx.trigger_rule = rule_name
+    end
+    -- 捕获当前请求头作为证据（供「触发记录」详情展示）
+    local all_hdrs = ngx.req.get_headers()
+    local hdrs = {}
+    if all_hdrs then
+        for k, v in pairs(all_hdrs) do
+            hdrs[#hdrs + 1] = { name = tostring(k), value = tostring(v) }
+        end
+    end
+    table.sort(hdrs, function(a, b) return a.name < b.name end)
+    waf_ctx.evidence = { headers = hdrs }
     record(waf_ctx, "issue")
     ngx.header.content_type = "text/html; charset=utf-8"
     -- 双保险：HTTP Set-Cookie 直接种下（不依赖前端 JS 执行），

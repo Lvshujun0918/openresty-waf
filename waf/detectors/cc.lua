@@ -1,12 +1,14 @@
 -- detectors/cc.lua
 -- CC 防刷：基于共享内存计数，同 IP 同 Host 同路径超频后临时封禁该 IP。
--- 频率阈值 / 封禁时长来自全局配置（config.cc，后台「CC 限流」页维护），
--- 哪些请求参与限流由「触发规则」页的 cc 触发规则（host/UA/请求头/IP 等条件）决定。
+-- 频率阈值 / 封禁时长来自命中的触发规则 config（缺省回退全局 config.cc），
+-- 哪些请求参与限流由「触发规则」页的 cc 触发规则（host/UA/请求头/IP 等条件）决定；
+-- 触发封禁时记录一条 CC 触发事件（waf:cc:list，后台「触发记录」页展示）。
 
 local _M = {}
 
 local config  = require "config"
 local storage = require "storage"
+local cjson   = require "cjson.safe"
 
 -- 解析 "count/seconds" 形式阈值，缺省 100/60
 local function parse_rate(rate)
@@ -17,15 +19,59 @@ local function parse_rate(rate)
     return tonumber(count), tonumber(seconds)
 end
 
+-- 本地时区偏移（与 log.lua 保持一致）
+local function tz_offset()
+    local now = os.time()
+    local utc = os.time(os.date("!*t", now))
+    local diff = os.difftime(now, utc)
+    local sign = diff < 0 and "-" or "+"
+    local a = math.abs(diff)
+    return string.format("%s%02d:%02d", sign, math.floor(a / 3600), math.floor((a % 3600) / 60))
+end
+
 -- 该 IP 是否在封禁期
 local function is_banned(cfg, ip)
     local key = (cfg.cc.ban_key_prefix or "waf:cc:ban:") .. ip
     return storage.get_shared(config.dict.counter, key) ~= nil
 end
 
+-- 记录一次 CC 触发事件（封禁/已在封禁期时上报，含详细参数供后台「触发记录」详情）
+-- rule_name: 命中的触发规则名称
+function _M.record(waf_ctx, cfg, rule_name)
+    local client_ip = waf_ctx and waf_ctx.client_ip or ngx.var.remote_addr or ""
+    local ok, geo = pcall(function()
+        return require("ip_region").lookup(client_ip)
+    end)
+    local evidence = (waf_ctx and waf_ctx.evidence) or {}
+    local rec = {
+        time       = os.date("%Y-%m-%dT%H:%M:%S") .. tz_offset(),
+        req_id     = waf_ctx and waf_ctx.req_id or "",
+        client_ip  = client_ip,
+        country    = ok and geo and geo.country or "",
+        province   = ok and geo and geo.province or "",
+        city       = ok and geo and geo.city or "",
+        method     = waf_ctx and waf_ctx.request and waf_ctx.request.method or "",
+        host       = waf_ctx and waf_ctx.request and waf_ctx.request.host or "",
+        uri        = waf_ctx and waf_ctx.request and waf_ctx.request.uri or "",
+        rule_name  = rule_name or "",
+        headers    = cjson.encode(evidence.headers or {}),
+        body       = evidence.body or "",
+        status     = ngx.status and ngx.status ~= 0 and ngx.status or 503, -- 记录封禁拦截状态
+    }
+    local ok2, err = ngx.timer.at(0, function(premature)
+        if premature then return end
+        local storage2 = require "storage"
+        storage2.redis_lpush("waf:cc:list", cjson.encode(rec))
+    end)
+    if not ok2 then
+        ngx.log(ngx.ERR, "[waf] 调度 CC 触发事件上报失败: ", tostring(err))
+    end
+end
+
 -- 执行 CC 检查：
+-- rate / ban_duration 可传触发规则级配置（nil 时回退全局 cfg.cc）
 -- 返回 "banned"（触发封禁或已在封禁期）/ nil（正常）
-function _M.check(waf_ctx, cfg)
+function _M.check(waf_ctx, cfg, rate, ban_duration)
     if not (cfg and cfg.cc) then
         return nil
     end
@@ -42,9 +88,9 @@ function _M.check(waf_ctx, cfg)
     local host = (waf_ctx.request and waf_ctx.request.host) or ""
     local path = (waf_ctx.request and waf_ctx.request.path) or "/"
 
-    -- 全局频率阈值与封禁时长（后台「CC 限流」页维护，随配置热更新）
-    local rate = cfg.cc.rate or "100/60"
-    local ban_duration = cfg.cc.ban_duration or 300
+    -- 规则级阈值优先，缺省回退全局
+    rate = rate or cfg.cc.rate or "100/60"
+    ban_duration = ban_duration or cfg.cc.ban_duration or 300
 
     local count, seconds = parse_rate(rate)
     -- 计数维度：IP + Host + 路径（不含 query string）

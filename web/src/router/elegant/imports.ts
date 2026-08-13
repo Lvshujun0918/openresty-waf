@@ -20,8 +20,6 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   500: () => import("@/views/_builtin/500/index.vue"),
   "iframe-page": () => import("@/views/_builtin/iframe-page/[url].vue"),
   login: () => import("@/views/_builtin/login/index.vue"),
-  cc: () => import("@/views/cc/index.vue"),
-  challenge: () => import("@/views/challenge/index.vue"),
   config: () => import("@/views/config/index.vue"),
   dashboard: () => import("@/views/dashboard/index.vue"),
   events: () => import("@/views/events/index.vue"),
@@ -30,5 +28,6 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   "ip-lists": () => import("@/views/ip-lists/index.vue"),
   rules: () => import("@/views/rules/index.vue"),
   traffic: () => import("@/views/traffic/index.vue"),
+  "trigger-records": () => import("@/views/trigger-records/index.vue"),
   "trigger-rules": () => import("@/views/trigger-rules/index.vue"),
 };

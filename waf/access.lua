@@ -119,7 +119,7 @@ local ctx = new_ctx(cfg)
 
 
 -- 0. 挑战相关路径（验证页 / 回调），不参与规则检测
-if cfg.challenge and cfg.challenge.enabled then
+if cfg.challenge then
     local uri = ngx.var.uri or ""
     if uri == cfg.challenge.page_path then
         require("detectors.challenge").serve_page(ctx, cfg)
@@ -172,17 +172,28 @@ if ruleset then
     end
 end
 
--- 3. 人机验证触发：命中 challenge 触发规则（host/UA/请求头/IP 等条件）且未通过验证时进入验证页
-if cfg.challenge and cfg.challenge.enabled then
+-- 3. 人机验证触发：命中 challenge 触发规则（host/UA/请求头/IP 等条件）且未通过验证时进入验证页。
+--    验证模式取规则 config（缺省用全局）；规则级触发不受全局 enabled 开关限制。
+if cfg.challenge then
     local ch = require "detectors.challenge"
     local trigger = require "rule_engine.trigger"
-    local triggered = trigger.match_any("challenge", ctx)
-    if triggered then
-        if not ch.check(ctx, cfg) then
+    local rule = trigger.match_first("challenge", ctx)
+    if rule then
+        -- 规则级验证模式（缺省用全局）
+        local rule_cfg = rule.config or {}
+        if rule_cfg.mode then
+            cfg.challenge.mode = rule_cfg.mode
+        end
+        -- 未通过验证（无有效 cookie）才进入挑战
+        if not ch.check(ctx, cfg, true) then
             return  -- 已通过验证，放行
         end
+        -- 记录触发规则名 + 捕获请求证据（供「触发记录」详情）
+        ctx.trigger_rule = rule.name
+        pcall(capture_evidence, ctx)
         if ctx.mode == "active" then
             local target = cfg.challenge.page_path .. "?redirect=" .. ngx.escape_uri(ngx.var.request_uri or "/")
+                .. "&rule=" .. ngx.escape_uri(rule.name or "")
             ngx.redirect(target, ngx.HTTP_TEMPORARY_REDIRECT)
             return
         end
@@ -191,13 +202,18 @@ if cfg.challenge and cfg.challenge.enabled then
     end
 end
 
--- 4. CC 防刷：命中 cc 触发规则（host/UA/请求头/IP 等条件）的请求参与限流
-if cfg.modules and cfg.modules.cc_check then
+-- 4. CC 防刷：命中 cc 触发规则（host/UA/请求头/IP 等条件）的请求参与限流，
+--    频率阈值 / 封禁时长取规则 config（缺省回退全局）
+if cfg.cc then
     local cc = require "detectors.cc"
     local trigger = require "rule_engine.trigger"
-    -- 触发规则决定哪些请求参与 CC 限流（未配置 cc 规则时 CC 不生效）
-    if trigger.match_any("cc", ctx) then
-        if cc.check(ctx, cfg) == "banned" then
+    local rule = trigger.match_first("cc", ctx)
+    if rule then
+        local rule_cfg = rule.config or {}
+        if cc.check(ctx, cfg, rule_cfg.rate, rule_cfg.ban_duration) == "banned" then
+            -- 上报 CC 触发事件（含详细参数）
+            pcall(capture_evidence, ctx)
+            cc.record(ctx, cfg, rule.name)
             if ctx.mode == "active" then
                 -- 人机验证：已通过验证（check 返回 nil）则解除封禁放行；否则进入验证页
                 if cfg.challenge and cfg.challenge.enabled then
@@ -207,6 +223,7 @@ if cfg.modules and cfg.modules.cc_check then
                         return  -- 验证通过，放行
                     end
                     local target = cfg.challenge.page_path .. "?redirect=" .. ngx.escape_uri(ngx.var.request_uri or "/")
+                        .. "&rule=" .. ngx.escape_uri(rule.name or "")
                     ngx.redirect(target, ngx.HTTP_TEMPORARY_REDIRECT)
                     return
                 end

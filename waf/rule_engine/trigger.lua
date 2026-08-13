@@ -106,6 +106,15 @@ function _M.match_any(kind, ctx)
     return false
 end
 
+-- 返回第一个命中的规则（含 config 动作参数），供 access.lua 使用规则级配置
+function _M.match_first(kind, ctx)
+    local rules = _M.get_rules(kind)
+    for _, r in ipairs(rules or {}) do
+        if _M.match(r, ctx) then return r end
+    end
+    return nil
+end
+
 -- 是否已配置该类触发规则
 function _M.has_rules(kind)
     return #(_M.get_rules(kind) or {}) > 0

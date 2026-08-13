@@ -20,8 +20,6 @@ declare module "@elegant-router/types" {
     "403": "/403";
     "404": "/404";
     "500": "/500";
-    "cc": "/cc";
-    "challenge": "/challenge";
     "config": "/config";
     "dashboard": "/dashboard";
     "events": "/events";
@@ -32,6 +30,7 @@ declare module "@elegant-router/types" {
     "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?";
     "rules": "/rules";
     "traffic": "/traffic";
+    "trigger-records": "/trigger-records";
     "trigger-rules": "/trigger-rules";
   };
 
@@ -67,8 +66,6 @@ declare module "@elegant-router/types" {
     | "403"
     | "404"
     | "500"
-    | "cc"
-    | "challenge"
     | "config"
     | "dashboard"
     | "events"
@@ -79,6 +76,7 @@ declare module "@elegant-router/types" {
     | "login"
     | "rules"
     | "traffic"
+    | "trigger-records"
     | "trigger-rules"
   >;
 
@@ -101,8 +99,6 @@ declare module "@elegant-router/types" {
     | "500"
     | "iframe-page"
     | "login"
-    | "cc"
-    | "challenge"
     | "config"
     | "dashboard"
     | "events"
@@ -111,6 +107,7 @@ declare module "@elegant-router/types" {
     | "ip-lists"
     | "rules"
     | "traffic"
+    | "trigger-records"
     | "trigger-rules"
   >;
 

@@ -28,6 +28,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	trafficHandler := NewTrafficHandler(db, mgr, cfg)
 	dashboardHandler := NewDashboardHandler(db)
 	challengeHandler := NewChallengeHandler(db, mgr, cfg)
+	ccLogHandler := NewCcLogHandler(db, mgr, cfg)
 	triggerRuleHandler := NewTriggerRuleHandler(db, mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
@@ -86,6 +87,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			// 人机验证事件
 			authed.GET("/challenges", challengeHandler.List)
 			authed.POST("/challenges/consume", challengeHandler.Consume)
+
+			// CC 触发事件
+			authed.GET("/cc-logs", ccLogHandler.List)
+			authed.POST("/cc-logs/consume", ccLogHandler.Consume)
 
 			// 触发规则（host/UA/请求头/IP 等条件筛选）
 			authed.GET("/trigger-rules", triggerRuleHandler.List)

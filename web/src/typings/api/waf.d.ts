@@ -106,7 +106,37 @@ declare namespace Api {
       province?: string;
       city?: string;
       action: string;
+      method?: string;
+      host?: string;
       uri: string;
+      /** 触发的触发规则名称 */
+      rule_name?: string;
+      /** 请求头 JSON（name/value 数组） */
+      headers?: string;
+      /** 请求体（最多 8KB） */
+      body?: string;
+      created_at?: string;
+    }
+
+    /** CC 触发事件 */
+    interface CcLogItem {
+      id: number;
+      time: string;
+      req_id?: string;
+      client_ip: string;
+      country?: string;
+      province?: string;
+      city?: string;
+      method?: string;
+      host?: string;
+      uri: string;
+      /** 触发的触发规则名称 */
+      rule_name?: string;
+      /** 请求头 JSON（name/value 数组） */
+      headers?: string;
+      /** 请求体（最多 8KB） */
+      body?: string;
+      status: number;
       created_at?: string;
     }
 
@@ -129,6 +159,8 @@ declare namespace Api {
       sort_order: number;
       /** TriggerCondition JSON 数组 */
       conditions: string;
+      /** 动作配置 JSON（cc: rate/ban_duration；challenge: mode） */
+      config?: string;
       created_at?: string;
       updated_at?: string;
     }

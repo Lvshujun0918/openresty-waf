@@ -72,6 +72,25 @@ t.test("无 client_ip 返回 nil", function()
     t.isnil(cc.check(ctx, base_cfg()))
 end)
 
+t.test("规则级阈值优先于全局", function()
+    ngx_reset()
+    local cfg = base_cfg()
+    cfg.cc.rate = "100/60" -- 全局较宽松
+    local ctx = { client_ip = "1.2.3.4", request = { path = "/" } }
+    t.isnil(cc.check(ctx, cfg, "2/60", 60), "1st under rule rate 2")
+    t.eq(cc.check(ctx, cfg, "2/60", 60), "banned", "2nd banned by rule rate")
+end)
+
+t.test("规则级阈值缺省回退全局", function()
+    ngx_reset()
+    local cfg = base_cfg()
+    cfg.cc.rate = "3/60"
+    local ctx = { client_ip = "1.2.3.4", request = { path = "/" } }
+    cc.check(ctx, cfg) -- 不传规则级参数
+    cc.check(ctx, cfg)
+    t.eq(cc.check(ctx, cfg), "banned", "fallback to global rate 3")
+end)
+
 t.test("unban 解除封禁", function()
     ngx_reset()
     local cfg = base_cfg()

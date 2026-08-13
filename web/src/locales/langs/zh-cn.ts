@@ -230,9 +230,8 @@ const local: App.I18n.Schema = {
     events: '攻击事件',
     traffic: '流量日志',
     rules: '规则管理',
-    cc: 'CC 防刷',
-    challenge: '人机验证',
     'trigger-rules': '触发规则',
+    'trigger-records': '触发记录',
     'ip-lists': '黑白名单',
     config: '系统配置',
     guide: '接入指引'

@@ -234,9 +234,8 @@ const local: App.I18n.Schema = {
     events: 'Attack Events',
     traffic: 'Traffic Logs',
     rules: 'Rules',
-    cc: 'CC Protection',
-    challenge: 'Challenge',
     'trigger-rules': 'Trigger Rules',
+    'trigger-records': 'Trigger Records',
     'ip-lists': 'IP Lists',
     config: 'Settings',
     guide: 'Guide'
