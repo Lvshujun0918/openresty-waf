@@ -31,13 +31,45 @@ const modeMeta: Record<string, { label: string; type: 'success' | 'warning' | 'd
   off: { label: '放行模式', type: 'default' }
 };
 
-// 统计卡
+// 统计卡（渐变卡片，仿 Soybean demo card-data）
 const statCards = computed(() => [
-  { label: '今日请求', value: formatNum(stats.value?.today.request ?? 0), sub: `累计请求 ${formatNum(stats.value?.total.traffic ?? 0)}`, color: '#2563eb' },
-  { label: '今日拦截', value: formatNum(stats.value?.today.attack ?? 0), sub: `累计拦截 ${formatNum(stats.value?.total.events ?? 0)}`, color: '#ef4444' },
-  { label: '24H 拦截', value: formatNum(stats.value?.today.intercept_24h ?? 0), sub: '近 24 小时命中攻击', color: '#f97316' },
-  { label: '实时 QPS', value: (stats.value?.qps ?? 0).toFixed(1), sub: '近 60 秒请求均值', color: '#10b981' }
+  {
+    label: '今日请求',
+    value: stats.value?.today.request ?? 0,
+    decimals: 0,
+    sub: `累计请求 ${formatNum(stats.value?.total.traffic ?? 0)}`,
+    color: { start: '#56cdf3', end: '#719de3' },
+    icon: 'mdi:web'
+  },
+  {
+    label: '今日拦截',
+    value: stats.value?.today.attack ?? 0,
+    decimals: 0,
+    sub: `累计拦截 ${formatNum(stats.value?.total.events ?? 0)}`,
+    color: { start: '#ec4786', end: '#b955a4' },
+    icon: 'mdi:shield-alert'
+  },
+  {
+    label: '24H 拦截',
+    value: stats.value?.today.intercept_24h ?? 0,
+    decimals: 0,
+    sub: '近 24 小时命中攻击',
+    color: { start: '#fcbc25', end: '#f68057' },
+    icon: 'mdi:fire'
+  },
+  {
+    label: '实时 QPS',
+    value: Number((stats.value?.qps ?? 0).toFixed(1)),
+    decimals: 1,
+    sub: '近 60 秒请求均值',
+    color: { start: '#865ec0', end: '#5144b4' },
+    icon: 'mdi:gauge'
+  }
 ]);
+
+function getGradient(c: { start: string; end: string }) {
+  return `linear-gradient(to bottom right, ${c.start}, ${c.end})`;
+}
 
 function formatNum(n: number) {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
@@ -195,38 +227,56 @@ onMounted(load);
       </div>
     </NCard>
 
-    <!-- 统计卡 -->
-    <NGrid :x-gap="16" :y-gap="16" cols="1 s:2 l:4">
+    <!-- 统计卡（渐变卡片） -->
+    <NGrid :x-gap="16" :y-gap="16" cols="s:1 m:2 l:4" responsive="screen">
       <NGi v-for="card in statCards" :key="card.label">
-        <NCard :bordered="false" class="card-wrapper">
-          <NStatistic :label="card.label" :value="card.value">
-            <template #suffix>
-              <span class="text-xs text-[rgb(125,125,125)]">{{ card.sub }}</span>
-            </template>
-          </NStatistic>
-          <div class="mt-2 h-1 w-12 rounded-full" :style="{ background: card.color }" />
+        <div
+          class="px-4 pb-4 pt-2 text-white"
+          :style="{ backgroundImage: getGradient(card.color), borderRadius: '8px' }"
+        >
+          <h3 class="text-sm">{{ card.label }}</h3>
+          <div class="flex items-center justify-between pt-3">
+            <SvgIcon :icon="card.icon" class="text-3xl opacity-80" />
+            <div class="text-right">
+              <CountTo :end-value="card.value" :decimals="card.decimals || 0" class="text-2xl font-semibold leading-none" />
+              <div class="mt-1 text-[11px] opacity-80">{{ card.sub }}</div>
+            </div>
+          </div>
+        </div>
+      </NGi>
+    </NGrid>
+
+    <!-- 趋势图 + Web 攻击分布 -->
+    <NGrid :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
+      <NGi span="24 s:24 m:14">
+        <NCard :bordered="false" class="card-wrapper h-full" title="请求与攻击趋势">
+          <template #header-extra>
+            <span class="text-xs text-[rgb(125,125,125)]">近 14 天攻击命中 + 全量请求</span>
+          </template>
+          <div ref="trendRef" class="h-64 w-full" />
+        </NCard>
+      </NGi>
+      <NGi span="24 s:24 m:10">
+        <NCard :bordered="false" class="card-wrapper h-full" title="Web 攻击分布">
+          <template #header-extra>
+            <span class="text-xs text-[rgb(125,125,125)]">攻击类型占比</span>
+          </template>
+          <div ref="donutRef" class="h-64 w-full" />
         </NCard>
       </NGi>
     </NGrid>
 
-    <!-- 趋势图 -->
-    <NCard :bordered="false" class="card-wrapper" title="请求与攻击趋势">
-      <template #header-extra>
-        <span class="text-xs text-[rgb(125,125,125)]">近 14 天攻击命中 + 全量请求</span>
-      </template>
-      <div ref="trendRef" class="h-64 w-full" />
-    </NCard>
-
-    <NGrid :x-gap="16" :y-gap="16" cols="1 l:2">
-      <!-- Web 攻击分布 -->
-      <NGi>
-        <NCard :bordered="false" class="card-wrapper h-full" title="Web 攻击分布">
-          <div ref="donutRef" class="h-64 w-full" />
+    <!-- 归属地分布 + 攻击来源 Top 10 -->
+    <NGrid :x-gap="16" :y-gap="16" responsive="screen" item-responsive>
+      <NGi span="24 s:24 m:14">
+        <NCard :bordered="false" class="card-wrapper h-full" title="攻击来源归属地">
+          <template #header-extra>
+            <span class="text-xs text-[rgb(125,125,125)]">按国家聚合</span>
+          </template>
+          <div ref="countryRef" class="h-64 w-full" />
         </NCard>
       </NGi>
-
-      <!-- 攻击来源 Top 10 -->
-      <NGi>
+      <NGi span="24 s:24 m:10">
         <NCard :bordered="false" class="card-wrapper h-full" title="攻击来源 Top 10">
           <template #header-extra>
             <span class="text-xs text-[rgb(125,125,125)]">含归属地</span>
@@ -255,20 +305,12 @@ onMounted(load);
       </NGi>
     </NGrid>
 
-    <NGrid :x-gap="16" :y-gap="16" cols="1 l:2">
-      <!-- 归属地分布 -->
-      <NGi>
-        <NCard :bordered="false" class="card-wrapper h-full" title="攻击来源归属地">
-          <div ref="countryRef" class="h-64 w-full" />
-        </NCard>
-      </NGi>
-
-      <!-- 近期攻击事件 -->
-      <NGi>
-        <NCard :bordered="false" class="card-wrapper h-full" title="近期攻击事件">
-          <NDataTable :columns="eventColumns" :data="recentEvents" :loading="loading" :bordered="false" size="small" />
-        </NCard>
-      </NGi>
-    </NGrid>
+    <!-- 近期攻击事件 -->
+    <NCard :bordered="false" class="card-wrapper" title="近期攻击事件">
+      <template #header-extra>
+        <span class="text-xs text-[rgb(125,125,125)]">最近被检测到的攻击请求</span>
+      </template>
+      <NDataTable :columns="eventColumns" :data="recentEvents" :loading="loading" :bordered="false" size="small" />
+    </NCard>
   </div>
 </template>

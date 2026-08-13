@@ -1,55 +1,104 @@
 <script setup lang="ts">
-import { NCard, NCode, NTag } from 'naive-ui';
+import { onMounted, ref } from 'vue';
+import { NAlert, NButton, NCard, NCode, NSpace, NTag, useMessage } from 'naive-ui';
+import { fetchSetupGuide } from '@/service/api';
 
-const nginxConfig = `# 在需要防护的 server / location 中加入以下指令
-lua_package_path "/opt/waf/?.lua;;";
+interface SetupGuide {
+  redis: { addr: string; password: string; db: number };
+  install_command: string;
+  download_url: string;
+  nginx_config: string;
+}
 
-lua_shared_dict waf_rule    20m;   # 规则缓存/版本
-lua_shared_dict waf_counter 50m;   # 频控/统计计数
+const message = useMessage();
+const guide = ref<SetupGuide | null>(null);
+const loading = ref(false);
 
-init_by_lua_file   /opt/waf/init.lua;
-access_by_lua_file /opt/waf/access.lua;
-log_by_lua_file    /opt/waf/log.lua;`;
+async function load() {
+  loading.value = true;
+  try {
+    const res = await fetchSetupGuide();
+    guide.value = res.data ?? null;
+  } finally {
+    loading.value = false;
+  }
+}
 
-const ipRegionNote = `# IP 归属地（可选）
-# 将 ip2region_v4.xdb 放入 /opt/waf/ 即可（bind mount 随配置下发）
-# 缺失时自动降级：攻击日志不带归属地，不影响防护功能`;
+async function copyInstall() {
+  if (!guide.value) return;
+  await navigator.clipboard.writeText(guide.value.install_command);
+  message.success('一键安装命令已复制');
+}
 
-const deployNote = `# 管理后台
-# 访问 http://<服务器>:8232 使用 WAF 管理后台（admin / admin123）
-# 引擎接入本机 OpenResty，配置变更 5 秒内热更新生效`;
+async function copyNginx() {
+  if (!guide.value) return;
+  await navigator.clipboard.writeText(guide.value.nginx_config);
+  message.success('Nginx 配置已复制');
+}
+
+onMounted(load);
 </script>
 
 <template>
   <div class="space-y-4">
     <div>
       <h2 class="text-xl font-semibold">接入指引</h2>
-      <p class="text-sm text-[rgb(125,125,125)]">将 WAF 引擎挂载到任意 OpenResty 的 server / location</p>
+      <p class="text-sm text-[rgb(125,125,125)]">一键安装 WAF 组件到 /opt/waf 并接入本机 OpenResty</p>
     </div>
 
-    <NCard :bordered="false" class="card-wrapper" title="Nginx 接入配置">
-      <NCode :code="nginxConfig" language="nginx" word-wrap />
+    <NAlert v-if="!guide && !loading" type="warning" title="无法获取接入指引">
+      请先完成 Redis 配置（引导页/系统配置），以便生成一键安装命令。
+    </NAlert>
+
+    <!-- 一键安装 -->
+    <NCard v-if="guide" :bordered="false" class="card-wrapper" title="一键安装 WAF 组件（安装到 /opt/waf）">
+      <template #header-extra>
+        <NSpace>
+          <NButton size="small" type="primary" @click="copyInstall">复制安装命令</NButton>
+          <NButton size="small" secondary tag="a" :href="guide.download_url" download="waf.tar.gz">
+            下载 waf.tar.gz
+          </NButton>
+        </NSpace>
+      </template>
+      <NCode :code="guide.install_command" language="bash" word-wrap />
+      <div class="mt-3 flex flex-wrap gap-4 text-sm">
+        <div class="flex items-center gap-2">
+          <NTag size="small" type="info" bordered>Redis</NTag>
+          <span class="font-mono text-xs">{{ guide.redis.addr }} / db{{ guide.redis.db }}</span>
+        </div>
+        <div class="text-xs text-[rgb(125,125,125)]">
+          脚本会将 Lua 组件解压到 /opt/waf（init.lua 位于 /opt/waf/init.lua），并写入 config_local.lua（Redis 连接）
+        </div>
+      </div>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" title="IP 归属地（可选）">
-      <NCode :code="ipRegionNote" language="bash" word-wrap />
+    <!-- Nginx 接入 -->
+    <NCard v-if="guide" :bordered="false" class="card-wrapper" title="Nginx 接入配置">
+      <template #header-extra>
+        <NButton size="small" type="primary" @click="copyNginx">复制配置</NButton>
+      </template>
+      <NCode :code="guide.nginx_config" language="nginx" word-wrap />
     </NCard>
 
+    <!-- 部署说明 -->
     <NCard :bordered="false" class="card-wrapper" title="部署说明">
       <div class="space-y-2 text-sm">
         <div class="flex items-center gap-2">
           <NTag type="primary" size="small" bordered>1</NTag>
-          <span>将 <code class="rounded bg-[rgb(245,245,245)] px-1 font-mono text-xs">/opt/waf</code> 目录挂载到 OpenResty 容器或宿主机，加入上述 nginx 配置并 reload</span>
+          <span>复制上方一键安装命令在 OpenResty 服务器执行，组件安装至 <code class="rounded bg-[rgb(245,245,245)] px-1 font-mono text-xs">/opt/waf</code></span>
         </div>
         <div class="flex items-center gap-2">
           <NTag type="primary" size="small" bordered>2</NTag>
-          <span>后台「系统配置」可调整防护模式、CRS 偏执级别、豁免路径与日志后端</span>
+          <span>将 Nginx 接入配置加入需要防护的 server/location，reload 生效</span>
         </div>
         <div class="flex items-center gap-2">
           <NTag type="primary" size="small" bordered>3</NTag>
+          <span>IP 归属地：将 <code class="rounded bg-[rgb(245,245,245)] px-1 font-mono text-xs">ip2region_v4.xdb</code> 放入 /opt/waf（可选，缺失自动降级）</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <NTag type="primary" size="small" bordered>4</NTag>
           <span>「规则管理」修改规则后点击「发布到引擎」，5 秒内热更新生效</span>
         </div>
-        <NCode :code="deployNote" language="bash" word-wrap />
       </div>
     </NCard>
   </div>

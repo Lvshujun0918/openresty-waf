@@ -28,6 +28,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	ipListHandler := NewIpListHandler(db, mgr, cfg)
 	trafficHandler := NewTrafficHandler(db, mgr, cfg)
 	dashboardHandler := NewDashboardHandler(db)
+	challengeHandler := NewChallengeHandler(db, mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -89,6 +90,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 
 			// 仪表盘聚合统计
 			authed.GET("/dashboard/stats", dashboardHandler.Stats)
+
+			// 人机验证事件
+			authed.GET("/challenges", challengeHandler.List)
+			authed.POST("/challenges/consume", challengeHandler.Consume)
 
 			// WAF 运行配置
 			authed.GET("/config", configHandler.Get)

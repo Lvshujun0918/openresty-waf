@@ -100,6 +100,21 @@ func main() {
 		}
 	}()
 
+	// 人机验证事件：定时消费 Redis 队列实时落库（每 3 秒）
+	challengeSvc := service.NewChallengeService(db, mgr, cfg)
+	go func() {
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if mgr.GetClient() == nil {
+				continue
+			}
+			if _, err := challengeSvc.Consume(100); err != nil {
+				log.Printf("消费人机验证事件失败: %v", err)
+			}
+		}
+	}()
+
 	// 远程 IP 列表订阅定时同步（每分钟检查到期订阅）
 	ipListSvc := service.NewIpListService(db, mgr, cfg)
 	go func() {

@@ -188,12 +188,54 @@ local function verify_geetest(cfg, params)
 end
 
 -- ============================================================================
+-- 人机验证事件记录（下发/通过/失败），异步推送到 Redis 供后台展示
+-- ============================================================================
+
+-- 本地时区偏移（如 +08:00）
+local function tz_offset()
+    local now = os.time()
+    local utc = os.time(os.date("!*t", now))
+    local diff = os.difftime(now, utc)
+    local sign = diff < 0 and "-" or "+"
+    local a = math.abs(diff)
+    return string.format("%s%02d:%02d", sign, math.floor(a / 3600), math.floor((a % 3600) / 60))
+end
+
+-- 记录一次人机验证事件
+-- action: "issue"（下发挑战页）| "pass"（验证通过）| "fail"（验证失败）
+local function record(waf_ctx, action)
+    local client_ip = waf_ctx and waf_ctx.client_ip or ngx.var.remote_addr or ""
+    local ok, geo = pcall(function()
+        return require("ip_region").lookup(client_ip)
+    end)
+    local rec = {
+        time       = os.date("%Y-%m-%dT%H:%M:%S") .. tz_offset(),
+        req_id     = waf_ctx and waf_ctx.req_id or "",
+        client_ip  = client_ip,
+        action     = action,
+        uri        = ngx.var.request_uri or "",
+        country    = ok and geo and geo.country or "",
+        province   = ok and geo and geo.province or "",
+        city       = ok and geo and geo.city or "",
+    }
+    local ok2, err = ngx.timer.at(0, function(premature)
+        if premature then return end
+        local storage = require "storage"
+        storage.redis_lpush("waf:challenge:list", cjson.encode(rec))
+    end)
+    if not ok2 then
+        ngx.log(ngx.ERR, "[waf] 调度人机验证事件上报失败: ", tostring(err))
+    end
+end
+
+-- ============================================================================
 -- 入口
 -- ============================================================================
 
 -- 渲染挑战页
 function _M.serve_page(waf_ctx, cfg)
     local ch = cfg.challenge
+    record(waf_ctx, "issue")
     ngx.header.content_type = "text/html; charset=utf-8"
     if ch.mode == "basic" then
         ngx.say(basic_page(ch, waf_ctx.client_ip))
@@ -213,8 +255,10 @@ function _M.serve_verify(waf_ctx, cfg)
     local ok, err = verify_geetest(ch, params)
     if ok then
         set_pass_cookie(ch, waf_ctx.client_ip)
+        record(waf_ctx, "pass")
         ngx.say(cjson.encode({ status = "ok" }))
     else
+        record(waf_ctx, "fail")
         ngx.say(cjson.encode({ status = "fail", error = err or "验证失败" }))
     end
     ngx.exit(ngx.HTTP_OK)

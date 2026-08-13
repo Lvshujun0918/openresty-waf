@@ -152,3 +152,23 @@ export function fetchConfig() {
 export function saveConfig(config: Record<string, unknown>) {
   return request<{ status: string }>({ url: '/config', method: 'put', data: { config } });
 }
+
+/** 获取接入指引（一键安装命令 / 组件下载 / nginx 配置） */
+export function fetchSetupGuide() {
+  return request<{
+    redis: { addr: string; password: string; db: number };
+    install_command: string;
+    download_url: string;
+    nginx_config: string;
+  }>({ url: '/setup/guide' });
+}
+
+/** 人机验证事件列表 */
+export function fetchChallenges(params: Record<string, string | number>) {
+  return request<Api.Waf.PageResult<Api.Waf.ChallengeItem>>({ url: '/challenges', params });
+}
+
+/** 消费人机验证队列 */
+export function consumeChallenges() {
+  return request<{ status: string; consumed: number }>({ url: '/challenges/consume', method: 'post' });
+}

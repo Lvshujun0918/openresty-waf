@@ -110,6 +110,20 @@ declare namespace Api {
       updated_at?: string;
     }
 
+    /** 人机验证事件 */
+    interface ChallengeItem {
+      id: number;
+      time: string;
+      req_id?: string;
+      client_ip: string;
+      country?: string;
+      province?: string;
+      city?: string;
+      action: string;
+      uri: string;
+      created_at?: string;
+    }
+
     /** 仪表盘聚合统计 */
     interface DashboardStats {
       today: { request: number; attack: number; intercept_24h: number };
