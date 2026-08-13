@@ -1,10 +1,12 @@
-# ---------- 阶段 1：构建前端（web/dist） ----------
+# ---------- 阶段 1：构建前端（web/dist，Soybean Admin + pnpm） ----------
 FROM node:24-alpine AS web
 WORKDIR /app
-COPY web/package.json web/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN corepack enable
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
+COPY web/packages/ ./packages/
+RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY web/ ./
-RUN npm run build
+RUN pnpm build
 
 # ---------- 阶段 2：构建后台（embed 前端产物 + 携带 WAF 组件） ----------
 FROM golang:1.25-alpine AS admin

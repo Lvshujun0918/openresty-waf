@@ -1,49 +1,30 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import type { App } from 'vue';
+import {
+  type RouterHistory,
+  createMemoryHistory,
+  createRouter,
+  createWebHashHistory,
+  createWebHistory
+} from 'vue-router';
+import { createBuiltinVueRoutes } from './routes/builtin';
+import { createRouterGuard } from './guard';
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue') },
-    { path: '/setup', name: 'setup', component: () => import('@/views/SetupView.vue') },
-    {
-      path: '/',
-      component: () => import('@/layouts/AdminLayout.vue'),
-      redirect: '/dashboard',
-      children: [
-        { path: 'dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
-        { path: 'rules', name: 'rules', component: () => import('@/views/RulesView.vue') },
-        { path: 'events', name: 'events', component: () => import('@/views/EventsView.vue') },
-        { path: 'config', name: 'config', component: () => import('@/views/ConfigView.vue') },
-        { path: 'guide', name: 'guide', component: () => import('@/views/GuideView.vue') },
-        { path: 'cc', name: 'cc', component: () => import('@/views/CcRulesView.vue') },
-        { path: 'challenge', name: 'challenge', component: () => import('@/views/ChallengeView.vue') },
-        { path: 'ip-lists', name: 'ip-lists', component: () => import('@/views/IpListView.vue') },
-        { path: 'traffic', name: 'traffic', component: () => import('@/views/TrafficView.vue') },
-      ],
-    },
-  ],
-})
+const { VITE_ROUTER_HISTORY_MODE = 'history', VITE_BASE_URL } = import.meta.env;
 
-// 全局路由守卫：登录 / 首次引导
-router.beforeEach(async (to) => {
-  const auth = useAuthStore()
-  if (to.name !== 'login' && !auth.token) {
-    return { name: 'login' }
-  }
-  if (to.name === 'login' && auth.token) {
-    return { name: 'dashboard' }
-  }
-  // 已登录：非引导页先确认引导状态
-  if (auth.token && to.name !== 'setup') {
-    await auth.checkSetup()
-    if (!auth.setupDone) {
-      return { name: 'setup' }
-    }
-  }
-  if (to.name === 'setup' && auth.setupDone && auth.token) {
-    return { name: 'dashboard' }
-  }
-})
+const historyCreatorMap: Record<Env.RouterHistoryMode, (base?: string) => RouterHistory> = {
+  hash: createWebHashHistory,
+  history: createWebHistory,
+  memory: createMemoryHistory
+};
 
-export default router
+export const router = createRouter({
+  history: historyCreatorMap[VITE_ROUTER_HISTORY_MODE](VITE_BASE_URL),
+  routes: createBuiltinVueRoutes()
+});
+
+/** Setup Vue Router */
+export async function setupRouter(app: App) {
+  app.use(router);
+  createRouterGuard(router);
+  await router.isReady();
+}
