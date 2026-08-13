@@ -45,11 +45,13 @@ jobs:
         with:
           node-version: 24
 
-      - name: 前端 Vitest 单元测试
+      - name: 前端检查与构建（Soybean Admin + pnpm）
         working-directory: web
         run: |
-          npm ci
-          npm test
+          corepack enable
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm typecheck
+          pnpm build
 
       - name: WAF Lua 引擎单元测试
         run: |
