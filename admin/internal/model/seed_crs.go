@@ -44,7 +44,9 @@ var SeedRulesCRS = []Rule{
 		Actions: "{\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"Possible Unicode character bypass detected\"}", Status: 403, Message: `Possible Unicode character bypass detected`, SortOrder: 8},
 	{RuleID: `920230`, Name: `Multiple URL Encoding Detected`, Group: `protocol`, Phase: "access", Severity: 2, Enabled: true,
 		Operator: `REGEX`, Pattern: `%[0-9a-fA-F]{2}`,
-		Transforms: "[]", Vars: "[{\"type\":\"URI_ARGS\"},{\"type\":\"POST_ARGS\"}]",
+		// 先 URL 解码一次再检测：正常中文编码（%E5%AF%B9...）解码后不再含 %XX 不误报；
+		// 真正的多重编码（%2520）解码一次后仍含 %XX 仍能检出。
+		Transforms: `["url_decode"]`, Vars: "[{\"type\":\"URI_ARGS\"},{\"type\":\"POST_ARGS\"}]",
 		Actions: "{\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"Multiple URL Encoding Detected\"}", Status: 403, Message: `Multiple URL Encoding Detected`, SortOrder: 9},
 	{RuleID: `920460`, Name: `Abnormal character escapes in request`, Group: `protocol`, Phase: "access", Severity: 3, Enabled: true,
 		Operator: `REGEX`, Pattern: `(?:^|[^\x5c])\x5c[cdeghijklmpqwxyz123456789]`,
@@ -715,8 +717,10 @@ var SeedRulesCRS = []Rule{
 		Transforms: "[]", Vars: "[{\"type\":\"COOKIE\"},{\"type\":\"COOKIE\",\"parse\":[\"keys\"]}]",
 		Actions: "{\"disrupt\":\"LOG_ONLY\",\"status\":403,\"msg\":\"Restricted SQL Character Anomaly Detection (cookies): # of special characters exceeded (8)\"}", Status: 0, Message: `Restricted SQL Character Anomaly Detection (cookies): # of special characters exceeded (8)`, SortOrder: 176},
 	{RuleID: `942460`, Name: `Meta-Character Anomaly Detection Alert - Repetitive Non-Word Characters`, Group: `sqli`, Phase: "access", Severity: 2, Enabled: true,
-		Operator: `REGEX`, Pattern: `\W{4}`,
-		Transforms: "[]", Vars: "[{\"type\":\"URI_ARGS\"},{\"type\":\"POST_ARGS\"}]",
+		Operator: `REGEX`, Pattern: `[\x00-\x2F\x3A-\x40\x5B-\x60\x7B-\x7E]{4}`,
+		// 只检测 ASCII 控制/特殊字符 4 连（排除 UTF-8 高位字节），避免中文被 \W 误判；
+		// 先 URL 解码一次再检测（正常中文编码解码后不再含 %XX 等）。
+		Transforms: `["url_decode"]`, Vars: "[{\"type\":\"URI_ARGS\"},{\"type\":\"POST_ARGS\"}]",
 		Actions: "{\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"Meta-Character Anomaly Detection Alert - Repetitive Non-Word Characters\"}", Status: 403, Message: `Meta-Character Anomaly Detection Alert - Repetitive Non-Word Characters`, SortOrder: 177},
 	{RuleID: `942511`, Name: `SQLi bypass attempt by ticks detected`, Group: `sqli`, Phase: "access", Severity: 3, Enabled: true,
 		Operator: `REGEX`, Pattern: `'(?:[\s\x0b\(\)\+\-0-9<=@-Z_a-\{\}]{2,29}|(?:[\+/-9A-Za-z]{4})+(?:(?:[\+/-9A-Za-z]{2}=|[\+/-9A-Za-z]{3})=)?)'`,

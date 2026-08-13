@@ -25,6 +25,8 @@ end
 
 local operators = {
     -- 正则匹配（优先使用预编译对象 compiled，避免每请求重复 PCRE 编译）
+    -- 注：使用 "u"（UTF-8）选项，多字节字符按整体处理；CRS 中 \W 类通配规则
+    --     由规则自身 pattern 显式限定 ASCII 字符范围，避免对 UTF-8 中文误报。
     REGEX = function(value, pattern, compiled)
         if value == nil then return false end
         if compiled then
@@ -35,7 +37,7 @@ local operators = {
             end
             return from ~= nil
         end
-        local from, _, err = re_find(tostring(value), pattern, "joi")
+        local from, _, err = re_find(tostring(value), pattern, "joiu")
         if err then
             ngx.log(ngx.WARN, "[waf] 正则编译/执行错误: ", err, " pattern=", pattern)
             return false

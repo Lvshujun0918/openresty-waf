@@ -2,7 +2,9 @@ package model
 
 // SeedVersion 内置规则种子版本：版本变化时启动自动替换旧种子规则（保留用户自定义规则）。
 // v2: libinjection 语义规则 + OWASP CRS 转译规则 + 基础兜底
-const SeedVersion = "2"
+// v3: 修复 920230/942460 对 URL 编码中文/UTF-8 中文的误报（加 url_decode transform）
+// v4: 942460 pattern 限定 ASCII 特殊字符 4 连，彻底避免 UTF-8 中文误报
+const SeedVersion = "4"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
