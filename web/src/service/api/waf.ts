@@ -128,9 +128,15 @@ export function fetchSetupGuide() {
   return request<{
     redis: { addr: string; password: string; db: number };
     install_command: string;
+    install_command_force: string;
     download_url: string;
     nginx_config: string;
   }>({ url: '/setup/guide' });
+}
+
+/** 测试并保存 Redis 配置 */
+export function saveRedisConfig(data: { addr: string; password: string; db: number }) {
+  return request<{ status: string }>({ url: '/setup/redis', method: 'post', data });
 }
 
 /** 人机验证事件列表 */

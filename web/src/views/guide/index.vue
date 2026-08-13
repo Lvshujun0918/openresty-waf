@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { NAlert, NButton, NCard, NCode, NSpace, NTag, useMessage } from 'naive-ui';
-import { fetchSetupGuide } from '@/service/api';
+import { onMounted, reactive, ref } from 'vue';
+import { NAlert, NButton, NCard, NCode, NForm, NFormItem, NInput, NInputNumber, NModal, NSpace, NTag, useMessage } from 'naive-ui';
+import { fetchSetupGuide, saveRedisConfig } from '@/service/api';
 
 interface SetupGuide {
   redis: { addr: string; password: string; db: number };
   install_command: string;
+  install_command_force: string;
   download_url: string;
   nginx_config: string;
 }
@@ -19,15 +20,61 @@ async function load() {
   try {
     const res = await fetchSetupGuide();
     guide.value = res.data ?? null;
+    if (guide.value) {
+      Object.assign(redisForm, {
+        addr: guide.value.redis.addr || '',
+        password: guide.value.redis.password || '',
+        db: guide.value.redis.db || 0
+      });
+    }
   } finally {
     loading.value = false;
+  }
+}
+
+// —— Redis 配置 ——
+const editOpen = ref(false);
+const saving = ref(false);
+const redisForm = reactive({ addr: '', password: '', db: 0 });
+
+function openRedisEdit() {
+  if (!guide.value) return;
+  Object.assign(redisForm, {
+    addr: guide.value.redis.addr,
+    password: guide.value.redis.password,
+    db: guide.value.redis.db
+  });
+  editOpen.value = true;
+}
+
+async function saveRedis() {
+  if (!redisForm.addr.trim()) {
+    message.warning('请填写 Redis 地址');
+    return;
+  }
+  saving.value = true;
+  try {
+    await saveRedisConfig({ addr: redisForm.addr.trim(), password: redisForm.password, db: redisForm.db });
+    message.success('Redis 配置已保存');
+    editOpen.value = false;
+    await load();
+  } catch (e) {
+    message.error('保存失败，请检查 Redis 连接');
+  } finally {
+    saving.value = false;
   }
 }
 
 async function copyInstall() {
   if (!guide.value) return;
   await navigator.clipboard.writeText(guide.value.install_command);
-  message.success('一键安装命令已复制');
+  message.success('安装命令已复制（更新组件，保留现有 Redis 配置）');
+}
+
+async function copyInstallForce() {
+  if (!guide.value) return;
+  await navigator.clipboard.writeText(guide.value.install_command_force);
+  message.success('强制覆盖命令已复制（更新组件并同步 Redis 配置）');
 }
 
 async function copyNginx() {
@@ -47,29 +94,46 @@ onMounted(load);
     </div>
 
     <NAlert v-if="!guide && !loading" type="warning" title="无法获取接入指引">
-      请先完成 Redis 配置（引导页/系统配置），以便生成一键安装命令。
+      请先配置 Redis 连接（下方「Redis 配置」），以便生成一键安装命令。
     </NAlert>
+
+    <!-- Redis 配置 -->
+    <NCard :bordered="false" class="card-wrapper" title="Redis 配置">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2 text-sm">
+          <NTag type="info" size="small" bordered>Redis</NTag>
+          <template v-if="guide">
+            <span class="font-mono text-xs">{{ guide.redis.addr }}</span>
+            <span class="text-xs text-[rgb(125,125,125)]">db{{ guide.redis.db }}</span>
+          </template>
+          <span v-else class="text-xs text-[rgb(125,125,125)]">未配置</span>
+        </div>
+        <NButton size="small" type="primary" secondary @click="openRedisEdit">修改 Redis 配置</NButton>
+      </div>
+      <p class="mt-2 text-xs text-[rgb(125,125,125)]">
+        引擎通过 Redis 接收规则/配置热更新、上报攻击事件。修改后请重新复制「强制覆盖」安装命令同步到下游引擎。
+      </p>
+    </NCard>
 
     <!-- 一键安装 -->
     <NCard v-if="guide" :bordered="false" class="card-wrapper" title="一键安装 WAF 组件（安装到 /opt/waf）">
-      <template #header-extra>
-        <NSpace>
-          <NButton size="small" type="primary" @click="copyInstall">复制安装命令</NButton>
-          <NButton size="small" secondary tag="a" :href="guide.download_url" download="waf.tar.gz">
-            下载 waf.tar.gz
-          </NButton>
-        </NSpace>
-      </template>
-      <NCode :code="guide.install_command" language="bash" word-wrap />
-      <div class="mt-3 flex flex-wrap gap-4 text-sm">
-        <div class="flex items-center gap-2">
-          <NTag size="small" type="info" bordered>Redis</NTag>
-          <span class="font-mono text-xs">{{ guide.redis.addr }} / db{{ guide.redis.db }}</span>
-        </div>
-        <div class="text-xs text-[rgb(125,125,125)]">
-          脚本会将 Lua 组件解压到 /opt/waf（init.lua 位于 /opt/waf/init.lua），并写入 config_local.lua（Redis 连接）
-        </div>
+      <div class="mb-2 text-sm font-medium text-[rgb(60,60,60)]">普通安装 / 更新组件</div>
+      <div class="flex items-start gap-2">
+        <NCode :code="guide.install_command" language="bash" word-wrap class="flex-1" />
+        <NButton size="small" type="primary" @click="copyInstall">复制</NButton>
       </div>
+      <p class="mt-1 text-xs text-[rgb(125,125,125)]">更新组件文件；已存在 config_local.lua 时保留现有 Redis 配置</p>
+
+      <div class="mt-4 mb-2 text-sm font-medium text-[rgb(60,60,60)]">强制覆盖 Redis 配置（修改 Redis 后快速同步下游引擎）</div>
+      <div class="flex items-start gap-2">
+        <NCode :code="guide.install_command_force" language="bash" word-wrap class="flex-1" />
+        <NButton size="small" type="warning" secondary @click="copyInstallForce">复制</NButton>
+      </div>
+      <p class="mt-1 text-xs text-[rgb(125,125,125)]">
+        追加 <code class="rounded bg-[rgb(245,245,245)] px-1 font-mono text-[11px]">-f</code> 参数：重新生成
+        <code class="rounded bg-[rgb(245,245,245)] px-1 font-mono text-[11px]">config_local.lua</code>
+        （按当前 Redis 配置覆盖），随后 <code class="rounded bg-[rgb(245,245,245)] px-1 font-mono text-[11px]">nginx -s reload</code> 生效
+      </p>
     </NCard>
 
     <!-- Nginx 接入 -->
@@ -101,5 +165,26 @@ onMounted(load);
         </div>
       </div>
     </NCard>
+
+    <!-- Redis 配置弹窗 -->
+    <NModal v-model:show="editOpen" preset="card" title="修改 Redis 配置" class="w-[min(96vw,480px)]" :style="{ borderRadius: '12px' }">
+      <NForm label-placement="left" label-width="90">
+        <NFormItem label="地址" required>
+          <NInput v-model:value="redisForm.addr" placeholder="如 127.0.0.1:6379 或 redis:6379" />
+        </NFormItem>
+        <NFormItem label="密码">
+          <NInput v-model:value="redisForm.password" type="password" show-password-on="click" placeholder="无密码留空" />
+        </NFormItem>
+        <NFormItem label="库号">
+          <NInputNumber v-model:value="redisForm.db" :min="0" :max="15" class="w-32" />
+        </NFormItem>
+      </NForm>
+      <template #footer>
+        <NSpace justify="end">
+          <NButton @click="editOpen = false">取消</NButton>
+          <NButton type="primary" :loading="saving" @click="saveRedis">测试并保存</NButton>
+        </NSpace>
+      </template>
+    </NModal>
   </div>
 </template>

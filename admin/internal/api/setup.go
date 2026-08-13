@@ -73,11 +73,14 @@ func (h *SetupHandler) Guide(c *gin.Context) {
 	if redisCfg.Password != "" {
 		installCmd += " -p " + shQuote(redisCfg.Password)
 	}
+	// 强制覆盖命令：加 -f 使脚本重新生成 config_local.lua（修改 Redis 后快速同步下游引擎）
+	installCmdForce := installCmd + " -f"
 	c.JSON(http.StatusOK, gin.H{
-		"redis":           redisCfg,
-		"install_command": installCmd,
-		"download_url":    adminURL + "/api/setup/waf.tar.gz",
-		"nginx_config":    nginxSnippet,
+		"redis":                  redisCfg,
+		"install_command":        installCmd,
+		"install_command_force":  installCmdForce,
+		"download_url":           adminURL + "/api/setup/waf.tar.gz",
+		"nginx_config":           nginxSnippet,
 	})
 }
 
@@ -153,14 +156,14 @@ init_worker_by_lua_file /opt/waf/init.lua;
 // 支持两种场景：
 //   - 首次安装：/opt/waf 不存在 → 全新解压并生成 config_local.lua
 //   - 更新组件：/opt/waf 已存在 → 覆盖更新组件文件，保留已有 config_local.lua
-//     （如需同步覆盖 Redis 配置，执行 FORCE=1 bash install.sh ...）
+//     （如需同步覆盖 Redis 配置，加 -f / --force 参数 或 FORCE=1 环境变量）
 const installScript = `#!/bin/bash
 # OpenResty WAF 一键接入 / 更新脚本（管理后台引导页生成）
 # 用法（推荐，无歧义）:
-#   bash install.sh <管理后台地址> -a <Redis地址> [-p <Redis密码>] [-d <库号>] [-i <安装目录>]
+#   bash install.sh <管理后台地址> -a <Redis地址> [-p <Redis密码>] [-d <库号>] [-i <安装目录>] [-f]
 # 兼容旧式（需提供完整参数，避免密码/库号错位）:
 #   bash install.sh <管理后台地址> <Redis地址> <Redis密码> <RedisDB> [安装目录]
-# 更新组件时默认保留已有 config_local.lua；需重新生成 Redis 配置请加 FORCE=1
+# 更新组件时默认保留已有 config_local.lua；加 -f/--force（或 FORCE=1）则按本次参数重新生成 Redis 配置
 set -euo pipefail
 
 ADMIN_URL="${1:-}"
@@ -195,6 +198,7 @@ else
       -p|--password) REDIS_PASSWORD="${2:-}"; shift 2 ;;
       -d|--db) REDIS_DB="${2:-0}"; shift 2 ;;
       -i|--install-dir) INSTALL_DIR="${2:-/opt/waf}"; shift 2 ;;
+      -f|--force) FORCE=1; shift ;;
       *) echo "忽略未知选项: $1" >&2; shift ;;
     esac
   done
@@ -236,7 +240,7 @@ echo "  组件已更新: $INSTALL_DIR"
 echo "[2/4] Redis 配置..."
 if [ -f "$INSTALL_DIR/config_local.lua" ] && [ "${FORCE:-0}" != "1" ]; then
   echo "  已存在 config_local.lua，保留现有 Redis 配置"
-  echo "  如需按本次参数重新生成，请执行: FORCE=1 bash install.sh ..."
+  echo "  如需按本次参数重新生成，请加 -f/--force 参数: bash install.sh ... -f"
 else
   HOST="${REDIS_ADDR%%:*}"
   PORT="${REDIS_ADDR##*:}"
