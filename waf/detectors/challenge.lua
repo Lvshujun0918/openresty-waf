@@ -260,8 +260,13 @@ end
 -- 渲染挑战页
 function _M.serve_page(waf_ctx, cfg)
     local ch = cfg.challenge
-    -- 携带原始请求 URI（access.lua 重定向时 ?redirect=...），验证通过后跳回
+    -- 携带原始请求 URI（access.lua 重定向时 ?redirect=...），验证通过后跳回。
+    -- 注意：nginx $arg_redirect 不解码 %2F，需用 ngx.unescape_uri 还原，
+    -- 否则根路径 "/" 会被编码成 %2F 并作为字面路径跳转（跳到 /%2F）。
     local redirect = ngx.var.arg_redirect or ""
+    if redirect ~= "" then
+        redirect = ngx.unescape_uri(redirect)
+    end
     record(waf_ctx, "issue")
     ngx.header.content_type = "text/html; charset=utf-8"
     -- 双保险：HTTP Set-Cookie 直接种下（不依赖前端 JS 执行），
