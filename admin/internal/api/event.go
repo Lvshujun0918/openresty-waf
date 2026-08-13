@@ -19,7 +19,7 @@ func NewEventHandler(db *gorm.DB, mgr *service.RedisManager, cfg *config.Config)
 	return &EventHandler{svc: service.NewEventService(db, mgr, cfg)}
 }
 
-// List GET /api/events?page=&page_size=&group=&client_ip=&rule_id=
+// List GET /api/events?page=&page_size=&group=&client_ip=&rule_id=&host=&action=
 func (h *EventHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
@@ -30,7 +30,7 @@ func (h *EventHandler) List(c *gin.Context) {
 		pageSize = 20
 	}
 	events, total, err := h.svc.List(
-		c.Query("group"), c.Query("client_ip"), c.Query("rule_id"), c.Query("host"), page, pageSize)
+		c.Query("group"), c.Query("client_ip"), c.Query("rule_id"), c.Query("host"), c.Query("action"), page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

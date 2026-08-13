@@ -23,8 +23,37 @@ const pageSize = ref(20)
 const group = ref('')
 const clientIp = ref('')
 const host = ref('')
+const action = ref('')
 const loading = ref(false)
 const message = ref('')
+
+// 攻击类型中文名 + 配色（完整 class 供 Tailwind 扫描）
+const groupMeta: Record<string, { label: string; color: string }> = {
+  sqli: { label: 'SQL 注入', color: 'bg-destructive' },
+  xss: { label: 'XSS 跨站', color: 'bg-warning' },
+  rce: { label: '远程执行', color: 'bg-purple-500' },
+  lfi: { label: '文件包含', color: 'bg-orange-500' },
+  ssrf: { label: 'SSRF', color: 'bg-cyan-500' },
+  protocol: { label: '协议异常', color: 'bg-brand-500' },
+  leak: { label: '信息泄露', color: 'bg-yellow-500' },
+  scanner: { label: '扫描器', color: 'bg-pink-500' },
+  custom: { label: '自定义规则', color: 'bg-slate-500' },
+}
+const groupOptions = ['sqli', 'xss', 'rce', 'lfi', 'ssrf', 'protocol', 'leak', 'scanner', 'custom']
+
+// 时间格式化：2026-08-13T08:00:00Z → 08-13 08:00:00
+function fmtTime(t: string) {
+  if (!t) return '-'
+  return t.replace('T', ' ').replace(/\.\d+/, '').replace('Z', '')
+}
+
+// 动作判定（事件 status 为 HTTP 状态码：403 即被拦截）
+function isBlocked(e: EventItem) {
+  return e.status >= 400
+}
+function geoText(e: EventItem) {
+  return [e.country, e.province, e.city].filter(Boolean).join(' ')
+}
 
 async function load() {
   loading.value = true
@@ -35,6 +64,7 @@ async function load() {
   if (group.value) params.set('group', group.value)
   if (clientIp.value) params.set('client_ip', clientIp.value)
   if (host.value) params.set('host', host.value)
+  if (action.value) params.set('action', action.value)
   const res = await api.get<PageResult<EventItem>>(`/events?${params}`)
   events.value = res.items
   total.value = res.total
@@ -63,30 +93,38 @@ onMounted(async () => {
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-semibold">攻击事件</h1>
-        <p class="text-sm text-muted-foreground">共 {{ total }} 条</p>
+        <p class="text-sm text-muted-foreground">共 {{ total }} 条 · 攻击日志实时入库</p>
       </div>
-      <Button variant="outline" @click="consume">消费 Redis 队列</Button>
+      <Button variant="outline" @click="consume" :disabled="loading">消费 Redis 队列</Button>
     </div>
 
     <Card>
       <CardHeader>
-        <CardTitle>过滤</CardTitle>
+        <CardTitle>筛选</CardTitle>
       </CardHeader>
       <CardContent class="flex flex-wrap items-end gap-4">
         <div class="space-y-1.5">
           <Label>攻击类型</Label>
           <select v-model="group" class="h-9 rounded-md border border-input bg-transparent px-3 text-sm">
             <option value="">全部</option>
-            <option v-for="g in ['sqli','xss','rce','lfi','ssrf','protocol','leak','scanner','custom']" :key="g" :value="g">{{ g }}</option>
+            <option v-for="g in groupOptions" :key="g" :value="g">{{ groupMeta[g]?.label || g }}</option>
+          </select>
+        </div>
+        <div class="space-y-1.5">
+          <Label>处置动作</Label>
+          <select v-model="action" class="h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+            <option value="">全部</option>
+            <option value="block">拦截</option>
+            <option value="record">仅记录</option>
           </select>
         </div>
         <div class="space-y-1.5">
           <Label>客户端 IP</Label>
-          <Input v-model="clientIp" placeholder="如 192.168.1.1" class="w-48" />
+          <Input v-model="clientIp" placeholder="如 192.168.1.1" class="w-44" />
         </div>
         <div class="space-y-1.5">
           <Label>域名 (Host)</Label>
-          <Input v-model="host" placeholder="如 example.com" class="w-48" />
+          <Input v-model="host" placeholder="如 example.com" class="w-44" />
         </div>
         <Button @click="page = 1; load()" :disabled="loading">查询</Button>
         <span v-if="message" class="text-sm text-muted-foreground">{{ message }}</span>
@@ -99,31 +137,53 @@ onMounted(async () => {
           <TableHeader>
             <TableRow>
               <TableHead>时间</TableHead>
-              <TableHead>域名</TableHead>
-              <TableHead>IP</TableHead>
+              <TableHead>攻击来源</TableHead>
+              <TableHead>攻击类型</TableHead>
+              <TableHead>命中规则</TableHead>
+              <TableHead>动作</TableHead>
               <TableHead>方法</TableHead>
-              <TableHead>URI</TableHead>
-              <TableHead>类型</TableHead>
-              <TableHead>规则</TableHead>
-              <TableHead>消息</TableHead>
+              <TableHead>请求</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <TableRow v-for="e in events" :key="e.id">
-              <TableCell class="whitespace-nowrap text-xs">{{ e.time }}</TableCell>
-              <TableCell class="max-w-[140px] truncate text-xs">{{ e.host || '-' }}</TableCell>
-              <TableCell class="text-xs">
-                <div class="font-mono">{{ e.client_ip }}</div>
-                <div v-if="e.country" class="text-[11px] text-muted-foreground">{{ [e.country, e.province, e.city].filter(Boolean).join(' ') }}</div>
+              <TableCell class="whitespace-nowrap text-xs text-muted-foreground">{{ fmtTime(e.time) }}</TableCell>
+              <TableCell>
+                <div class="font-mono text-xs">{{ e.client_ip }}</div>
+                <div v-if="e.country" class="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <span class="h-1 w-1 rounded-full bg-brand-400" />
+                  {{ geoText(e) }}
+                </div>
               </TableCell>
-              <TableCell class="text-xs">{{ e.method }}</TableCell>
-              <TableCell class="max-w-[200px] truncate font-mono text-xs">{{ e.uri }}</TableCell>
-              <TableCell><Badge variant="destructive">{{ e.group }}</Badge></TableCell>
-              <TableCell class="font-mono text-xs">{{ e.rule_id }}</TableCell>
-              <TableCell class="max-w-[240px] truncate text-xs">{{ e.msg }}</TableCell>
+              <TableCell>
+                <Badge :class="`${groupMeta[e.group]?.color || 'bg-muted'} text-white border-transparent`">
+                  {{ groupMeta[e.group]?.label || e.group }}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <div class="font-mono text-xs">{{ e.rule_id }}</div>
+                <div class="max-w-[180px] truncate text-[11px] text-muted-foreground">{{ e.msg }}</div>
+              </TableCell>
+              <TableCell>
+                <Badge
+                  :class="isBlocked(e) ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-muted-foreground'"
+                  class="border-transparent"
+                >
+                  {{ isBlocked(e) ? '拦截' : '记录' }}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <span class="rounded border border-border px-1.5 py-0.5 font-mono text-[11px]">{{ e.method || '-' }}</span>
+              </TableCell>
+              <TableCell>
+                <div class="max-w-[260px] truncate text-xs">
+                  <span class="text-muted-foreground">{{ e.host || '' }}</span>
+                  <span class="font-mono">{{ e.uri }}</span>
+                </div>
+              </TableCell>
             </TableRow>
             <TableRow v-if="events.length === 0">
-              <TableCell colspan="8" class="py-8 text-center text-muted-foreground">
+              <TableCell colspan="7" class="py-8 text-center text-muted-foreground">
                 暂无数据，可先触发一次攻击或点击"消费 Redis 队列"
               </TableCell>
             </TableRow>

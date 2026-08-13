@@ -41,6 +41,15 @@ waf/
     └── whitelist.json
 ```
 
+## IP 归属地（可选）
+
+引擎内置纯 Lua 的 ip2region xdb 解析器（`ip_region.lua`，兼容 v2/v3 格式），
+命中攻击日志会附带 country / province / city 归属地，后台可展示地理分布。
+
+- 数据文件：将 `ip2region_v4.xdb` 放入 **`/opt/waf/`**（与 WAF 配置同目录，经 bind mount 下发）
+- 缺省路径：`/opt/waf/ip2region_v4.xdb`（引擎容器重建无需重新放置）
+- 缺失时自动降级：攻击日志不带归属地，不影响防护功能
+
 ## 设计约定
 
 - 纯 Lua 5.1（LuaJIT）语法，不依赖 C 模块。

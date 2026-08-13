@@ -36,6 +36,14 @@ const saving = ref(false)
 const loading = ref(false)
 const message = ref('')
 
+function fmtTime(t: string) {
+  if (!t) return '-'
+  return t.replace('T', ' ').replace(/\.\d+/, '').replace('Z', '')
+}
+function geoText(e: TrafficItem) {
+  return [e.country, e.province, e.city].filter(Boolean).join(' ')
+}
+
 async function loadCfg() {
   const d = await api.get<{ config: any }>('/config')
   Object.assign(cfg, d.config || {})
@@ -188,13 +196,18 @@ onMounted(async () => {
           </TableHeader>
           <TableBody>
             <TableRow v-for="e in items" :key="e.id">
-              <TableCell class="whitespace-nowrap text-xs text-muted-foreground">{{ e.time }}</TableCell>
+              <TableCell class="whitespace-nowrap text-xs text-muted-foreground">{{ fmtTime(e.time) }}</TableCell>
               <TableCell class="max-w-[140px] truncate text-xs">{{ e.host || '-' }}</TableCell>
               <TableCell class="text-xs">
                 <div class="font-mono">{{ e.client_ip }}</div>
-                <div v-if="e.country" class="text-[11px] text-muted-foreground">{{ [e.country, e.province, e.city].filter(Boolean).join(' ') }}</div>
+                <div v-if="e.country" class="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <span class="h-1 w-1 rounded-full bg-brand-400" />
+                  {{ geoText(e) }}
+                </div>
               </TableCell>
-              <TableCell class="text-xs">{{ e.method }}</TableCell>
+              <TableCell>
+                <span class="rounded border border-border px-1.5 py-0.5 font-mono text-[11px]">{{ e.method || '-' }}</span>
+              </TableCell>
               <TableCell class="max-w-[220px] truncate font-mono text-xs" :title="e.uri">{{ e.uri }}</TableCell>
               <TableCell>
                 <Badge :variant="e.status >= 400 ? 'destructive' : 'outline'">{{ e.status }}</Badge>
