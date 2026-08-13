@@ -46,9 +46,23 @@ function _M.check(waf_ctx, cfg)
     return "challenge"
 end
 
--- 手动触发路径匹配：uri 命中 trigger_paths 任一前缀（或完全相等）返回 true
-function _M.is_triggered(uri, paths)
+-- 手动触发匹配：uri 命中 trigger_paths 任一前缀（或完全相等）；
+-- 若配置了 trigger_hosts，则当前 host 必须命中其一（空=全部 host）
+function _M.is_triggered(uri, paths, host, hosts)
     if not paths or #paths == 0 then return false end
+    -- host 过滤
+    if hosts and #hosts > 0 then
+        host = host or ""
+        local matched = false
+        for _, h in ipairs(hosts) do
+            h = tostring(h)
+            if h ~= "" and (host == h or host:sub(1, #h) == h) then
+                matched = true
+                break
+            end
+        end
+        if not matched then return false end
+    end
     uri = uri or ""
     for _, p in ipairs(paths) do
         p = tostring(p)
@@ -70,11 +84,17 @@ local function set_pass_cookie(cfg, ip)
         "; Path=/; HttpOnly; Max-Age=" .. cfg.cookie_ttl
 end
 
--- 基础 JS 挑战页：token 由服务端签名，前端 JS 执行后种 cookie 并刷新
-local function basic_page(cfg, ip)
+-- 基础 JS 挑战页：token 由服务端签名，前端 JS 执行后种 cookie 并跳转回原请求
+local function basic_page(cfg, ip, redirect)
     local ts = os.time()
     local token = calc_sign(ip, ts, cfg.cookie_secret)
     local cookie = cfg.cookie_name .. "=" .. ts .. ":" .. token
+    -- 验证通过后跳回原始请求 URI（避免停留在挑战页造成无限刷新）
+    local js = "location.reload();"
+    if redirect and redirect ~= "" then
+        local safe = redirect:gsub("'", "\\'"):gsub("\n", ""):gsub("\r", "")
+        js = "location.href='" .. safe .. "';"
+    end
     return [[<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>安全验证</title>
 <style>body{font-family:sans-serif;text-align:center;padding:80px 20px;color:#333}
@@ -85,13 +105,18 @@ local function basic_page(cfg, ip)
 <h2>正在验证您的浏览器…</h2><p>请稍候，正在执行安全检测。</p></div>
 <script>
 document.cookie = ']] .. cookie .. [[; Path=/; Max-Age=]] .. cfg.cookie_ttl .. [[';
-setTimeout(function(){ location.reload(); }, 300);
+setTimeout(function(){ ]] .. js .. [[ }, 300);
 </script></body></html>]]
 end
 
--- 高级验证码（极验 GT4 / Gitee）挑战页：嵌入官方 SDK
-local function advanced_page(cfg)
+-- 高级验证码（极验 GT4 / Gitee）挑战页：嵌入官方 SDK，验证成功后跳回原请求
+local function advanced_page(cfg, redirect)
     local sdk = cfg.captcha.sdk or "https://static.geetest.com/v4/gt4.js"
+    local js = "location.reload();"
+    if redirect and redirect ~= "" then
+        local safe = redirect:gsub("'", "\\'"):gsub("\n", ""):gsub("\r", "")
+        js = "location.href='" .. safe .. "';"
+    end
     return [[<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>安全验证</title>
 <style>body{font-family:sans-serif;text-align:center;padding:60px 20px;color:#333}</style>
@@ -112,7 +137,7 @@ initGeetest4({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(result)
         }).then(function (r) { return r.json(); }).then(function (d) {
-            if (d.status === 'ok') { location.reload(); }
+            if (d.status === 'ok') { ]] .. js .. [[ }
             else { alert('验证失败，请重试'); captchaObj.showCaptcha(); }
         });
     });
@@ -235,12 +260,17 @@ end
 -- 渲染挑战页
 function _M.serve_page(waf_ctx, cfg)
     local ch = cfg.challenge
+    -- 携带原始请求 URI（access.lua 重定向时 ?redirect=...），验证通过后跳回
+    local redirect = ngx.var.arg_redirect or ""
     record(waf_ctx, "issue")
     ngx.header.content_type = "text/html; charset=utf-8"
+    -- 双保险：HTTP Set-Cookie 直接种下（不依赖前端 JS 执行），
+    -- JS 侧也种一份并负责跳回原始 URI
+    set_pass_cookie(ch, waf_ctx.client_ip)
     if ch.mode == "basic" then
-        ngx.say(basic_page(ch, waf_ctx.client_ip))
+        ngx.say(basic_page(ch, waf_ctx.client_ip, redirect))
     else
-        ngx.say(advanced_page(ch))
+        ngx.say(advanced_page(ch, redirect))
     end
     ngx.exit(ngx.HTTP_OK)
 end

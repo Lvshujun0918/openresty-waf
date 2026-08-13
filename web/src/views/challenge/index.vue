@@ -27,9 +27,11 @@ const challenge = reactive({
   page_path: '/__waf_challenge__',
   verify_path: '/__waf_challenge_verify__',
   trigger_paths: [] as string[],
+  trigger_hosts: [] as string[],
   captcha: { id: '', key: '', verify_api: '', sdk: '' }
 });
 const triggerText = ref('');
+const triggerHostText = ref('');
 let rawConfig: Record<string, unknown> = {};
 
 async function load() {
@@ -43,9 +45,11 @@ async function load() {
     page_path: ch.page_path || '/__waf_challenge__',
     verify_path: ch.verify_path || '/__waf_challenge_verify__',
     trigger_paths: Array.isArray(ch.trigger_paths) ? (ch.trigger_paths as string[]) : [],
+    trigger_hosts: Array.isArray(ch.trigger_hosts) ? (ch.trigger_hosts as string[]) : [],
     captcha: { id: '', key: '', verify_api: '', sdk: '', ...((ch.captcha as Record<string, unknown>) ?? {}) }
   });
   triggerText.value = challenge.trigger_paths.join('\n');
+  triggerHostText.value = challenge.trigger_hosts.join('\n');
   loaded.value = true;
 }
 
@@ -53,6 +57,10 @@ async function save() {
   saving.value = true;
   try {
     const triggerPaths = triggerText.value
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
+    const triggerHosts = triggerHostText.value
       .split('\n')
       .map(s => s.trim())
       .filter(Boolean);
@@ -65,6 +73,7 @@ async function save() {
         page_path: challenge.page_path,
         verify_path: challenge.verify_path,
         trigger_paths: triggerPaths,
+        trigger_hosts: triggerHosts,
         captcha: challenge.captcha
       }
     };
@@ -182,6 +191,12 @@ onMounted(() => {
               <div class="w-full">
                 <NInput v-model:value="triggerText" type="textarea" :rows="3" placeholder="每行一个前缀路径，如 /login、/api/user（留空则不手动触发）" />
                 <p class="mt-1 text-xs text-[rgb(125,125,125)]">命中这些前缀的请求需先通过人机验证才可访问</p>
+              </div>
+            </NFormItem>
+            <NFormItem label="触发域名">
+              <div class="w-full">
+                <NInput v-model:value="triggerHostText" type="textarea" :rows="2" placeholder="每行一个域名，如 login.example.com（留空则所有域名生效）" />
+                <p class="mt-1 text-xs text-[rgb(125,125,125)]">仅对指定域名启用触发路径，支持前缀匹配</p>
               </div>
             </NFormItem>
             <NFormItem label="极验 Captcha ID">

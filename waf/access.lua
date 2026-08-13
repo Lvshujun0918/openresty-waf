@@ -171,12 +171,14 @@ end
 if cfg.challenge and cfg.challenge.enabled
    and cfg.challenge.trigger_paths and #cfg.challenge.trigger_paths > 0 then
     local ch = require "detectors.challenge"
-    if ch.is_triggered(ngx.var.uri or "", cfg.challenge.trigger_paths) then
+    if ch.is_triggered(ngx.var.uri or "", cfg.challenge.trigger_paths,
+                      ngx.var.host or "", cfg.challenge.trigger_hosts) then
         if not ch.check(ctx, cfg) then
             return  -- 已通过验证，放行
         end
         if ctx.mode == "active" then
-            ngx.redirect(cfg.challenge.page_path, ngx.HTTP_TEMPORARY_REDIRECT)
+            local target = cfg.challenge.page_path .. "?redirect=" .. ngx.escape_uri(ngx.var.request_uri or "/")
+            ngx.redirect(target, ngx.HTTP_TEMPORARY_REDIRECT)
             return
         end
         -- detect 模式：仅记录，放行
@@ -196,7 +198,8 @@ if cfg.modules and cfg.modules.cc_check then
                     cc.unban(ctx, cfg)
                     return  -- 验证通过，放行
                 end
-                ngx.redirect(cfg.challenge.page_path, ngx.HTTP_TEMPORARY_REDIRECT)
+                local target = cfg.challenge.page_path .. "?redirect=" .. ngx.escape_uri(ngx.var.request_uri or "/")
+                ngx.redirect(target, ngx.HTTP_TEMPORARY_REDIRECT)
                 return
             end
             ngx.exit(503)

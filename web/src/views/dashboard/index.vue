@@ -3,7 +3,7 @@ import { computed, h, onMounted, ref } from 'vue';
 import { NCard, NDataTable, NGrid, NGi, NStatistic, NTag } from 'naive-ui';
 import { useEcharts } from '@/hooks/common/echarts';
 import type { ECOption } from '@/hooks/common/echarts';
-import { fetchDashboardStats, fetchEvents, fetchTrafficTrend } from '@/service/api';
+import { fetchDashboardStats, fetchEvents, fetchRules, fetchTrafficTrend } from '@/service/api';
 
 const mode = ref('active');
 const ruleCount = ref(0);
@@ -191,17 +191,24 @@ const eventColumns = [
 async function load() {
   loading.value = true;
   try {
-    const [st, tr, ev] = await Promise.all([
+    const [st, tr, ev, rules] = await Promise.all([
       fetchDashboardStats(14),
       fetchTrafficTrend(14).catch(() => ({ data: { items: [] as { date: string; total: number }[] } })),
-      fetchEvents({ page: 1, page_size: 6 }).catch(() => ({ data: { items: [] as Api.Waf.EventItem[] } }))
+      fetchEvents({ page: 1, page_size: 6 }).catch(() => ({ data: { items: [] as Api.Waf.EventItem[] } })),
+      fetchRules().catch(() => ({ data: [] as Api.Waf.Rule[] }))
     ]);
     stats.value = st.data;
     reqTrend.value = tr.data?.items ?? [];
     recentEvents.value = ev.data?.items ?? [];
-    ruleCount.value = 0;
-    enabledCount.value = 0;
-    await Promise.all([updateTrend(), updateDonut(), updateCountry()]);
+    const rulesList = rules.data ?? [];
+    ruleCount.value = rulesList.length;
+    enabledCount.value = rulesList.filter(r => r.enabled).length;
+    // 数据更新后需传入最新 option 工厂重新计算（默认 callback 用初始空数据）
+    await Promise.all([
+      updateTrend(() => trendOption()),
+      updateDonut(() => donutOption()),
+      updateCountry(() => countryOption())
+    ]);
   } finally {
     loading.value = false;
   }
