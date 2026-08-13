@@ -199,6 +199,43 @@ async function publish() {
   setTimeout(() => (message.value = ''), 4000)
 }
 
+// ---------- 规则测试 ----------
+const testRuleID = ref('')
+const testURI = ref('/')
+const testMethod = ref('GET')
+const testBody = ref('')
+const testContentType = ref('application/x-www-form-urlencoded')
+const testResult = ref('')
+const testNote = ref('')
+const testing = ref(false)
+
+async function runTest() {
+  if (!testRuleID.value) {
+    testResult.value = '请先选择规则'
+    return
+  }
+  testing.value = true
+  testResult.value = ''
+  testNote.value = ''
+  try {
+    const d = await api.post<{ matched: boolean; note?: string }>('/rules/test', {
+      rule_id: testRuleID.value,
+      request: {
+        method: testMethod.value,
+        uri: testURI.value,
+        body: testBody.value,
+        content_type: testContentType.value,
+      },
+    })
+    testResult.value = d.matched ? '✅ 命中（会触发该规则）' : '❌ 未命中'
+    if (d.note) testNote.value = d.note
+  } catch (e: any) {
+    testResult.value = '测试失败: ' + (e.message || '')
+  } finally {
+    testing.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -216,6 +253,53 @@ onMounted(load)
     </div>
 
     <p v-if="message" class="text-sm text-muted-foreground">{{ message }}</p>
+
+    <!-- 规则测试 -->
+    <Card>
+      <CardHeader>
+        <CardTitle>规则测试</CardTitle>
+        <CardDescription>用模拟请求验证规则是否命中（保存/发布前先测），libinjection 语义规则需在引擎真实流量验证</CardDescription>
+      </CardHeader>
+      <CardContent class="grid gap-4 md:grid-cols-2">
+        <div class="space-y-1.5">
+          <Label>选择规则</Label>
+          <select v-model="testRuleID" class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
+            <option value="">— 选择规则 —</option>
+            <option v-for="r in rules" :key="r.id" :value="r.rule_id">{{ r.rule_id }} · {{ r.name }}</option>
+          </select>
+        </div>
+        <div class="space-y-1.5">
+          <Label>方法</Label>
+          <select v-model="testMethod" class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
+            <option>GET</option>
+            <option>POST</option>
+            <option>PUT</option>
+            <option>DELETE</option>
+          </select>
+        </div>
+        <div class="space-y-1.5 md:col-span-2">
+          <Label>URI</Label>
+          <Input v-model="testURI" placeholder="/index.php?id=1 union select 2" />
+        </div>
+        <div class="space-y-1.5">
+          <Label>Content-Type</Label>
+          <select v-model="testContentType" class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
+            <option>application/x-www-form-urlencoded</option>
+            <option>application/json</option>
+            <option>text/plain</option>
+          </select>
+        </div>
+        <div class="space-y-1.5">
+          <Label>请求体</Label>
+          <Input v-model="testBody" placeholder="POST body" />
+        </div>
+        <div class="md:col-span-2 flex flex-wrap items-center gap-3">
+          <Button :disabled="testing" @click="runTest">{{ testing ? '测试中…' : '测试' }}</Button>
+          <span v-if="testResult" class="text-sm font-medium" :class="testResult.includes('命中') ? 'text-destructive' : 'text-muted-foreground'">{{ testResult }}</span>
+          <span v-if="testNote" class="text-xs text-muted-foreground">{{ testNote }}</span>
+        </div>
+      </CardContent>
+    </Card>
 
     <!-- 新增/编辑表单（友好式） -->
     <Card v-if="showForm" class="border-primary/40">

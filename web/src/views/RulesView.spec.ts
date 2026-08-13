@@ -52,8 +52,11 @@ describe('RulesView 规则管理（友好表单）', () => {
     await w.findAll('button').find((b) => b.text() === '新增规则')!.trigger('click')
     await flushPromises()
 
-    // 填名称（第一个 input）与匹配值（textarea）
-    await w.findAll('input')[0].setValue('拦截 admin')
+    // 填名称（按 placeholder 定位规则名称输入框）与匹配值（textarea）
+    const nameInput = w.findAll('input').find((i) =>
+      (i.element as HTMLInputElement).placeholder?.includes('拦截'),
+    )!
+    await nameInput.setValue('拦截 admin')
     await w.find('textarea').setValue('admin/login')
     await w.findAll('button').find((b) => b.text() === '保存规则')!.trigger('click')
     await flushPromises()
