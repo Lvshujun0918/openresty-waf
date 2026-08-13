@@ -78,9 +78,6 @@ _M.rule_refresh = {
     -- 运行配置热更新（后台统一管理，取代直接改本文件）
     config_version_key = "waf:config:version",
     config_data_key    = "waf:config:data",
-    -- CC 防刷精细化规则（按 host + 路径配置不同阈值）
-    cc_rules_key      = "waf:cc:rules",     -- CC 规则集（JSON）
-    cc_version_key    = "waf:cc:version",   -- CC 规则版本号
     -- 触发规则（host/UA/请求头/IP 等条件筛选，命中执行人机验证/豁免/CC）
     trigger_rules_key   = "waf:trigger:rules",   -- 触发规则集（JSON）
     trigger_version_key = "waf:trigger:version", -- 触发规则版本号
@@ -113,8 +110,6 @@ _M.challenge = {
     cookie_ttl    = 300,       -- 通过验证后的放行时长（秒）
     page_path     = "/__waf_challenge__",
     verify_path   = "/__waf_challenge_verify__",
-    -- 手动触发路径前缀（每项按前缀匹配）：命中且未通过验证时直接进入验证页，不受 CC 限制
-    trigger_paths = {},
     -- 高级验证码（geetest / gitee）配置
     captcha = {
         id         = "",       -- captcha_id

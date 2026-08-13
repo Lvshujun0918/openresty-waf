@@ -1,170 +1,90 @@
 <script setup lang="ts">
-import { h, onMounted, reactive, ref } from 'vue';
-import {
-  NButton,
-  NCard,
-  NDataTable,
-  NForm,
-  NFormItem,
-  NInput,
-  NInputNumber,
-  NModal,
-  NPopconfirm,
-  NSpace,
-  NSwitch,
-  NTag
-} from 'naive-ui';
-import {
-  createCcRule,
-  deleteCcRule,
-  fetchCcRules,
-  publishCcRules,
-  setCcRuleEnabled,
-  updateCcRule
-} from '@/service/api';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { NAlert, NButton, NCard, NForm, NFormItem, NInputNumber, NSpace, NSwitch } from 'naive-ui';
+import { fetchConfig, saveConfig } from '@/service/api';
 
-const rules = ref<Api.Waf.CcRule[]>([]);
-const loading = ref(false);
+const saving = ref(false);
+const loaded = ref(false);
+const ccEnabled = ref(true);
+const cc = reactive({ rate_count: 100, rate_seconds: 60, ban_duration: 300 });
+let rawConfig: Record<string, unknown> = {};
+
+const ratePreview = computed(() => `每 ${cc.rate_seconds} 秒内，同一 IP 同一路径最多允许 ${cc.rate_count} 次请求，超出后封禁该 IP ${cc.ban_duration} 秒`);
 
 async function load() {
-  loading.value = true;
-  try {
-    const res = await fetchCcRules();
-    rules.value = res.data ?? [];
-  } finally {
-    loading.value = false;
-  }
+  const res = await fetchConfig();
+  rawConfig = res.data?.config ?? {};
+  const c = (rawConfig.cc as Record<string, unknown>) ?? {};
+  const m = String(c.rate || '100/60').match(/^(\d+)\/(\d+)$/);
+  cc.rate_count = m ? Number(m[1]) : 100;
+  cc.rate_seconds = m ? Number(m[2]) : 60;
+  cc.ban_duration = Number(c.ban_duration) || 300;
+  ccEnabled.value = ((rawConfig.modules as Record<string, unknown>)?.cc_check) !== false;
+  loaded.value = true;
 }
 
-async function toggleEnabled(row: Api.Waf.CcRule) {
-  await setCcRuleEnabled(row.id, !row.enabled);
-  row.enabled = !row.enabled;
-  window.$message?.success('已更新');
-}
-
-async function remove(row: Api.Waf.CcRule) {
-  await deleteCcRule(row.id);
-  window.$message?.success('已删除');
-  await load();
-}
-
-async function doPublish() {
-  await publishCcRules();
-  window.$message?.success('CC 规则已发布，引擎 5 秒内热更新生效');
-}
-
-// —— 表单 ——
-const editOpen = ref(false);
-const saving = ref(false);
-const form = reactive<Partial<Api.Waf.CcRule>>({ name: '', host: '', path: '', rate: '20r/s', ban_duration: 300, enabled: true });
-
-function openCreate() {
-  Object.assign(form, { id: undefined, name: '', host: '', path: '', rate: '20r/s', ban_duration: 300, enabled: true });
-  editOpen.value = true;
-}
-function openEdit(row: Api.Waf.CcRule) {
-  Object.assign(form, row);
-  editOpen.value = true;
-}
 async function save() {
   saving.value = true;
   try {
-    if (form.id) {
-      await updateCcRule(form.id, form);
-    } else {
-      await createCcRule(form);
-    }
-    window.$message?.success('已保存');
-    editOpen.value = false;
-    await load();
+    const next = {
+      ...rawConfig,
+      modules: { ...((rawConfig.modules as Record<string, unknown>) ?? {}), cc_check: ccEnabled.value },
+      cc: { ...((rawConfig.cc as Record<string, unknown>) ?? {}), rate: `${cc.rate_count}/${cc.rate_seconds}`, ban_duration: cc.ban_duration }
+    };
+    await saveConfig(next);
+    window.$message?.success('CC 限流策略已保存并下发，引擎 5 秒内热更新生效');
   } finally {
     saving.value = false;
   }
 }
-
-const columns = [
-  { title: '名称', key: 'name', minWidth: 140 },
-  { title: '域名', key: 'host', width: 160, render: (row: Api.Waf.CcRule) => row.host || '-' },
-  { title: '路径', key: 'path', width: 140, render: (row: Api.Waf.CcRule) => row.path || '-' },
-  { title: '频率限制', key: 'rate', width: 110, render: (row: Api.Waf.CcRule) => h('span', { class: 'font-mono text-xs' }, row.rate) },
-  {
-    title: '封禁时长(s)',
-    key: 'ban_duration',
-    width: 110,
-    render: (row: Api.Waf.CcRule) => row.ban_duration
-  },
-  {
-    title: '启用',
-    key: 'enabled',
-    width: 70,
-    render: (row: Api.Waf.CcRule) => h(NSwitch, { value: row.enabled, onUpdateValue: () => toggleEnabled(row) })
-  },
-  {
-    title: '操作',
-    key: 'action',
-    width: 140,
-    render: (row: Api.Waf.CcRule) =>
-      h(NSpace, { size: 4 }, [
-        h(NButton, { size: 'small', quaternary: true, type: 'primary', onClick: () => openEdit(row) }, { default: () => '编辑' }),
-        h(
-          NPopconfirm,
-          { onPositiveClick: () => remove(row) },
-          {
-            trigger: () => h(NButton, { size: 'small', quaternary: true, type: 'error' }, { default: () => '删除' }),
-            default: () => '确认删除该规则？'
-          }
-        )
-      ])
-  }
-];
 
 onMounted(load);
 </script>
 
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-xl font-semibold">CC 防刷</h2>
-        <p class="text-sm text-[rgb(125,125,125)]">按域名 + 路径精细化频率限制，超限自动封禁 IP</p>
-      </div>
-      <NSpace>
-        <NButton secondary type="warning" @click="doPublish">发布到引擎</NButton>
-        <NButton type="primary" @click="openCreate">新建规则</NButton>
-      </NSpace>
+    <div>
+      <h2 class="text-xl font-semibold">CC 限流</h2>
+      <p class="text-sm text-[rgb(125,125,125)]">配置全局频率限制策略；哪些请求参与限流请在「触发规则」页配置 CC 触发规则</p>
     </div>
 
-    <NCard :bordered="false" class="card-wrapper">
-      <NDataTable :columns="columns" :data="rules" :loading="loading" :bordered="false" size="small" />
-    </NCard>
+    <NCard :bordered="false" class="card-wrapper" v-if="loaded">
+      <div class="mb-4 rounded-lg border border-[rgb(230,240,255)] bg-[rgb(245,250,255)] px-4 py-3 text-sm text-[rgb(70,90,130)]">
+        💡 限流对象已统一由「触发规则」页管理：创建「CC 限流」用途的触发规则（可按域名 / User-Agent / 请求头 / IP / 路径等条件筛选），
+        命中的请求将参与本页配置的频率限制，超限自动封禁 IP。
+      </div>
 
-    <NModal v-model:show="editOpen" preset="card" :title="form.id ? '编辑 CC 规则' : '新建 CC 规则'" class="w-[min(96vw,560px)]">
-      <NForm :model="form" label-placement="left" label-width="100">
-        <NFormItem label="名称" required>
-          <NInput v-model:value="form.name" placeholder="如 登录接口防刷" />
+      <NForm label-placement="left" label-width="150">
+        <NFormItem label="启用 CC 限流">
+          <NSwitch v-model:value="ccEnabled" />
         </NFormItem>
-        <NFormItem label="域名">
-          <NInput v-model:value="form.host" placeholder="如 api.example.com（留空匹配全部）" />
+
+        <NFormItem label="频率限制">
+          <NSpace align="center" :wrap="true">
+            <span class="text-sm text-[rgb(125,125,125)]">每</span>
+            <NInputNumber v-model:value="cc.rate_seconds" :min="1" class="w-24" />
+            <span class="text-sm text-[rgb(125,125,125)]">秒内，同一 IP 同一路径最多</span>
+            <NInputNumber v-model:value="cc.rate_count" :min="1" class="w-28" />
+            <span class="text-sm text-[rgb(125,125,125)]">次</span>
+          </NSpace>
         </NFormItem>
-        <NFormItem label="路径">
-          <NInput v-model:value="form.path" placeholder="如 /login（留空匹配全部）" />
-        </NFormItem>
-        <NFormItem label="频率限制" required>
-          <NInput v-model:value="form.rate" placeholder="如 20r/s 或 100r/m" />
-        </NFormItem>
+
         <NFormItem label="封禁时长(s)">
-          <NInputNumber v-model:value="form.ban_duration" :min="1" />
+          <NInputNumber v-model:value="cc.ban_duration" :min="1" class="w-32" />
+          <span class="ml-2 text-xs text-[rgb(125,125,125)]">超限后封禁该 IP 的秒数，封禁期内所有路径均被拦截</span>
         </NFormItem>
-        <NFormItem label="启用">
-          <NSwitch v-model:value="form.enabled" />
+
+        <NFormItem label=" ">
+          <div class="w-full rounded bg-[rgb(245,245,245)] px-3 py-2 text-xs">
+            <span class="text-[rgb(125,125,125)]">策略预览：</span>
+            <span class="text-[rgb(60,60,60)]">{{ ratePreview }}</span>
+          </div>
+        </NFormItem>
+
+        <NFormItem label=" ">
+          <NButton type="primary" :loading="saving" @click="save">保存策略</NButton>
         </NFormItem>
       </NForm>
-      <template #footer>
-        <NSpace justify="end">
-          <NButton @click="editOpen = false">取消</NButton>
-          <NButton type="primary" :loading="saving" @click="save">保存</NButton>
-        </NSpace>
-      </template>
-    </NModal>
+    </NCard>
   </div>
 </template>

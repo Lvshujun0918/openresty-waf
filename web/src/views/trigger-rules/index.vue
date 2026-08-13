@@ -27,10 +27,10 @@ import {
 
 const message = useMessage();
 
-const kindMeta: Record<string, { label: string; type: 'primary' | 'success' | 'warning' | 'error' }> = {
-  challenge: { label: '人机验证', type: 'primary' },
-  exempt: { label: '豁免检测', type: 'success' },
-  cc: { label: 'CC 限流', type: 'warning' }
+const kindMeta: Record<string, { label: string; type: 'primary' | 'success' | 'warning' | 'error'; desc: string }> = {
+  challenge: { label: '人机验证', type: 'primary', desc: '命中后需先通过人机验证（JS 挑战 / 验证码）才可访问，验证方式在「人机验证」页配置' },
+  exempt: { label: '豁免检测', type: 'success', desc: '命中后跳过全部规则检测，直接放行（用于可信来源 / 静态资源等）' },
+  cc: { label: 'CC 限流', type: 'warning', desc: '命中后参与频率限制，超限自动封禁 IP，阈值与封禁时长在「CC 限流」页配置' }
 };
 const fieldMeta: Record<string, { label: string }> = {
   host: { label: '域名' },
@@ -309,10 +309,15 @@ onMounted(load);
           <NInput v-model:value="form.name" placeholder="如：登录接口人机验证" />
         </NFormItem>
         <NFormItem label="用途" required>
-          <NSelect
-            v-model:value="form.kind"
-            :options="Object.keys(kindMeta).map(k => ({ label: kindMeta[k].label, value: k }))"
-          />
+          <div class="w-full">
+            <NSelect
+              v-model:value="form.kind"
+              :options="Object.keys(kindMeta).map(k => ({ label: kindMeta[k].label, value: k }))"
+            />
+            <div class="mt-2 rounded bg-[rgb(245,245,245)] px-3 py-2 text-xs text-[rgb(80,80,80)]">
+              {{ kindMeta[form.kind]?.desc }}
+            </div>
+          </div>
         </NFormItem>
         <NFormItem label="排序">
           <NInputNumber v-model:value="form.sort_order" :min="0" />

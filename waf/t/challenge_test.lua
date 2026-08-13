@@ -84,34 +84,3 @@ t.test("IP 维度：签名绑定 client_ip", function()
     t.eq(challenge.check({ client_ip = "9.9.9.9" }, cfg), "challenge")
 end)
 
--- 手动触发路径匹配
-t.test("is_triggered：无配置返回 false", function()
-    ngx_reset()
-    t.no(challenge.is_triggered("/admin/", nil))
-    t.no(challenge.is_triggered("/admin/", {}))
-end)
-
-t.test("is_triggered：前缀匹配命中", function()
-    ngx_reset()
-    t.ok(challenge.is_triggered("/admin/login", { "/admin/" }))
-    t.ok(challenge.is_triggered("/api/login", { "/api/", "/admin/" }))
-end)
-
-t.test("is_triggered：完全相等命中", function()
-    ngx_reset()
-    t.ok(challenge.is_triggered("/pay", { "/pay" }))
-end)
-
-t.test("is_triggered：未命中返回 false", function()
-    ngx_reset()
-    t.no(challenge.is_triggered("/home", { "/admin/" }))
-    t.no(challenge.is_triggered("/adminx", { "/admin/" }))
-    t.no(challenge.is_triggered("", { "/admin/" }))
-end)
-
-t.test("is_triggered：忽略空条目", function()
-    ngx_reset()
-    t.no(challenge.is_triggered("/", { "", "  " }))
-    t.ok(challenge.is_triggered("/login", { "", "/login" }))
-end)
-

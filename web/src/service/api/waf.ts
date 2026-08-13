@@ -83,36 +83,6 @@ export function testRule(data: Api.Waf.RuleTestReq) {
   return request<{ matched: boolean; note?: string }>({ url: '/rules/test', method: 'post', data });
 }
 
-/** CC 规则列表 */
-export function fetchCcRules() {
-  return request<Api.Waf.CcRule[]>({ url: '/cc-rules' });
-}
-
-/** 新建 CC 规则 */
-export function createCcRule(data: Partial<Api.Waf.CcRule>) {
-  return request<Api.Waf.CcRule>({ url: '/cc-rules', method: 'post', data });
-}
-
-/** 更新 CC 规则 */
-export function updateCcRule(id: number, data: Partial<Api.Waf.CcRule>) {
-  return request<Api.Waf.CcRule>({ url: `/cc-rules/${id}`, method: 'put', data });
-}
-
-/** 删除 CC 规则 */
-export function deleteCcRule(id: number) {
-  return request<{ status: string }>({ url: `/cc-rules/${id}`, method: 'delete' });
-}
-
-/** 启用/禁用 CC 规则 */
-export function setCcRuleEnabled(id: number, enabled: boolean) {
-  return request<{ status: string }>({ url: `/cc-rules/${id}/enabled`, method: 'patch', data: { enabled } });
-}
-
-/** 发布 CC 规则 */
-export function publishCcRules() {
-  return request<{ status: string }>({ url: '/cc-rules/publish', method: 'post' });
-}
-
 /** IP 列表订阅 */
 export function fetchIpListSubs() {
   return request<Api.Waf.IpListSub[]>({ url: '/ip-list-subs' });

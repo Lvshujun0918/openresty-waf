@@ -26,12 +26,8 @@ const challenge = reactive({
   cookie_ttl: 300,
   page_path: '/__waf_challenge__',
   verify_path: '/__waf_challenge_verify__',
-  trigger_paths: [] as string[],
-  trigger_hosts: [] as string[],
   captcha: { id: '', key: '', verify_api: '', sdk: '' }
 });
-const triggerText = ref('');
-const triggerHostText = ref('');
 let rawConfig: Record<string, unknown> = {};
 
 async function load() {
@@ -44,26 +40,14 @@ async function load() {
     cookie_ttl: Number(ch.cookie_ttl) || 300,
     page_path: ch.page_path || '/__waf_challenge__',
     verify_path: ch.verify_path || '/__waf_challenge_verify__',
-    trigger_paths: Array.isArray(ch.trigger_paths) ? (ch.trigger_paths as string[]) : [],
-    trigger_hosts: Array.isArray(ch.trigger_hosts) ? (ch.trigger_hosts as string[]) : [],
     captcha: { id: '', key: '', verify_api: '', sdk: '', ...((ch.captcha as Record<string, unknown>) ?? {}) }
   });
-  triggerText.value = challenge.trigger_paths.join('\n');
-  triggerHostText.value = challenge.trigger_hosts.join('\n');
   loaded.value = true;
 }
 
 async function save() {
   saving.value = true;
   try {
-    const triggerPaths = triggerText.value
-      .split('\n')
-      .map(s => s.trim())
-      .filter(Boolean);
-    const triggerHosts = triggerHostText.value
-      .split('\n')
-      .map(s => s.trim())
-      .filter(Boolean);
     const next = {
       ...rawConfig,
       challenge: {
@@ -72,8 +56,6 @@ async function save() {
         cookie_ttl: challenge.cookie_ttl,
         page_path: challenge.page_path,
         verify_path: challenge.verify_path,
-        trigger_paths: triggerPaths,
-        trigger_hosts: triggerHosts,
         captcha: challenge.captcha
       }
     };
@@ -161,13 +143,17 @@ onMounted(() => {
   <div class="space-y-4">
     <div>
       <h2 class="text-xl font-semibold">人机验证</h2>
-      <p class="text-sm text-[rgb(125,125,125)]">通过 JS 挑战 / 验证码拦截自动化攻击，支持配置路径手动触发</p>
+      <p class="text-sm text-[rgb(125,125,125)]">配置验证方式与策略；哪些请求需要验证请在「触发规则」页配置人机验证触发规则</p>
     </div>
 
     <NTabs type="line" animated>
       <!-- 配置 -->
       <NTabPane name="config" tab="验证配置">
         <NCard :bordered="false" class="card-wrapper" v-if="loaded">
+          <div class="mb-4 rounded-lg border border-[rgb(230,240,255)] bg-[rgb(245,250,255)] px-4 py-3 text-sm text-[rgb(70,90,130)]">
+            💡 触发方式已统一由「触发规则」页管理：创建「人机验证」用途的触发规则（可按域名 / User-Agent / 请求头 / IP / 路径等条件筛选），
+            命中后将先经过人机验证才可访问。
+          </div>
           <NForm label-placement="left" label-width="140">
             <NFormItem label="启用">
               <NSwitch v-model:value="challenge.enabled" />
@@ -186,18 +172,6 @@ onMounted(() => {
             </NFormItem>
             <NFormItem label="校验回调路径">
               <NInput v-model:value="challenge.verify_path" />
-            </NFormItem>
-            <NFormItem label="手动触发路径">
-              <div class="w-full">
-                <NInput v-model:value="triggerText" type="textarea" :rows="3" placeholder="每行一个前缀路径，如 /login、/api/user（留空则不手动触发）" />
-                <p class="mt-1 text-xs text-[rgb(125,125,125)]">命中这些前缀的请求需先通过人机验证才可访问</p>
-              </div>
-            </NFormItem>
-            <NFormItem label="触发域名">
-              <div class="w-full">
-                <NInput v-model:value="triggerHostText" type="textarea" :rows="2" placeholder="每行一个域名，如 login.example.com（留空则所有域名生效）" />
-                <p class="mt-1 text-xs text-[rgb(125,125,125)]">仅对指定域名启用触发路径，支持前缀匹配</p>
-              </div>
             </NFormItem>
             <NFormItem label="极验 Captcha ID">
               <NInput v-model:value="challenge.captcha.id" placeholder="geetest 模式下填写" />

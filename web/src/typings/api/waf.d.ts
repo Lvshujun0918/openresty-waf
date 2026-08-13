@@ -81,20 +81,6 @@ declare namespace Api {
       updated_at?: string;
     }
 
-    /** CC 防刷规则 */
-    interface CcRule {
-      id: number;
-      name: string;
-      host: string;
-      path: string;
-      rate: string;
-      ban_duration: number;
-      enabled: boolean;
-      sort_order: number;
-      created_at?: string;
-      updated_at?: string;
-    }
-
     /** IP 列表订阅 */
     interface IpListSub {
       id: number;

@@ -21,7 +21,6 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	authHandler := NewAuthHandler(db, cfg)
 	authSvc := service.NewAuthService(db, cfg)
 	ruleHandler := NewRuleHandler(db, mgr, cfg)
-	ccRuleHandler := NewCcRuleHandler(db, mgr, cfg)
 	eventHandler := NewEventHandler(db, mgr, cfg)
 	setupHandler := NewSetupHandler(db, mgr, cfg)
 	configHandler := NewConfigHandler(db, mgr, cfg)
@@ -60,14 +59,6 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.PATCH("/rules/:id/enabled", ruleHandler.SetEnabled)
 			authed.POST("/rules/publish", ruleHandler.Publish)
 			authed.POST("/rules/test", ruleHandler.Test)
-
-			// CC 防刷规则（按 host + 路径精细化配置）
-			authed.GET("/cc-rules", ccRuleHandler.List)
-			authed.POST("/cc-rules", ccRuleHandler.Create)
-			authed.PUT("/cc-rules/:id", ccRuleHandler.Update)
-			authed.DELETE("/cc-rules/:id", ccRuleHandler.Delete)
-			authed.PATCH("/cc-rules/:id/enabled", ccRuleHandler.SetEnabled)
-			authed.POST("/cc-rules/publish", ccRuleHandler.Publish)
 
 			// IP 列表订阅（远程威胁情报 IP 列表）
 			authed.GET("/ip-list-subs", ipListHandler.List)

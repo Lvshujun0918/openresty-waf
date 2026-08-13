@@ -172,13 +172,11 @@ if ruleset then
     end
 end
 
--- 3. 人机验证手动触发：命中 trigger_paths（或 challenge 触发规则）且未通过验证时进入验证页
+-- 3. 人机验证触发：命中 challenge 触发规则（host/UA/请求头/IP 等条件）且未通过验证时进入验证页
 if cfg.challenge and cfg.challenge.enabled then
     local ch = require "detectors.challenge"
     local trigger = require "rule_engine.trigger"
-    local triggered = ch.is_triggered(ngx.var.uri or "", cfg.challenge.trigger_paths,
-                                      ngx.var.host or "", cfg.challenge.trigger_hosts)
-        or trigger.match_any("challenge", ctx)
+    local triggered = trigger.match_any("challenge", ctx)
     if triggered then
         if not ch.check(ctx, cfg) then
             return  -- 已通过验证，放行
@@ -193,12 +191,12 @@ if cfg.challenge and cfg.challenge.enabled then
     end
 end
 
--- 4. CC 防刷
+-- 4. CC 防刷：命中 cc 触发规则（host/UA/请求头/IP 等条件）的请求参与限流
 if cfg.modules and cfg.modules.cc_check then
     local cc = require "detectors.cc"
     local trigger = require "rule_engine.trigger"
-    -- 触发规则控制哪些请求参与 CC 限流；未配置 cc 规则时保持现有 host/path/全局逻辑
-    if not trigger.has_rules("cc") or trigger.match_any("cc", ctx) then
+    -- 触发规则决定哪些请求参与 CC 限流（未配置 cc 规则时 CC 不生效）
+    if trigger.match_any("cc", ctx) then
         if cc.check(ctx, cfg) == "banned" then
             if ctx.mode == "active" then
                 -- 人机验证：已通过验证（check 返回 nil）则解除封禁放行；否则进入验证页

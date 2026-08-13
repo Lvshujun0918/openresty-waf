@@ -46,36 +46,6 @@ function _M.check(waf_ctx, cfg)
     return "challenge"
 end
 
--- 手动触发匹配：uri 命中 trigger_paths 任一前缀（或完全相等）；
--- 若配置了 trigger_hosts，则当前 host 必须命中其一（空=全部 host）
-function _M.is_triggered(uri, paths, host, hosts)
-    if not paths or #paths == 0 then return false end
-    -- host 过滤
-    if hosts and #hosts > 0 then
-        host = host or ""
-        local matched = false
-        for _, h in ipairs(hosts) do
-            h = tostring(h)
-            if h ~= "" and (host == h or host:sub(1, #h) == h) then
-                matched = true
-                break
-            end
-        end
-        if not matched then return false end
-    end
-    uri = uri or ""
-    for _, p in ipairs(paths) do
-        p = tostring(p)
-        if p ~= "" and uri == p then
-            return true
-        end
-        if p ~= "" and uri:sub(1, #p) == p then
-            return true
-        end
-    end
-    return false
-end
-
 -- 签发验证 cookie
 local function set_pass_cookie(cfg, ip)
     local ts = os.time()
