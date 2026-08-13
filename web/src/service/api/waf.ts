@@ -172,3 +172,33 @@ export function fetchChallenges(params: Record<string, string | number>) {
 export function consumeChallenges() {
   return request<{ status: string; consumed: number }>({ url: '/challenges/consume', method: 'post' });
 }
+
+/** 触发规则列表 */
+export function fetchTriggerRules(params: Record<string, string | number> = {}) {
+  return request<{ items: Api.Waf.TriggerRule[] }>({ url: '/trigger-rules', params });
+}
+
+/** 新建触发规则 */
+export function createTriggerRule(data: Record<string, unknown>) {
+  return request<Api.Waf.TriggerRule>({ url: '/trigger-rules', method: 'post', data });
+}
+
+/** 更新触发规则 */
+export function updateTriggerRule(id: number, data: Record<string, unknown>) {
+  return request<{ status: string }>({ url: `/trigger-rules/${id}`, method: 'put', data });
+}
+
+/** 删除触发规则 */
+export function deleteTriggerRule(id: number) {
+  return request<{ status: string }>({ url: `/trigger-rules/${id}`, method: 'delete' });
+}
+
+/** 启用/禁用触发规则 */
+export function setTriggerRuleEnabled(id: number, enabled: boolean) {
+  return request<{ status: string }>({ url: `/trigger-rules/${id}/enabled`, method: 'patch', data: { enabled } });
+}
+
+/** 发布触发规则到引擎 */
+export function publishTriggerRules() {
+  return request<{ status: string; version: string }>({ url: '/trigger-rules/publish', method: 'post' });
+}

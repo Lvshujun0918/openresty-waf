@@ -117,6 +117,7 @@ end
 
 local ctx = new_ctx(cfg)
 
+
 -- 0. 挑战相关路径（验证页 / 回调），不参与规则检测
 if cfg.challenge and cfg.challenge.enabled then
     local uri = ngx.var.uri or ""
@@ -144,7 +145,7 @@ end
 -- 2. 规则引擎（URL / Args / Cookie / Header / Body 等规则）
 local ruleset = engine.get_ruleset()
 if ruleset then
-    -- 豁免路径：命中前缀时跳过规则检测（用于规避 JSON API 误报）
+    -- 豁免：exclude_paths 前缀 或 命中 exempt 触发规则（host/UA/请求头/IP 条件）时跳过规则检测
     local exempt = false
     local ep = cfg.detection and cfg.detection.exclude_paths
     if ep and #ep > 0 then
@@ -157,6 +158,10 @@ if ruleset then
         end
     end
     if not exempt then
+        local trigger = require "rule_engine.trigger"
+        exempt = trigger.match_any("exempt", ctx)
+    end
+    if not exempt then
         -- 先捕获请求头/请求体：engine.run 内部 BLOCK 动作会直接 ngx.exit(403)，
         -- 因此必须在检测前捕获证据，否则永远执行不到。
         pcall(capture_evidence, ctx)
@@ -167,12 +172,14 @@ if ruleset then
     end
 end
 
--- 3. 人机验证手动触发路径：命中且未通过验证时直接进入验证页（不受 CC 限制）
-if cfg.challenge and cfg.challenge.enabled
-   and cfg.challenge.trigger_paths and #cfg.challenge.trigger_paths > 0 then
+-- 3. 人机验证手动触发：命中 trigger_paths（或 challenge 触发规则）且未通过验证时进入验证页
+if cfg.challenge and cfg.challenge.enabled then
     local ch = require "detectors.challenge"
-    if ch.is_triggered(ngx.var.uri or "", cfg.challenge.trigger_paths,
-                      ngx.var.host or "", cfg.challenge.trigger_hosts) then
+    local trigger = require "rule_engine.trigger"
+    local triggered = ch.is_triggered(ngx.var.uri or "", cfg.challenge.trigger_paths,
+                                      ngx.var.host or "", cfg.challenge.trigger_hosts)
+        or trigger.match_any("challenge", ctx)
+    if triggered then
         if not ch.check(ctx, cfg) then
             return  -- 已通过验证，放行
         end
@@ -189,23 +196,27 @@ end
 -- 4. CC 防刷
 if cfg.modules and cfg.modules.cc_check then
     local cc = require "detectors.cc"
-    if cc.check(ctx, cfg) == "banned" then
-        if ctx.mode == "active" then
-            -- 人机验证：已通过验证（check 返回 nil）则解除封禁放行；否则进入验证页
-            if cfg.challenge and cfg.challenge.enabled then
-                local ch = require "detectors.challenge"
-                if not ch.check(ctx, cfg) then
-                    cc.unban(ctx, cfg)
-                    return  -- 验证通过，放行
+    local trigger = require "rule_engine.trigger"
+    -- 触发规则控制哪些请求参与 CC 限流；未配置 cc 规则时保持现有 host/path/全局逻辑
+    if not trigger.has_rules("cc") or trigger.match_any("cc", ctx) then
+        if cc.check(ctx, cfg) == "banned" then
+            if ctx.mode == "active" then
+                -- 人机验证：已通过验证（check 返回 nil）则解除封禁放行；否则进入验证页
+                if cfg.challenge and cfg.challenge.enabled then
+                    local ch = require "detectors.challenge"
+                    if not ch.check(ctx, cfg) then
+                        cc.unban(ctx, cfg)
+                        return  -- 验证通过，放行
+                    end
+                    local target = cfg.challenge.page_path .. "?redirect=" .. ngx.escape_uri(ngx.var.request_uri or "/")
+                    ngx.redirect(target, ngx.HTTP_TEMPORARY_REDIRECT)
+                    return
                 end
-                local target = cfg.challenge.page_path .. "?redirect=" .. ngx.escape_uri(ngx.var.request_uri or "/")
-                ngx.redirect(target, ngx.HTTP_TEMPORARY_REDIRECT)
-                return
+                ngx.exit(503)
             end
-            ngx.exit(503)
+            -- detect 模式：仅记录
+            return
         end
-        -- detect 模式：仅记录
-        return
     end
 end
 

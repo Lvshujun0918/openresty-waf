@@ -81,6 +81,9 @@ _M.rule_refresh = {
     -- CC 防刷精细化规则（按 host + 路径配置不同阈值）
     cc_rules_key      = "waf:cc:rules",     -- CC 规则集（JSON）
     cc_version_key    = "waf:cc:version",   -- CC 规则版本号
+    -- 触发规则（host/UA/请求头/IP 等条件筛选，命中执行人机验证/豁免/CC）
+    trigger_rules_key   = "waf:trigger:rules",   -- 触发规则集（JSON）
+    trigger_version_key = "waf:trigger:version", -- 触发规则版本号
     event_key     = "waf:event:list",       -- 攻击事件队列（LPUSH）
     stat_key      = "waf:stat:counter",     -- 统计计数
 }

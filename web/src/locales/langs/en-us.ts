@@ -236,6 +236,7 @@ const local: App.I18n.Schema = {
     rules: 'Rules',
     cc: 'CC Protection',
     challenge: 'Challenge',
+    'trigger-rules': 'Trigger Rules',
     'ip-lists': 'IP Lists',
     config: 'Settings',
     guide: 'Guide'

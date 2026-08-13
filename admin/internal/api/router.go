@@ -29,6 +29,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	trafficHandler := NewTrafficHandler(db, mgr, cfg)
 	dashboardHandler := NewDashboardHandler(db)
 	challengeHandler := NewChallengeHandler(db, mgr, cfg)
+	triggerRuleHandler := NewTriggerRuleHandler(db, mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -94,6 +95,14 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			// 人机验证事件
 			authed.GET("/challenges", challengeHandler.List)
 			authed.POST("/challenges/consume", challengeHandler.Consume)
+
+			// 触发规则（host/UA/请求头/IP 等条件筛选）
+			authed.GET("/trigger-rules", triggerRuleHandler.List)
+			authed.POST("/trigger-rules", triggerRuleHandler.Create)
+			authed.PUT("/trigger-rules/:id", triggerRuleHandler.Update)
+			authed.DELETE("/trigger-rules/:id", triggerRuleHandler.Delete)
+			authed.PATCH("/trigger-rules/:id/enabled", triggerRuleHandler.SetEnabled)
+			authed.POST("/trigger-rules/publish", triggerRuleHandler.Publish)
 
 			// WAF 运行配置
 			authed.GET("/config", configHandler.Get)

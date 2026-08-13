@@ -47,6 +47,8 @@ type Rule struct {
 	EventKey   string // 攻击事件队列键（WAF log.lua redis 后端 LPUSH）
 	CcRulesKey string // CC 规则集键（host/path 精细化 CC 防刷）
 	CcVersionKey string // CC 规则版本键，自增触发热更新
+	TriggerRulesKey string // 触发规则集键（host/UA/请求头/IP 等条件筛选）
+	TriggerVersionKey string // 触发规则版本键，自增触发热更新
 }
 
 func Load() *Config {
@@ -66,6 +68,8 @@ func Load() *Config {
 			EventKey:     getEnv("WAF_EVENT_KEY", "waf:event:list"),
 			CcRulesKey:   getEnv("WAF_CC_RULES_KEY", "waf:cc:rules"),
 			CcVersionKey: getEnv("WAF_CC_VERSION_KEY", "waf:cc:version"),
+			TriggerRulesKey:   getEnv("WAF_TRIGGER_RULES_KEY", "waf:trigger:rules"),
+			TriggerVersionKey: getEnv("WAF_TRIGGER_VERSION_KEY", "waf:trigger:version"),
 		},
 		WAF: WAF{
 			DistDir: getEnv("WAF_DIST_DIR", "/opt/waf-dist"),

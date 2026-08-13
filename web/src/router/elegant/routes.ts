@@ -69,7 +69,7 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'config',
       i18nKey: 'route.config',
       icon: 'mdi:cog',
-      order: 9
+      order: 10
     }
   },
   {
@@ -102,7 +102,7 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'guide',
       i18nKey: 'route.guide',
       icon: 'mdi:book-open-variant',
-      order: 10
+      order: 11
     }
   },
   {
@@ -138,7 +138,7 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'ip-lists',
       i18nKey: 'route.ip-lists',
       icon: 'mdi:account-group',
-      order: 8
+      order: 9
     }
   },
   {
@@ -173,6 +173,17 @@ export const generatedRoutes: GeneratedRoute[] = [
       i18nKey: 'route.traffic',
       icon: 'mdi:chart-timeline-variant',
       order: 4
+    }
+  },
+  {
+    name: 'trigger-rules',
+    path: '/trigger-rules',
+    component: 'layout.base$view.trigger-rules',
+    meta: {
+      title: 'trigger-rules',
+      i18nKey: 'route.trigger-rules',
+      icon: 'mdi:filter-variant',
+      order: 8
     }
   }
 ];
