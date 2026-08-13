@@ -130,6 +130,15 @@ func (s *RuleService) Publish() (*Ruleset, error) {
 	return rs, nil
 }
 
+// GetByRuleID 按规则 ID 查询单条规则（规则测试用）
+func (s *RuleService) GetByRuleID(ruleID string) (*model.Rule, error) {
+	var r model.Rule
+	if err := s.db.Where("rule_id = ?", ruleID).First(&r).Error; err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
 // List 规则列表（支持 group / site_id / keyword 过滤）
 func (s *RuleService) List(group, siteID, keyword string) ([]model.Rule, error) {
 	q := s.db

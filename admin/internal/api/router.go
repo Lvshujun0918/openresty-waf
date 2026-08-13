@@ -56,6 +56,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.DELETE("/rules/:id", ruleHandler.Delete)
 			authed.PATCH("/rules/:id/enabled", ruleHandler.SetEnabled)
 			authed.POST("/rules/publish", ruleHandler.Publish)
+			authed.POST("/rules/test", ruleHandler.Test)
 
 			// CC 防刷规则（按 host + 路径精细化配置）
 			authed.GET("/cc-rules", ccRuleHandler.List)

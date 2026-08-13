@@ -9,6 +9,7 @@ import (
 
 	"openresty-waf/admin/internal/config"
 	"openresty-waf/admin/internal/model"
+	"openresty-waf/admin/internal/ruletest"
 	"openresty-waf/admin/internal/service"
 )
 
@@ -28,6 +29,31 @@ func (h *RuleHandler) List(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, rules)
+}
+
+// Test POST /api/rules/test  模拟请求测试规则是否命中（保存前验证）
+func (h *RuleHandler) Test(c *gin.Context) {
+	var req struct {
+		RuleID  string                `json:"rule_id" binding:"required"`
+		Request ruletest.TestRequest  `json:"request"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误: " + err.Error()})
+		return
+	}
+	rule, err := h.svc.GetByRuleID(req.RuleID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "规则不存在: " + req.RuleID})
+		return
+	}
+	res := ruletest.Match(*rule, req.Request)
+	c.JSON(http.StatusOK, gin.H{
+		"matched": res.Matched,
+		"note":    res.Note,
+		"rule": gin.H{
+			"id": rule.RuleID, "name": rule.Name, "group": rule.Group, "msg": rule.Message,
+		},
+	})
 }
 
 // Create POST /api/rules
