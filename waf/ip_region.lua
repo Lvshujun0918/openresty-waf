@@ -9,12 +9,12 @@
 --   Data: 国家|省份|城市|ISP|iso-alpha2-code （v3 官方数据格式）
 -- 注意：文件内 IP 与指针均为小端序。
 --
--- 数据文件：容器内固定路径（不随 /opt/waf 下发，避免多节点下发配置复杂）
--- 部署：将 ip2region_v4.xdb 放入引擎容器该路径（docker cp）；容器重建后需重新放置
+-- 数据文件：/opt/waf/ip2region_v4.xdb（与 WAF 配置同目录，经 bind mount 下发，容器重建无需重新放置）
+-- 部署：将 ip2region_v4.xdb 放入 /opt/waf 即可（随引擎配置目录一起挂载）
 
 local _M = {}
 
-local IP_REGION_FILE = "/usr/local/openresty/nginx/conf/ip2region_v4.xdb"
+local IP_REGION_FILE = "/opt/waf/ip2region_v4.xdb"
 
 local _raw        = nil   -- 文件全部字节
 local _header_len = 0     -- 16 (v2) / 256 (v3)
