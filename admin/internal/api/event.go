@@ -49,3 +49,18 @@ func (h *EventHandler) Consume(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "consumed": n})
 }
+
+// Detail GET /api/events/:id  事件详情（含命中规则 / 请求头 / 请求体）
+func (h *EventHandler) Detail(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "非法的事件 ID"})
+		return
+	}
+	ev, err := h.svc.Get(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "事件不存在"})
+		return
+	}
+	c.JSON(http.StatusOK, ev)
+}

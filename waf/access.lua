@@ -21,6 +21,41 @@ local function gen_req_id()
     )
 end
 
+-- 证据采集上限
+local EVIDENCE_MAX_HEADERS = 16
+local EVIDENCE_MAX_BODY    = 8192  -- 请求体最大保留 8KB
+
+-- 命中攻击时捕获请求头与请求体（access 阶段执行，供 log 阶段事件详情使用）
+local function capture_evidence(ctx)
+    local evidence = {}
+    -- 请求头：按名称排序，取前 N 个
+    local all = ngx.req.get_headers()
+    local hdrs = {}
+    if all then
+        for k, v in pairs(all) do
+            hdrs[#hdrs + 1] = { name = tostring(k), value = tostring(v) }
+        end
+    end
+    table.sort(hdrs, function(a, b) return a.name < b.name end)
+    if #hdrs > EVIDENCE_MAX_HEADERS then
+        -- 截断到前 N 个
+        local cut = {}
+        for i = 1, EVIDENCE_MAX_HEADERS do cut[i] = hdrs[i] end
+        hdrs = cut
+    end
+    evidence.headers = hdrs
+    -- 请求体（表单 / JSON / 原始）：仅非 GET/HEAD 读取，避免无谓开销
+    local method = ngx.req.get_method() or "GET"
+    if method ~= "GET" and method ~= "HEAD" then
+        ngx.req.read_body()
+        local body = ngx.req.get_body_data()
+        if body and #body > 0 then
+            evidence.body = string.sub(body, 1, EVIDENCE_MAX_BODY)
+        end
+    end
+    ctx.evidence = evidence
+end
+
 -- 初始化请求上下文（写入 ngx.ctx，供 log 等后续阶段使用）
 local function new_ctx(cfg)
     local ctx = {
@@ -122,6 +157,9 @@ if ruleset then
         end
     end
     if not exempt then
+        -- 先捕获请求头/请求体：engine.run 内部 BLOCK 动作会直接 ngx.exit(403)，
+        -- 因此必须在检测前捕获证据，否则永远执行不到。
+        pcall(capture_evidence, ctx)
         local result = engine.run(ruleset, "access", ctx)
         if result == "blocked" or result == "accepted" then
             return

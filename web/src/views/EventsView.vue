@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api'
 import type { EventItem, PageResult } from '@/types'
 import { Badge } from '@/components/ui/badge'
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { X } from 'lucide-vue-next'
 import {
   Table,
   TableBody,
@@ -53,6 +54,47 @@ function isBlocked(e: EventItem) {
 }
 function geoText(e: EventItem) {
   return [e.country, e.province, e.city].filter(Boolean).join(' ')
+}
+
+// ===== 事件详情弹窗 =====
+interface RuleHit { id: string; group: string; msg: string; severity: number }
+interface HeaderKV { name: string; value: string }
+const detailOpen = ref(false)
+const detailLoading = ref(false)
+const detail = ref<(EventItem & { rules?: string; headers?: string; body?: string }) | null>(null)
+
+const parsedRules = computed<RuleHit[]>(() => {
+  if (!detail.value?.rules) return []
+  try { return JSON.parse(detail.value.rules) } catch { return [] }
+})
+const parsedHeaders = computed<HeaderKV[]>(() => {
+  if (!detail.value?.headers) return []
+  try { return JSON.parse(detail.value.headers) } catch { return [] }
+})
+const severityMeta: Record<number, { label: string; cls: string }> = {
+  1: { label: '紧急', cls: 'bg-rose-600 text-white' },
+  2: { label: '高危', cls: 'bg-destructive text-white' },
+  3: { label: '中危', cls: 'bg-warning text-white' },
+  4: { label: '低危', cls: 'bg-muted text-muted-foreground' },
+}
+
+async function openDetail(e: EventItem) {
+  detailOpen.value = true
+  detailLoading.value = true
+  detail.value = null
+  try {
+    detail.value = await api.get<EventItem & { rules?: string; headers?: string; body?: string }>(
+      `/events/${e.id}`,
+    )
+  } catch {
+    detail.value = null
+  } finally {
+    detailLoading.value = false
+  }
+}
+function closeDetail() {
+  detailOpen.value = false
+  detail.value = null
 }
 
 async function load() {
@@ -144,6 +186,7 @@ onMounted(async () => {
               <TableHead>动作</TableHead>
               <TableHead>方法</TableHead>
               <TableHead>请求</TableHead>
+              <TableHead>操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -185,9 +228,12 @@ onMounted(async () => {
                   <span class="font-mono">{{ e.uri }}</span>
                 </div>
               </TableCell>
+              <TableCell>
+                <Button variant="outline" size="sm" @click="openDetail(e)">详情</Button>
+              </TableCell>
             </TableRow>
             <TableRow v-if="events.length === 0">
-              <TableCell colspan="8" class="py-8 text-center text-muted-foreground">
+              <TableCell colspan="9" class="py-8 text-center text-muted-foreground">
                 暂无数据，可先触发一次攻击或点击"消费 Redis 队列"
               </TableCell>
             </TableRow>
@@ -201,6 +247,132 @@ onMounted(async () => {
       <div class="flex gap-2">
         <Button variant="outline" size="sm" :disabled="page <= 1" @click="page--; load()">上一页</Button>
         <Button variant="outline" size="sm" :disabled="page * pageSize >= total" @click="page++; load()">下一页</Button>
+      </div>
+    </div>
+
+    <!-- 事件详情弹窗 -->
+    <div
+      v-if="detailOpen"
+      class="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4 sm:p-8"
+      @click.self="closeDetail"
+    >
+      <div class="mx-auto w-full max-w-3xl rounded-xl border bg-card shadow-2xl">
+        <!-- 头部 -->
+        <div class="flex items-center justify-between border-b px-5 py-3.5">
+          <div>
+            <h2 class="text-base font-semibold">攻击事件详情</h2>
+            <p class="font-mono text-[11px] text-muted-foreground">req_id: {{ detail?.req_id || '-' }}</p>
+          </div>
+          <button
+            class="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            @click="closeDetail"
+          >
+            <X class="h-5 w-5" />
+          </button>
+        </div>
+
+        <div class="max-h-[75vh] space-y-6 overflow-y-auto p-5">
+          <p v-if="detailLoading" class="py-8 text-center text-sm text-muted-foreground">加载中…</p>
+
+          <template v-if="detail && !detailLoading">
+            <!-- 基本信息 -->
+            <div class="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm md:grid-cols-3">
+              <div>
+                <div class="text-xs text-muted-foreground">时间</div>
+                <div>{{ fmtTime(detail.time) }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-muted-foreground">来源 IP</div>
+                <div class="font-mono">{{ detail.client_ip }}</div>
+              </div>
+              <div v-if="detail.country">
+                <div class="text-xs text-muted-foreground">归属地</div>
+                <div>{{ geoText(detail) }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-muted-foreground">方法</div>
+                <div>{{ detail.method || '-' }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-muted-foreground">域名</div>
+                <div>{{ detail.host || '-' }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-muted-foreground">动作</div>
+                <Badge
+                  :class="isBlocked(detail) ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-muted-foreground'"
+                  class="border-transparent"
+                >
+                  {{ isBlocked(detail) ? '拦截' : '记录' }}
+                </Badge>
+              </div>
+              <div class="col-span-2 md:col-span-3">
+                <div class="text-xs text-muted-foreground">请求</div>
+                <div class="break-all font-mono text-xs">{{ detail.method }} {{ detail.host }}{{ detail.uri }}</div>
+              </div>
+            </div>
+
+            <!-- 命中规则 -->
+            <div>
+              <h3 class="mb-2 text-sm font-semibold">命中规则（{{ parsedRules.length }}）</h3>
+              <div v-if="parsedRules.length" class="overflow-hidden rounded-lg border">
+                <table class="w-full text-sm">
+                  <thead class="bg-muted/60 text-xs text-muted-foreground">
+                    <tr>
+                      <th class="px-3 py-2 text-left">规则 ID</th>
+                      <th class="px-3 py-2 text-left">类型</th>
+                      <th class="px-3 py-2 text-left">级别</th>
+                      <th class="px-3 py-2 text-left">描述</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in parsedRules" :key="r.id" class="border-t">
+                      <td class="px-3 py-2 font-mono text-xs">{{ r.id }}</td>
+                      <td class="px-3 py-2 text-xs">{{ groupMeta[r.group]?.label || r.group }}</td>
+                      <td class="px-3 py-2">
+                        <span
+                          class="rounded px-1.5 py-0.5 text-[11px]"
+                          :class="severityMeta[r.severity]?.cls || 'bg-muted text-muted-foreground'"
+                        >
+                          {{ severityMeta[r.severity]?.label || r.severity }}
+                        </span>
+                      </td>
+                      <td class="px-3 py-2 text-xs">{{ r.msg }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p v-else class="text-sm text-muted-foreground">无命中规则明细</p>
+            </div>
+
+            <!-- 请求头 -->
+            <div v-if="parsedHeaders.length">
+              <h3 class="mb-2 text-sm font-semibold">请求头（{{ parsedHeaders.length }}）</h3>
+              <div class="overflow-hidden rounded-lg border">
+                <table class="w-full text-sm">
+                  <thead class="bg-muted/60 text-xs text-muted-foreground">
+                    <tr>
+                      <th class="px-3 py-2 text-left">名称</th>
+                      <th class="px-3 py-2 text-left">值</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(h, i) in parsedHeaders" :key="i" class="border-t">
+                      <td class="px-3 py-1.5 font-mono text-xs">{{ h.name }}</td>
+                      <td class="break-all px-3 py-1.5 font-mono text-xs text-muted-foreground">{{ h.value }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 请求体 -->
+            <div v-if="detail.body">
+              <h3 class="mb-2 text-sm font-semibold">请求体（前 8KB）</h3>
+              <pre class="max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/40 p-3 font-mono text-xs">{{ detail.body }}</pre>
+            </div>
+          </template>
+        </div>
       </div>
     </div>
   </div>

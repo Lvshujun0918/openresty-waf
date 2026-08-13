@@ -16,6 +16,9 @@ type Event struct {
 	URI       string    `gorm:"type:text" json:"uri"`
 	RuleID    string    `gorm:"size:32;index" json:"rule_id"` // 主命中规则（severity 最高）
 	RuleIDs   string    `gorm:"size:255" json:"rule_ids"`      // 全部命中规则 id（逗号分隔）
+	Rules     string    `gorm:"type:text" json:"rules"`        // 命中规则详情 JSON（id/group/msg/severity）
+	Headers   string    `gorm:"type:text" json:"headers"`      // 请求头 JSON（name/value 数组）
+	Body      string    `gorm:"type:text" json:"body"`         // 请求体（最多保留 8KB）
 	Group     string    `gorm:"size:32;index" json:"group"`
 	Message   string    `gorm:"size:255" json:"msg"` // 与 WAF 日志字段 msg 一致
 	Severity  int       `json:"severity"`

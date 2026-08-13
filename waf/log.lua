@@ -37,18 +37,27 @@ local function ts_now()
 end
 
 -- 组装单条攻击事件：一个请求最多一条（即使命中多条规则）。
--- 主命中取 severity 最高者（同级别取先命中），rule_ids 列出全部命中。
+-- 主命中取 severity 最高者（同级别取先命中），rule_ids 列出全部命中；
+-- rules / headers / body 为 JSON 文本，供事件详情展示。
 local function build_event(ctx)
     local geo = lookup_geo(ctx.client_ip)
     local matches = ctx.matched or {}
     local primary = matches[1]
     local rule_ids = {}
+    local rules = {}
     for _, m in ipairs(matches) do
         rule_ids[#rule_ids + 1] = m.id
+        rules[#rules + 1] = {
+            id       = m.id,
+            group    = m.group,
+            msg      = m.msg,
+            severity = m.severity,
+        }
         if primary == nil or (m.severity or 0) > (primary.severity or 0) then
             primary = m
         end
     end
+    local evidence = ctx.evidence or {}
     return {
         time      = ts_now(),   -- 本地时间（带时区偏移）
         req_id    = ctx.req_id or "",
@@ -59,6 +68,9 @@ local function build_event(ctx)
         uri       = ctx.request and ctx.request.uri,
         rule_id   = primary and primary.id,
         rule_ids  = table.concat(rule_ids, ","),
+        rules     = cjson.encode(rules),
+        headers   = cjson.encode(evidence.headers or {}),
+        body      = evidence.body or "",
         group     = primary and primary.group,
         msg       = primary and primary.msg,
         severity  = primary and primary.severity,

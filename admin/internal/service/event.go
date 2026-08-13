@@ -83,9 +83,22 @@ func (s *EventService) List(group, clientIP, ruleID, host, action string, page, 
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
+	// 列表不返回大字段（命中规则详情/请求头/请求体），详情接口单独获取
 	var events []model.Event
-	if err := q.Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&events).Error; err != nil {
+	if err := q.Select("id", "time", "req_id", "client_ip", "country", "province", "city",
+		"method", "host", "uri", "rule_id", "rule_ids", "`group`", "message",
+		"severity", "status", "created_at").
+		Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&events).Error; err != nil {
 		return nil, 0, err
 	}
 	return events, total, nil
+}
+
+// Get 按 ID 获取事件完整信息（含命中规则详情 / 请求头 / 请求体）
+func (s *EventService) Get(id uint) (*model.Event, error) {
+	var ev model.Event
+	if err := s.db.First(&ev, id).Error; err != nil {
+		return nil, err
+	}
+	return &ev, nil
 }

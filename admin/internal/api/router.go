@@ -84,6 +84,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 
 			// 攻击事件
 			authed.GET("/events", eventHandler.List)
+			authed.GET("/events/:id", eventHandler.Detail)
 			authed.POST("/events/consume", eventHandler.Consume)
 
 			// 仪表盘聚合统计
