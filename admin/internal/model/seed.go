@@ -5,7 +5,8 @@ package model
 // v3: 修复 920230/942460 对 URL 编码中文/UTF-8 中文的误报（加 url_decode transform）
 // v4: 942460 pattern 限定 ASCII 特殊字符 4 连，彻底避免 UTF-8 中文误报
 // v5: 新增协议异常规则 25003-25006（方法字符集/Content-Length/编码与控制字符）
-const SeedVersion = "5"
+// v6: 新增响应泄露检测规则 26001/26002（默认 LOG_ONLY 监控，可改 BLOCK）
+const SeedVersion = "6"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -62,4 +63,14 @@ var baseRules = []Rule{
 		Operator: "REGEX", Pattern: `[\x00-\x08\x0B\x0C\x0E-\x1F]`,
 		Transforms: `[]`, Vars: `[{"type":"HEADERS"}]`,
 		Actions: `{"disrupt":"BLOCK","status":400,"msg":"请求头控制字符"}`, Status: 400, Message: "请求头控制字符", SortOrder: 8},
+
+	// ---- 响应检测（默认仅监控，可在后台改为 BLOCK 拦截） ----
+	{RuleID: "26001", Name: "响应体泄露检测", Group: "response", Phase: "body_filter", Severity: 2, Enabled: true,
+		Operator: "REGEX", Pattern: `(ORA-[0-9]+|SQLSTATE\s*\[|mysql_fetch_|Fatal error:|Parse error:|Traceback \(most recent call last\)|syntax error, unexpected)`,
+		Transforms: `[]`, Vars: `[{"type":"RESPONSE_BODY"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"响应体泄露：错误堆栈/数据库报错"}`, Status: 200, Message: "响应体泄露：错误堆栈/数据库报错", SortOrder: 9},
+	{RuleID: "26002", Name: "响应头版本泄露", Group: "response", Phase: "header_filter", Severity: 1, Enabled: true,
+		Operator: "EXISTS", Pattern: ``,
+		Transforms: `[]`, Vars: `[{"type":"RESPONSE_HEADERS","specific":"x-powered-by"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"响应头泄露：X-Powered-By 版本信息"}`, Status: 200, Message: "响应头泄露：X-Powered-By 版本信息", SortOrder: 10},
 }
