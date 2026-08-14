@@ -105,7 +105,7 @@ function _M.run(ruleset, phase, waf_ctx)
             end
         end
         if best then
-            local result = actions.execute(waf_ctx, best.actions, nil)
+            local result = actions.execute(waf_ctx, best.actions, nil, phase)
             if result == "accepted" then
                 return "accepted"
             end
@@ -115,15 +115,25 @@ function _M.run(ruleset, phase, waf_ctx)
         end
     end
 
-    -- 异常分阈值阻断
+    -- 异常分阈值阻断（响应阶段不 ngx.exit，改为改状态码/替换响应体）
     local threshold = waf_ctx.score_threshold or 5
     if waf_ctx.score >= threshold and waf_ctx.mode ~= "detect" then
         local cfg = _M.get_active_config()
-        ngx.status = 403
-        ngx.header.content_type = "text/html; charset=utf-8"
-        ngx.say(cfg.block and cfg.block.html or "Forbidden")
-        waf_ctx._exited = true
-        ngx.exit(403)
+        if phase == "access" then
+            ngx.status = 403
+            ngx.header.content_type = "text/html; charset=utf-8"
+            ngx.say(cfg.block and cfg.block.html or "Forbidden")
+            waf_ctx._exited = true
+            ngx.exit(403)
+        elseif phase == "header_filter" then
+            ngx.status = 403
+            ngx.header.content_type = "text/html; charset=utf-8"
+            ngx.header.content_length = nil
+            waf_ctx.response_block = cfg.block and cfg.block.html or "Forbidden"
+        else
+            waf_ctx.response_block = cfg.block and cfg.block.html or "Forbidden"
+        end
+        return "blocked"
     end
 
     if #waf_ctx.matched > 0 then

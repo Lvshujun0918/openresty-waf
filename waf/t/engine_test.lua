@@ -199,6 +199,32 @@ t.test("多 vars 任一命中即匹配", function()
     t.exits(function() engine.run(rs, "access", ctx) end, 403)
 end)
 
+-- 响应阶段动作：header_filter/body_filter 禁用 ngx.exit
+
+t.test("header_filter 阶段 BLOCK 不 exit：改状态码并标记 response_block", function()
+    ngx_reset()
+    ngx.var.uri = "/union select"
+    local rs = { rules = { rule({ phase = "header_filter" }) } }
+    local ctx = { mode = "active" }
+    local res = engine.run(rs, "header_filter", ctx)
+    t.eq(res, "blocked")
+    t.eq(ngx.status, 403)
+    t.isnil(ngx.exit_code, "header_filter 不应调用 ngx.exit")
+    t.ok(ctx.response_block ~= nil and ctx.response_block ~= "", "应标记替换响应体")
+end)
+
+t.test("body_filter 阶段 BLOCK 仅标记 response_block", function()
+    ngx_reset()
+    ngx.var.uri = "/union select"
+    local rs = { rules = { rule({ phase = "body_filter" }) } }
+    local ctx = { mode = "active" }
+    local res = engine.run(rs, "body_filter", ctx)
+    t.eq(res, "blocked")
+    t.isnil(ngx.exit_code, "body_filter 不应调用 ngx.exit")
+    t.eq(ngx.status, 0, "响应头已发送不应改状态码")
+    t.ok(ctx.response_block ~= nil, "应标记替换响应体")
+end)
+
 -- fail-open 机制：BLOCK/DROP 在 ngx.exit 前标记 _exited，外层据此区分拦截与异常
 t.test("BLOCK 动作 exit 前标记 _exited", function()
     ngx_reset()

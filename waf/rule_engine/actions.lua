@@ -24,12 +24,15 @@ local function get_config()
 end
 
 -- 执行动作，返回结果标记：
---   "blocked"  已阻断（响应已发出）
+--   "blocked"  已阻断（access：响应已发出；header_filter：状态码已改待 body_filter 替换响应体）
 --   "accepted" 放行并跳过后续规则
 --   "score"    累加异常分
 --   "logged"   监控模式仅记录
 --   nil        无阻断动作
-function _M.execute(waf_ctx, action, rule)
+-- phase: access / header_filter / body_filter。
+--   header_filter 阶段禁用 ngx.exit：BLOCK 改为改状态码 + response_block 标记；
+--   body_filter 阶段响应头已发送：BLOCK 仅标记 response_block（body_filter.lua 替换响应体）。
+function _M.execute(waf_ctx, action, rule, phase)
     local disrupt = action.disrupt
     if not disrupt then
         return nil
@@ -40,24 +43,45 @@ function _M.execute(waf_ctx, action, rule)
     if disrupt == "BLOCK" then
         if mode == "active" then
             local status = tonumber(action.status) or 403
-            if status == 444 then
-                -- 444: 直接关闭连接（标记已 exit，供外层 fail-open 区分拦截与异常）
-                waf_ctx._exited = true
-                ngx.exit(444)
-            end
             local cfg = get_config()
-            ngx.status = status
-            ngx.header.content_type = "text/html; charset=utf-8"
-            ngx.say(cfg.block and cfg.block.html or "Forbidden")
-            waf_ctx._exited = true
-            ngx.exit(status)
+            local html = cfg.block and cfg.block.html or "Forbidden"
+            if status == 444 then
+                -- 444：直接关闭连接（响应阶段无法关闭，仅标记清空响应体）
+                if phase == "access" then
+                    waf_ctx._exited = true
+                    ngx.exit(444)
+                end
+                waf_ctx.response_block = ""
+                return "blocked"
+            end
+            if phase == "access" then
+                ngx.status = status
+                ngx.header.content_type = "text/html; charset=utf-8"
+                ngx.say(html)
+                waf_ctx._exited = true
+                ngx.exit(status)
+            elseif phase == "header_filter" then
+                -- 改响应状态码，去掉 Content-Length（响应体将被替换，长度变化）
+                ngx.status = status
+                ngx.header.content_type = "text/html; charset=utf-8"
+                ngx.header.content_length = nil
+                waf_ctx.response_block = html
+            else
+                -- body_filter：响应头已发出，仅替换响应体
+                waf_ctx.response_block = html
+            end
+            return "blocked"
         end
         return "logged"
 
     elseif disrupt == "DROP" then
         if mode == "active" then
-            waf_ctx._exited = true
-            ngx.exit(444)
+            if phase == "access" then
+                waf_ctx._exited = true
+                ngx.exit(444)
+            end
+            -- 响应阶段：清空响应体
+            waf_ctx.response_block = ""
         end
         return "logged"
 
@@ -69,7 +93,8 @@ function _M.execute(waf_ctx, action, rule)
         return "accepted"
 
     elseif disrupt == "REDIRECT" then
-        if mode == "active" then
+        -- ngx.redirect 仅 access 阶段可用
+        if mode == "active" and phase == "access" then
             ngx.redirect(action.location or "/", ngx.HTTP_MOVED_TEMPORARILY)
         end
         return "logged"
