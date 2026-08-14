@@ -1,8 +1,8 @@
 import { request } from '../request';
 
-/** 仪表盘聚合统计 */
-export function fetchDashboardStats(days = 14) {
-  return request<Api.Waf.DashboardStats>({ url: '/dashboard/stats', params: { days } });
+/** 仪表盘聚合统计（host 非空时仅统计该站点） */
+export function fetchDashboardStats(days = 14, host = '') {
+  return request<Api.Waf.DashboardStats>({ url: '/dashboard/stats', params: { days, host } });
 }
 
 /** 攻击事件列表 */

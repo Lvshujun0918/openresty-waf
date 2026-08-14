@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref } from 'vue';
-import { NCard, NDataTable, NGrid, NGi, NStatistic, NTag } from 'naive-ui';
+import { NCard, NDataTable, NGrid, NGi, NSelect, NStatistic, NTag } from 'naive-ui';
 import { useEcharts } from '@/hooks/common/echarts';
 import type { ECOption } from '@/hooks/common/echarts';
-import { fetchDashboardStats, fetchEvents, fetchRules, fetchTrafficTrend } from '@/service/api';
+import { fetchDashboardStats, fetchEvents, fetchRules, fetchSites, fetchTrafficTrend } from '@/service/api';
 
 const mode = ref('active');
 const ruleCount = ref(0);
@@ -12,6 +12,17 @@ const recentEvents = ref<Api.Waf.EventItem[]>([]);
 const stats = ref<Api.Waf.DashboardStats | null>(null);
 const reqTrend = ref<{ date: string; total: number }[]>([]);
 const loading = ref(true);
+const sites = ref<Api.Waf.Site[]>([]);
+const siteHost = ref('');
+const siteOptions = computed(() => [
+  { label: '全部站点', value: '' },
+  ...sites.value.map(s => ({ label: `${s.name}（${s.domain}）`, value: s.domain }))
+]);
+
+async function loadSites() {
+  const res = await fetchSites();
+  sites.value = res.data ?? [];
+}
 
 const groupMeta: Record<string, { label: string; color: string }> = {
   sqli: { label: 'SQL 注入', color: '#ef4444' },
@@ -192,7 +203,7 @@ async function load() {
   loading.value = true;
   try {
     const [st, tr, ev, rules] = await Promise.all([
-      fetchDashboardStats(14),
+      fetchDashboardStats(14, siteHost.value),
       fetchTrafficTrend(14).catch(() => ({ data: { items: [] as { date: string; total: number }[] } })),
       fetchEvents({ page: 1, page_size: 6 }).catch(() => ({ data: { items: [] as Api.Waf.EventItem[] } })),
       fetchRules().catch(() => ({ data: [] as Api.Waf.Rule[] }))
@@ -214,7 +225,10 @@ async function load() {
   }
 }
 
-onMounted(load);
+onMounted(() => {
+  load();
+  loadSites();
+});
 </script>
 
 <template>
@@ -230,7 +244,10 @@ onMounted(load);
             命中规则即阻断 · 配置变更 5 秒内热更新生效
           </div>
         </div>
-        <div class="text-sm">规则 {{ ruleCount }} 条 / 启用 {{ enabledCount }} 条</div>
+        <div class="flex items-center gap-3">
+          <NSelect v-model:value="siteHost" :options="siteOptions" class="w-48" @update:value="load" />
+          <div class="text-sm">规则 {{ ruleCount }} 条 / 启用 {{ enabledCount }} 条</div>
+        </div>
       </div>
     </NCard>
 
