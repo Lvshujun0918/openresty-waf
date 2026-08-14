@@ -148,6 +148,11 @@ lua_shared_dict waf_rule 20m;
 lua_shared_dict waf_counter 50m;
 init_by_lua_file /opt/waf/init.lua;
 init_worker_by_lua_file /opt/waf/init.lua;
+# 慢速攻击防护（http 段）：读头/读体超时与 body 缓冲上限
+#   client_header_timeout 10s;   # slowloris：请求头读超时
+#   client_body_timeout   30s;   # 慢 body 传输超时
+#   client_body_buffer_size 128k;# 超过则落盘，WAF 仍扫描前 512KB（见 config.lua upload.spooled_scan_bytes）
+#   send_timeout 30s;
 # 在需要防护的 server / location 内追加：
 #   access_by_lua_file /opt/waf/access.lua;
 #   log_by_lua_file    /opt/waf/log.lua;
@@ -270,6 +275,11 @@ lua_shared_dict waf_rule 20m;
 lua_shared_dict waf_counter 50m;
 init_by_lua_file $INSTALL_DIR/init.lua;
 init_worker_by_lua_file $INSTALL_DIR/init.lua;
+# 慢速攻击防护（http 段，按需取消注释）
+#   client_header_timeout 10s;   # slowloris：请求头读超时
+#   client_body_timeout   30s;   # 慢 body 传输超时
+#   client_body_buffer_size 128k;# 超过则落盘，WAF 仍扫描前 512KB
+#   send_timeout 30s;
 # 在需要防护的 server/location 内追加：
 #   access_by_lua_file $INSTALL_DIR/access.lua;
 #   log_by_lua_file    $INSTALL_DIR/log.lua;
