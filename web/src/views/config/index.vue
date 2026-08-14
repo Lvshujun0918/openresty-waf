@@ -8,12 +8,15 @@ const loaded = ref(false);
 const cfg = reactive({
   mode: 'active',
   detection: { exclude_paths: [] as string[], geo: true, paranoia_level: 1 },
-  log: { enabled: true, backend: 'redis' }
+  log: { enabled: true, backend: 'redis' },
+  upload: { enabled: true }
 });
 const excludeText = ref('');
 const staticExtText = ref('');
 const staticPrefixText = ref('');
 const trustedText = ref('');
+const uploadExtText = ref('');
+const uploadMimeText = ref('');
 let rawConfig: Record<string, unknown> = {};
 
 const modeOptions = [
@@ -39,12 +42,18 @@ async function load() {
     log: {
       enabled: log.enabled !== false,
       backend: log.backend || 'redis'
+    },
+    upload: {
+      enabled: ((rawConfig.upload as Record<string, unknown>) ?? {}).enabled !== false
     }
   });
   excludeText.value = cfg.detection.exclude_paths.join('\n');
   staticExtText.value = (Array.isArray(skip.ext) ? (skip.ext as string[]) : []).join('\n');
   staticPrefixText.value = (Array.isArray(skip.prefix) ? (skip.prefix as string[]) : []).join('\n');
   trustedText.value = (Array.isArray(rawConfig.trusted_proxies) ? (rawConfig.trusted_proxies as string[]) : []).join('\n');
+  const up = (rawConfig.upload as Record<string, unknown>) ?? {};
+  uploadExtText.value = (Array.isArray(up.deny_ext) ? (up.deny_ext as string[]) : []).join('\n');
+  uploadMimeText.value = (Array.isArray(up.deny_mime) ? (up.deny_mime as string[]) : []).join('\n');
   loaded.value = true;
 }
 
@@ -67,6 +76,14 @@ async function save() {
       .split('\n')
       .map(s => s.trim())
       .filter(Boolean);
+    const uploadExt = uploadExtText.value
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
+    const uploadMime = uploadMimeText.value
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
     const next = {
       ...rawConfig,
       mode: cfg.mode,
@@ -85,6 +102,12 @@ async function save() {
         ...((rawConfig.log as Record<string, unknown>) ?? {}),
         enabled: cfg.log.enabled,
         backend: cfg.log.backend
+      },
+      upload: {
+        ...((rawConfig.upload as Record<string, unknown>) ?? {}),
+        enabled: cfg.upload.enabled,
+        deny_ext: uploadExt,
+        deny_mime: uploadMime
       },
       trusted_proxies: trusted
     };
@@ -160,6 +183,27 @@ onMounted(load);
           <div class="w-full">
             <NInput v-model:value="trustedText" type="textarea" :rows="3" placeholder="每行一个精确 IP 或 CIDR，如 10.0.0.0/8&#10;留空 = 无条件信任 XFF（兼容旧行为）" />
             <p class="mt-1 text-xs text-[rgb(125,125,125)]">仅当直连地址命中此列表时才信任 XFF 最左值；公网直连部署建议配置，防止伪造 XFF 绕过 IP 名单/CC/人机验证</p>
+          </div>
+        </NFormItem>
+      </NForm>
+    </NCard>
+
+    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="文件上传检测">
+      <NForm label-placement="left" label-width="140">
+        <NFormItem label="上传检测">
+          <NSwitch v-model:value="cfg.upload.enabled" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">检测 multipart 上传的文件名后缀与 Content-Type</span>
+        </NFormItem>
+        <NFormItem label="危险后缀">
+          <div class="w-full">
+            <NInput v-model:value="uploadExtText" type="textarea" :rows="3" placeholder="每行一个后缀（不含点），如 php、jsp、exe" />
+            <p class="mt-1 text-xs text-[rgb(125,125,125)]">文件名以此后缀结尾即拦截（不区分大小写）</p>
+          </div>
+        </NFormItem>
+        <NFormItem label="危险类型">
+          <div class="w-full">
+            <NInput v-model:value="uploadMimeText" type="textarea" :rows="2" placeholder="每行一个 Content-Type，如 application/x-php" />
+            <p class="mt-1 text-xs text-[rgb(125,125,125)]">伪造后缀但类型命中黑名单同样拦截</p>
           </div>
         </NFormItem>
       </NForm>
