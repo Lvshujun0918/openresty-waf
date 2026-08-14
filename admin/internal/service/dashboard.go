@@ -63,8 +63,8 @@ type DashboardStats struct {
 	Countries   []CountryCount     `json:"countries"`     // 归属地分布 Top 8
 }
 
-// Stats 聚合仪表盘数据
-func (s *DashboardService) Stats(days int) (*DashboardStats, error) {
+// Stats 聚合仪表盘数据；host 非空时仅统计指定站点域名的数据（多站点隔离）
+func (s *DashboardService) Stats(days int, host string) (*DashboardStats, error) {
 	if days <= 0 || days > 90 {
 		days = 14
 	}
@@ -77,6 +77,10 @@ func (s *DashboardService) Stats(days int) (*DashboardStats, error) {
 
 	ev := s.db.Model(&model.Event{})
 	tr := s.db.Model(&model.TrafficLog{})
+	if host != "" {
+		ev = ev.Where("host = ?", host)
+		tr = tr.Where("host = ?", host)
+	}
 
 	// —— 今日 / 近24h / 累计 ——
 	if err := ev.Where("time >= ?", todayStart).Count(&st.Today.Attack).Error; err != nil {
@@ -112,10 +116,14 @@ func (s *DashboardService) Stats(days int) (*DashboardStats, error) {
 		Attack int64
 	}
 	var atkRows []atkRow
+	hostCond := ""
+	if host != "" {
+		hostCond = " AND host = ?"
+	}
 	if err := s.db.Raw(`SELECT strftime('%Y-%m-%d', time) AS date, COUNT(*) AS attack
-		FROM events WHERE time >= ?
-		GROUP BY strftime('%Y-%m-%d', time) ORDER BY date`,
-		trendStart.Format("2006-01-02 15:04:05")).Scan(&atkRows).Error; err != nil {
+		FROM events WHERE time >= ?`+hostCond+
+		` GROUP BY strftime('%Y-%m-%d', time) ORDER BY date`,
+		append([]interface{}{trendStart.Format("2006-01-02 15:04:05")}, hostArgs(host)...)...).Scan(&atkRows).Error; err != nil {
 		return nil, err
 	}
 	byDate := make(map[string]int64, len(atkRows))
@@ -129,7 +137,8 @@ func (s *DashboardService) Stats(days int) (*DashboardStats, error) {
 	}
 
 	// —— 攻击类型分布 ——
-	if err := s.db.Raw("SELECT `group`, COUNT(*) AS count FROM events GROUP BY `group` ORDER BY count DESC").
+	if err := s.db.Raw("SELECT `group`, COUNT(*) AS count FROM events WHERE 1=1"+hostCond+
+		" GROUP BY `group` ORDER BY count DESC", hostArgs(host)...).
 		Scan(&st.Groups).Error; err != nil {
 		return nil, err
 	}
@@ -137,18 +146,27 @@ func (s *DashboardService) Stats(days int) (*DashboardStats, error) {
 	// —— 攻击来源 Top 10（含归属地） ——
 	if err := s.db.Raw(`SELECT client_ip, COUNT(*) AS count,
 		MAX(country) AS country, MAX(province) AS province, MAX(city) AS city
-		FROM events GROUP BY client_ip ORDER BY count DESC LIMIT 10`).
+		FROM events WHERE 1=1`+hostCond+
+		` GROUP BY client_ip ORDER BY count DESC LIMIT 10`, hostArgs(host)...).
 		Scan(&st.TopIPs).Error; err != nil {
 		return nil, err
 	}
 
 	// —— 归属地分布 Top 8（国家维度） ——
 	if err := s.db.Raw(`SELECT country, COUNT(*) AS count FROM events
-		WHERE country IS NOT NULL AND country != ''
-		GROUP BY country ORDER BY count DESC LIMIT 8`).
+		WHERE country IS NOT NULL AND country != ''`+hostCond+
+		` GROUP BY country ORDER BY count DESC LIMIT 8`, hostArgs(host)...).
 		Scan(&st.Countries).Error; err != nil {
 		return nil, err
 	}
 
 	return st, nil
+}
+
+// hostArgs 站点过滤参数（host 为空时返回空切片）
+func hostArgs(host string) []interface{} {
+	if host == "" {
+		return []interface{}{}
+	}
+	return []interface{}{host}
 }
