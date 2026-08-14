@@ -66,7 +66,8 @@ func (s *RuleService) toEngineRule(r model.Rule) map[string]interface{} {
 }
 
 // BuildRuleset 从数据库构建待下发规则集（仅启用的规则，按站点与排序）
-// 按 CRS 偏执级别过滤：仅下发 paranoia_level <= 当前配置档位的规则
+// 按 CRS 偏执级别过滤：仅下发 paranoia_level <= 当前配置档位的规则。
+// 站点规则（SiteID != 0）写入 site 域名字段，Lua 引擎按请求 Host 过滤子集。
 func (s *RuleService) BuildRuleset() (*Ruleset, error) {
 	var rules []model.Rule
 	if err := s.db.Where("enabled = ?", true).
@@ -74,6 +75,7 @@ func (s *RuleService) BuildRuleset() (*Ruleset, error) {
 		return nil, err
 	}
 	level := s.currentParanoiaLevel()
+	domains := s.siteDomains(rules)
 	rs := &Ruleset{
 		Version: fmt.Sprintf("v%d", time.Now().UnixNano()),
 		Rules:   make([]map[string]interface{}, 0, len(rules)),
@@ -82,9 +84,24 @@ func (s *RuleService) BuildRuleset() (*Ruleset, error) {
 		if model.RuleParanoiaLevel(r.RuleID) > level {
 			continue // 高档位规则，当前档位不参与检测
 		}
-		rs.Rules = append(rs.Rules, s.toEngineRule(r))
+		er := s.toEngineRule(r)
+		if d, ok := domains[r.SiteID]; ok && d != "" {
+			er["site"] = d
+		}
+		rs.Rules = append(rs.Rules, er)
 	}
 	return rs, nil
+}
+
+// siteDomains 规则集涉及的站点 ID → 域名映射
+func (s *RuleService) siteDomains(rules []model.Rule) map[uint]string {
+	ids := []uint{}
+	for _, r := range rules {
+		if r.SiteID != 0 {
+			ids = append(ids, r.SiteID)
+		}
+	}
+	return NewSiteService(s.db).DomainsByIDs(ids)
 }
 
 // currentParanoiaLevel 读取后台运行配置中的 CRS 偏执级别（1-4，缺省 1）

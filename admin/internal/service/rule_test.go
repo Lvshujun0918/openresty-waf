@@ -75,6 +75,41 @@ func TestRuleService_BuildRuleset(t *testing.T) {
 	}
 }
 
+// TestRuleService_BuildRuleset_Site 站点规则下发带 site 域名字段，全局规则不带
+func TestRuleService_BuildRuleset_Site(t *testing.T) {
+	db := newTestDB(t)
+	s := NewRuleService(db, nil, newTestConfig())
+
+	st := &model.Site{Name: "主站", Domain: "cszj.wang"}
+	if err := db.Create(st).Error; err != nil {
+		t.Fatal(err)
+	}
+	// 全局规则（site_id=0）
+	db.Create(&model.Rule{RuleID: "g1", Operator: "REGEX", Pattern: "a", Enabled: true})
+	// 站点规则
+	db.Create(&model.Rule{RuleID: "s1", Operator: "REGEX", Pattern: "b", Enabled: true, SiteID: st.ID})
+	// 站点已删除（site_id 悬空）→ 不下发 site 字段，按全局处理
+	db.Create(&model.Rule{RuleID: "s2", Operator: "REGEX", Pattern: "c", Enabled: true, SiteID: 999})
+
+	rs, err := s.BuildRuleset()
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	byID := map[string]map[string]interface{}{}
+	for _, r := range rs.Rules {
+		byID[r["id"].(string)] = r
+	}
+	if _, ok := byID["g1"]["site"]; ok {
+		t.Error("全局规则不应带 site 字段")
+	}
+	if v, ok := byID["s1"]["site"]; !ok || v != "cszj.wang" {
+		t.Errorf("站点规则 site = %v", byID["s1"]["site"])
+	}
+	if _, ok := byID["s2"]["site"]; ok {
+		t.Error("悬空站点规则不应带 site 字段")
+	}
+}
+
 func TestRuleParanoiaLevel(t *testing.T) {
 	cases := map[string]int{
 		// PL1：关键字/语义/自定义
