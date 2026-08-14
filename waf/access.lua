@@ -171,9 +171,17 @@ if ruleset then
         -- 先捕获请求头/请求体：engine.run 内部 BLOCK 动作会直接 ngx.exit(403)，
         -- 因此必须在检测前捕获证据，否则永远执行不到。
         pcall(capture_evidence, ctx)
-        local result = engine.run(ruleset, "access", ctx)
-        if result == "blocked" or result == "accepted" then
-            return
+        -- fail-open：规则引擎任何运行错误都不影响业务，记录错误后放行。
+        -- ngx.exit 以 Lua 错误形式抛出：配合 _exited 标记区分「正常拦截」与「异常」。
+        local ok, result = pcall(engine.run, ruleset, "access", ctx)
+        if ok then
+            if result == "blocked" or result == "accepted" then
+                return
+            end
+        elseif ctx._exited then
+            return  -- 拦截响应已发送
+        else
+            ngx.log(ngx.ERR, "[waf] 规则引擎执行异常，fail-open 放行: " .. tostring(result))
         end
     end
 end

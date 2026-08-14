@@ -122,6 +122,7 @@ function _M.run(ruleset, phase, waf_ctx)
         ngx.status = 403
         ngx.header.content_type = "text/html; charset=utf-8"
         ngx.say(cfg.block and cfg.block.html or "Forbidden")
+        waf_ctx._exited = true
         ngx.exit(403)
     end
 

@@ -22,5 +22,9 @@ end
 
 local ruleset = engine.get_ruleset()
 if ruleset then
-    engine.run(ruleset, "header_filter", ctx)
+    -- fail-open：检测异常不阻断响应，记录错误后继续
+    local ok, err = pcall(engine.run, ruleset, "header_filter", ctx)
+    if not ok and not ctx._exited then
+        ngx.log(ngx.ERR, "[waf] header_filter 检测异常，fail-open: ", tostring(err))
+    end
 end

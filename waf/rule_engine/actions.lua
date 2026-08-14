@@ -33,19 +33,22 @@ function _M.execute(waf_ctx, action, rule)
         if mode == "active" then
             local status = tonumber(action.status) or 403
             if status == 444 then
-                -- 444: 直接关闭连接
+                -- 444: 直接关闭连接（标记已 exit，供外层 fail-open 区分拦截与异常）
+                waf_ctx._exited = true
                 ngx.exit(444)
             end
             local cfg = get_config()
             ngx.status = status
             ngx.header.content_type = "text/html; charset=utf-8"
             ngx.say(cfg.block and cfg.block.html or "Forbidden")
+            waf_ctx._exited = true
             ngx.exit(status)
         end
         return "logged"
 
     elseif disrupt == "DROP" then
         if mode == "active" then
+            waf_ctx._exited = true
             ngx.exit(444)
         end
         return "logged"

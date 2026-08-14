@@ -137,6 +137,7 @@ t.test("SCORE 达到阈值 → exit 403", function()
     }
     local ctx = { mode = "active", score_threshold = 5 }
     t.exits(function() engine.run(rs, "access", ctx) end, 403)
+    t.ok(ctx._exited, "ngx.exit 前应标记 _exited")
 end)
 
 t.test("SCORE 达到阈值但 detect 模式不阻断", function()
@@ -196,6 +197,25 @@ t.test("多 vars 任一命中即匹配", function()
     }
     local ctx = { mode = "active" }
     t.exits(function() engine.run(rs, "access", ctx) end, 403)
+end)
+
+-- fail-open 机制：BLOCK/DROP 在 ngx.exit 前标记 _exited，外层据此区分拦截与异常
+t.test("BLOCK 动作 exit 前标记 _exited", function()
+    ngx_reset()
+    ngx.var.uri = "/union select"
+    local rs = { rules = { rule() } }
+    local ctx = { mode = "active" }
+    t.exits(function() engine.run(rs, "access", ctx) end, 403)
+    t.ok(ctx._exited, "ngx.exit 前应标记 _exited")
+end)
+
+t.test("DROP 动作 exit 前标记 _exited", function()
+    ngx_reset()
+    ngx.var.uri = "/union select"
+    local rs = { rules = { rule({ actions = { disrupt = "DROP" } }) } }
+    local ctx = { mode = "active" }
+    t.exits(function() engine.run(rs, "access", ctx) end, 444)
+    t.ok(ctx._exited, "ngx.exit 前应标记 _exited")
 end)
 
 -- 版本化缓存：版本未变返回同一引用，变化后重新解码
