@@ -17,24 +17,8 @@ _M.mode = "active"
 -- WAF 挂载路径前缀（用于生成拦截页面中的提示，可留空）
 _M.base_path = "/waf"
 
--- ============================================================================
--- 检测模块开关
--- ============================================================================
-_M.modules = {
-    ip_check      = true,   -- IP 黑白名单
-    ua_check      = true,   -- User-Agent 检测
-    url_check     = true,   -- URL 检测
-    args_check    = true,   -- GET 参数检测
-    cookie_check  = true,   -- Cookie 检测
-    header_check  = true,   -- 请求头检测
-    post_check    = true,   -- POST body 检测（含 multipart）
-    upload_check  = true,   -- 文件上传检测
-    cc_check      = true,   -- CC 防刷
-    challenge     = true,   -- 人机验证
-    protocol_check= true,   -- 协议异常
-    leak_check    = true,   -- 敏感文件/目录泄露
-    semisense     = false,  -- 语义增强探测（词法级 SQL/XSS，实验性）
-}
+-- 说明：检测能力完全由规则集驱动（内置 + 后台下发），无模块级开关；
+-- 需要关闭某类检测请在后台规则管理页停用对应规则组。
 
 -- ============================================================================
 -- 检测控制

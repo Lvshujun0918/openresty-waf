@@ -79,13 +79,7 @@ func (s *WafConfigService) Save(cfg map[string]interface{}) error {
 func defaultWafConfig() map[string]interface{} {
 	return map[string]interface{}{
 		"mode": "active",
-		"modules": map[string]interface{}{
-			"ip_check": true, "ua_check": true, "url_check": true,
-			"args_check": true, "cookie_check": true, "header_check": true,
-			"post_check": true, "upload_check": true, "cc_check": true,
-			"challenge": true, "protocol_check": true, "leak_check": true,
-			"semisense": false,
-		},
+		// 检测能力由规则集驱动（规则管理页停用），无模块级开关
 		"detection": map[string]interface{}{
 			"exclude_paths":  []string{},
 			"geo":            true,

@@ -7,7 +7,6 @@ local t = require "assert"
 t.test("默认配置字段完整", function()
     local config = require "config"
     t.eq(config.mode, "active")
-    t.ok(config.modules.ip_check)
     t.eq(config.dict.rules, "waf_rule")
     t.eq(config.dict.counter, "waf_counter")
     t.eq(config.redis.host, "127.0.0.1")
