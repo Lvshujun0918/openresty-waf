@@ -8,7 +8,9 @@ package model
 // v6: 新增响应泄露检测规则 26001/26002（默认 LOG_ONLY 监控，可改 BLOCK）
 // v7: 新增协议计数 25007/25008、HPP 27001/27002、API 安全 27010-27012、
 //     编码混淆 27013、DLP 26010-26014、爬虫/客户端指纹 28001-28004
-const SeedVersion = "7"
+// v8: 修复 921170 误报（原 pattern=. 匹配所有参数键）：改为链式规则，
+//     仅 GET/HEAD 且请求体存在时记录
+const SeedVersion = "8"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
