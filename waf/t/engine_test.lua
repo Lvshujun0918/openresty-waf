@@ -284,6 +284,25 @@ t.test("chain: 普通规则重置链状态，后续成员重新作为链首", fu
     t.exits(function() engine.run(rs, "access", ctx) end, 403)
 end)
 
+t.test("chain: 链尾 LOG_ONLY 完成链并仅记录", function()
+    ngx_reset()
+    ngx.req._method = "GET"
+    ngx.req._body = "x"
+    local rs = {
+        rules = {
+            rule({ id = "m1", vars = { { type = "METHOD" } }, pattern = "get",
+                   actions = { chain = true } }),
+            rule({ id = "m2", vars = { { type = "BODY" } }, operator = "EXISTS", pattern = "",
+                   actions = { chain = true, disrupt = "LOG_ONLY", msg = "GET 携带请求体" } }),
+        },
+    }
+    local ctx = { mode = "active" }
+    local res = engine.run(rs, "access", ctx)
+    t.eq(res, "matched")
+    t.isnil(ngx.exit_code)
+    t.eq(#ctx.matched, 2, "整条链记录")
+end)
+
 -- fail-open 机制：BLOCK/DROP 在 ngx.exit 前标记 _exited，外层据此区分拦截与异常
 t.test("BLOCK 动作 exit 前标记 _exited", function()
     ngx_reset()

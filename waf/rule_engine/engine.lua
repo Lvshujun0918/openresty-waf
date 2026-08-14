@@ -80,7 +80,7 @@ function _M.run(ruleset, phase, waf_ctx)
     local hits = {}
     -- chain 链式状态（ModSecurity 语义）：
     --   - 链成员（含链尾）均带 actions.chain=true，链尾同时携带实际动作
-    --     （disrupt 非空且非 SCORE/LOG_ONLY）；成员必须紧随排列。
+    --     （disrupt 非空，可为 BLOCK/LOG_ONLY/SCORE 等）；成员必须紧随排列。
     --   - 链首命中开启链；后续成员连续命中则继续，链尾命中执行动作并记录整条链；
     --   - 任一成员未命中/被禁用 → 链中断，后续成员整体跳过，
     --     直到出现不带 chain 的普通规则后重置。
@@ -93,7 +93,7 @@ function _M.run(ruleset, phase, waf_ctx)
         local action = rule.actions or {}
         local is_member = action.chain == true
         local disrupt = action.disrupt
-        local has_disrupt = disrupt ~= nil and disrupt ~= "SCORE" and disrupt ~= "LOG_ONLY"
+        local has_disrupt = disrupt ~= nil
         local skip = 0
 
         if is_member then
