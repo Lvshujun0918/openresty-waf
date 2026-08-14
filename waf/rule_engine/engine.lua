@@ -202,11 +202,6 @@ end
 local ruleset_cache = { version = false, value = nil }
 local config_cache  = { version = false, value = nil }
 
--- 站点规则按 Host 过滤缓存：同一版本规则集内，每个 Host 的过滤结果缓存一次
--- （站点数量有限；规则集版本变化时随 source 引用变化整体失效）。
-local host_rules_cache = { source = nil, map = {} }
-local HOST_CACHE_MAX = 64
-
 -- 读取当前生效规则集（共享内存，按版本号缓存）
 function _M.get_ruleset()
     local config = require "config"
@@ -220,38 +215,6 @@ function _M.get_ruleset()
     ruleset_cache.version = version
     ruleset_cache.value = ruleset
     return ruleset
-end
-
--- 读取当前 Host 生效的规则子集（全局规则 + 该域名的站点规则），按 Host 缓存过滤结果。
--- host 须先规范化（去掉端口，与 trigger.lua 一致）。
-function _M.get_rules_for_host(host)
-    local rs = _M.get_ruleset()
-    if not rs then return nil end
-    if host_rules_cache.source ~= rs then
-        host_rules_cache = { source = rs, map = {} }
-    end
-    host = host or ""
-    local cached = host_rules_cache.map[host]
-    if cached then
-        return cached
-    end
-    local out = {}
-    for _, r in ipairs(rs.rules or {}) do
-        local site = r.site
-        if site == nil or site == "" or site == host then
-            out[#out + 1] = r
-        end
-    end
-    local filtered = { rules = out, version = rs.version }
-    -- 简单容量控制：超限时重建（防未知 Host 泛洪撑爆 worker 内存）
-    local n = 0
-    for _ in pairs(host_rules_cache.map) do n = n + 1 end
-    if n >= HOST_CACHE_MAX then
-        host_rules_cache.map = { [host] = filtered }
-    else
-        host_rules_cache.map[host] = filtered
-    end
-    return filtered
 end
 
 -- 读取当前生效配置（共享内存，按版本号缓存；无下发配置时回退默认 config）

@@ -20,8 +20,7 @@ if not ctx then
     ngx.ctx.waf_ctx = ctx
 end
 
-local host = (ctx.request and ctx.request.host or ""):gsub(":%d+$", "")
-local ruleset = engine.get_rules_for_host(host)
+local ruleset = engine.get_ruleset()
 if ruleset then
     -- fail-open：检测异常不阻断响应，记录错误后继续
     local ok, err = pcall(engine.run, ruleset, "header_filter", ctx)
