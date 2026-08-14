@@ -142,11 +142,28 @@ elseif ip_result == "blocked" then
     return
 end
 
+-- 1.5 URL / UA 名单（whitelist 跳过规则检测；blacklist 直接拦截）
+local util = require "rule_engine.util"
+local uri_for_list = ngx.var.uri or ""
+if util.match_regex_list(uri_for_list, cfg.whitelist and cfg.whitelist.urls) then
+    ctx.exempt_from_rules = true
+elseif util.match_regex_list(ngx.var.http_user_agent or "",
+                             cfg.whitelist and cfg.whitelist.user_agents) then
+    ctx.exempt_from_rules = true
+elseif util.match_regex_list(uri_for_list, cfg.blacklist and cfg.blacklist.urls) then
+    if ctx.mode == "active" then
+        block(cfg)
+    end
+    -- detect 模式：仅记录
+    return
+end
+
 -- 2. 规则引擎（URL / Args / Cookie / Header / Body 等规则）
 local ruleset = engine.get_ruleset()
 if ruleset then
-    -- 豁免：exclude_paths 前缀 或 命中 exempt 触发规则（host/UA/请求头/IP 条件）时跳过规则检测
-    local exempt = false
+    -- 豁免：URL/UA 白名单命中 或 exclude_paths 前缀 或 命中 exempt 触发规则
+    -- （host/UA/请求头/IP 条件）时跳过规则检测
+    local exempt = ctx.exempt_from_rules or false
     local ep = cfg.detection and cfg.detection.exclude_paths
     if ep and #ep > 0 then
         local uri = ngx.var.uri or ""

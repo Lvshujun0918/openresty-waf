@@ -55,4 +55,17 @@ function _M.is_static_path(path, skip)
     return false
 end
 
+-- 名单正则匹配：value 命中 patterns 中任一正则时返回 true（空 pattern 跳过）。
+-- 用于 whitelist.urls / whitelist.user_agents / blacklist.urls 等名单配置。
+function _M.match_regex_list(value, patterns)
+    if type(value) ~= "string" or not patterns then return false end
+    local operators = require "rule_engine.operators"
+    for _, p in ipairs(patterns) do
+        if type(p) == "string" and p ~= "" and operators.eval("REGEX", value, p) then
+            return true
+        end
+    end
+    return false
+end
+
 return _M
