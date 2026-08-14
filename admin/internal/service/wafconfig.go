@@ -133,6 +133,7 @@ h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
 			"urls": []string{},
 		},
 		"upload": map[string]interface{}{
+			"enabled":   true,
 			"deny_ext":  []string{"php", "php3", "php5", "phtml", "jsp", "jspx", "asp", "aspx", "asa", "cer", "cgi", "pl", "sh", "py", "exe"},
 			"deny_mime": []string{"application/x-php", "application/x-httpd-php", "application/x-msdownload"},
 		},
