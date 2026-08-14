@@ -23,6 +23,89 @@ local function ipv4_to_int(ip)
     return (a * 16777216) + (b * 65536) + (c * 256) + d
 end
 
+-- IPv6 字符串解析为 8 个 16 位整数（纯 Lua，支持 :: 压缩与 IPv4 尾段映射）
+local function ipv6_to_words(ip)
+    ip = tostring(ip or "")
+    if ip == "" then return nil end
+    ip = ip:gsub("^%[", ""):gsub("%]$", "")
+
+    -- IPv4 尾段（如 ::ffff:1.2.3.4）：拆出尾部两个 16 位段
+    local tail_words
+    local v4 = ip:match(":([%d%.]+)$")
+    if v4 and v4:find("%.") then
+        local a, b, c, d = v4:match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
+        if not a then return nil end
+        a, b, c, d = tonumber(a), tonumber(b), tonumber(c), tonumber(d)
+        if not (a and b and c and d) or a > 255 or b > 255 or c > 255 or d > 255 then
+            return nil
+        end
+        tail_words = { a * 256 + b, c * 256 + d }
+        ip = ip:sub(1, -#v4 - 1)  -- 去掉 ":v4" 后缀（保留结尾的 ":"）
+    end
+
+    -- 解析十六进制段（结尾冒号产生的空段自动跳过）
+    local function parse_side(s, out)
+        if s == "" then return true end
+        for p in string.gmatch(s, "[^:]+") do
+            local h = tonumber(p, 16)
+            if not h or h > 0xFFFF then return false end
+            out[#out + 1] = h
+        end
+        return true
+    end
+
+    local words = {}
+    local left_s, right_s = ip:match("^(.-)::(.-)$")
+    if left_s then
+        -- :: 压缩：左侧 + 补零 + 右侧 + IPv4 尾段
+        if not parse_side(left_s, words) then return nil end
+        local left_n = #words
+        if not parse_side(right_s, words) then return nil end
+        local tail_n = tail_words and 2 or 0
+        local fill = 8 - #words - tail_n
+        if fill < 1 then return nil end  -- :: 至少代表一个全零段
+        -- 把右侧段整体后移 fill 位，中间补零
+        for i = #words, left_n + 1, -1 do
+            words[i + fill] = words[i]
+        end
+        for i = 1, fill do
+            words[left_n + i] = 0
+        end
+    else
+        if not parse_side(ip, words) then return nil end
+        local tail_n = tail_words and 2 or 0
+        if #words + tail_n ~= 8 then return nil end
+    end
+
+    if tail_words then
+        if #words + 2 > 8 then return nil end
+        words[#words + 1] = tail_words[1]
+        words[#words + 1] = tail_words[2]
+    end
+    return #words == 8 and words or nil
+end
+
+-- IPv6 前缀匹配：比较前 prefix 位
+local function ipv6_match(net_words, prefix, ip_words)
+    if prefix <= 0 then return true end
+    if prefix >= 128 then
+        for i = 1, 8 do
+            if net_words[i] ~= ip_words[i] then return false end
+        end
+        return true
+    end
+    local full = math.floor(prefix / 16)
+    local rem = prefix % 16
+    for i = 1, full do
+        if net_words[i] ~= ip_words[i] then return false end
+    end
+    if rem > 0 then
+        local mask = bit.lshift(0xFFFF, 16 - rem)
+        return bit.band(net_words[full + 1], mask) == bit.band(ip_words[full + 1], mask)
+    end
+    return true
+end
+
 local operators = {
     -- 正则匹配（优先使用预编译对象 compiled，避免每请求重复 PCRE 编译）
     -- 注：使用 "u"（UTF-8）选项，多字节字符按整体处理；CRS 中 \W 类通配规则
@@ -67,7 +150,7 @@ local operators = {
         return false
     end,
 
-    -- CIDR / 精确 IP 匹配（IPv4）
+    -- CIDR / 精确 IP 匹配（IPv4 + IPv6）
     CIDR = function(value, pattern)
         if value == nil then return false end
         local ip_str = tostring(value)
@@ -75,10 +158,17 @@ local operators = {
         if not net or not prefix then
             return ip_str == tostring(pattern)
         end
+        prefix = tonumber(prefix)
+        -- IPv6：值或网段含 ":" 即走 IPv6 路径（128 位逐字比较）
+        if ip_str:find(":", 1, true) or net:find(":", 1, true) then
+            local ip_w = ipv6_to_words(ip_str)
+            local net_w = ipv6_to_words(net)
+            if not ip_w or not net_w then return false end
+            return ipv6_match(net_w, prefix, ip_w)
+        end
         local ip_int = ipv4_to_int(ip_str)
         local net_int = ipv4_to_int(net)
         if not ip_int or not net_int then return false end
-        prefix = tonumber(prefix)
         if prefix <= 0 then return true end
         if prefix >= 32 then return ip_int == net_int end
         local mask = bit.lshift(0xFFFFFFFF, 32 - prefix)

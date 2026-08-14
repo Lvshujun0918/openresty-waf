@@ -160,3 +160,43 @@ t.test("is_valid: 语义运算符有效", function()
     t.ok(operators.is_valid("LIBINJECTION_SQLI"))
     t.ok(operators.is_valid("LIBINJECTION_XSS"))
 end)
+
+-- ========== IPv6 CIDR ==========
+
+t.test("CIDR IPv6: 精确匹配与网段", function()
+    t.ok(operators.eval("CIDR", "2001:db8::1", "2001:db8::1"))
+    t.ok(operators.eval("CIDR", "2001:db8::1", "2001:db8::/32"))
+    t.ok(operators.eval("CIDR", "2001:db8:abcd::1", "2001:db8::/32"))
+    t.ok(operators.eval("CIDR", "::1", "::1/128"))
+    t.ok(operators.eval("CIDR", "::1", "::/0"))
+end)
+
+t.test("CIDR IPv6: 不匹配网段", function()
+    t.no(operators.eval("CIDR", "2001:db9::1", "2001:db8::/32"))
+    t.no(operators.eval("CIDR", "::1", "::2/128"))
+    t.no(operators.eval("CIDR", "::1", "2001:db8::/64"))
+end)
+
+t.test("CIDR IPv6: 压缩形式与 IPv4 尾段", function()
+    -- 全写形式与 :: 压缩形式语义等价（/128 比较）
+    t.ok(operators.eval("CIDR", "2001:db8::1", "2001:0db8:0000:0000:0000:0000:0000:0001/128"))
+    t.ok(operators.eval("CIDR", "2001:db8::1", "2001:db8:0:0:0:0:0:1/128"))
+    -- IPv4 尾段映射（::ffff:192.0.2.1）
+    t.ok(operators.eval("CIDR", "::ffff:192.0.2.1", "::ffff:192.0.2.0/120"))
+    t.no(operators.eval("CIDR", "::ffff:192.0.2.9", "::ffff:192.0.2.0/125"))
+end)
+
+t.test("CIDR IPv6: 非法输入不匹配", function()
+    t.no(operators.eval("CIDR", "not-an-ip", "2001:db8::/32"))
+    t.no(operators.eval("CIDR", "2001:db8::1", "gggg::/32"))
+    t.no(operators.eval("CIDR", "2001:db8::1", "2001:db8::/129"))
+end)
+
+t.test("CIDR IPv6: 前缀边界", function()
+    t.ok(operators.eval("CIDR", "fe80::1", "fe80::/10"))
+    t.no(operators.eval("CIDR", "ff02::1", "fe80::/10"))
+    t.ok(operators.eval("CIDR", "2001:db8::12", "2001:db8::/120"))
+    t.no(operators.eval("CIDR", "2001:db8::abcd", "2001:db8::/120"))
+    t.ok(operators.eval("CIDR", "2001:db8::1", "2001:db8::/126"))
+    t.no(operators.eval("CIDR", "2001:db8::abce", "2001:db8::/126"))
+end)
