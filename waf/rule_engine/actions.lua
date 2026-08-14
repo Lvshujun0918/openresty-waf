@@ -3,8 +3,16 @@
 
 local _M = {}
 
--- 读取当前生效配置（共享内存），失败则回退到模块默认配置
+-- 读取当前生效配置：
+-- 优先复用规则引擎的版本化配置缓存（攻击场景每次拦截都要取拦截页配置，
+-- 直接解码 JSON 代价高）；引擎未加载（单独使用本模块）时回退共享内存直读。
+-- 注意：不能用 require "rule_engine.engine"（引擎加载本模块时会造成循环加载），
+-- 通过 package.loaded 在运行时查找已加载的引擎。
 local function get_config()
+    local engine = package.loaded["rule_engine.engine"]
+    if engine and engine.get_active_config then
+        return engine.get_active_config()
+    end
     local config = require "config"
     local storage = require "storage"
     local body = storage.get_shared(config.dict.rules, "active_config")
