@@ -48,7 +48,8 @@ local function eval_condition(cond, ctx)
     elseif op == "contains" then
         matched = actual:find(value, 1, true) ~= nil
     elseif op == "regex" then
-        local ok, res = pcall(string.match, actual, value)
+        -- PCRE 语义（与规则引擎 / 后台规则测试一致）：编译错误视为不匹配
+        local ok, res = pcall(ngx.re.find, actual, value, "jo")
         matched = ok and res ~= nil
     elseif op == "cidr" then
         matched = operators.eval("CIDR", actual, value)
