@@ -6,9 +6,13 @@ local trigger = require "rule_engine.trigger"
 local storage = require "storage"
 
 -- 写入共享内存的触发规则集（ngx_reset 会清空 waf_rule，必须在 reset 后调用）
+-- 同步写入版本号（与 init.lua 热更新一致，供版本化缓存失效判定）
+local seq = 0
 local function load_rules(rules)
+    seq = seq + 1
+    storage.set_shared("waf_rule", "trigger_rules_version", "v" .. seq)
     storage.set_shared("waf_rule", "active_trigger_rules",
-                       storage.encode({ version = "v1", rules = rules }))
+                       storage.encode({ version = "v" .. seq, rules = rules }))
 end
 
 local function rule_with(conds, over)
@@ -142,4 +146,18 @@ t.test("未下发触发规则集时所有查询安全返回", function()
     t.ok(not trigger.match_any("challenge", {}))
     t.isnil(trigger.match_first("cc", {}))
     t.eq(#(trigger.get_rules(nil) or {}), 0)
+end)
+
+-- 版本化缓存：版本未变复用解码结果（过滤表每次新建，但规则表引用相同）
+t.test("触发规则集版本化缓存：同版本复用解码结果", function()
+    ngx_reset()
+    load_rules({ rule_with({}, { id = "x" }) })
+    local a = trigger.get_rules(nil)
+    local b = trigger.get_rules(nil)
+    t.eq(#a, 1)
+    t.ok(a[1] == b[1], "同版本应复用同一规则表引用")
+    load_rules({ rule_with({}, { id = "y" }) })
+    local c = trigger.get_rules(nil)
+    t.ok(c[1] ~= a[1], "版本变化应重新解码")
+    t.eq(c[1].id, "y")
 end)

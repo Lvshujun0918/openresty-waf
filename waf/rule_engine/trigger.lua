@@ -9,6 +9,10 @@ local _M = {}
 
 local operators = require "rule_engine.operators"
 
+-- 模块级缓存：触发规则集按共享内存版本号（trigger_rules_version）缓存解码结果，
+-- 避免每个请求对触发规则 JSON 重复 cjson.decode（access 阶段最多查询 3 次）。
+local trigger_cache = { version = false, value = nil }
+
 -- 条件字段取值
 local function get_value(field, ctx, cond)
     if field == "host" then
@@ -85,9 +89,13 @@ end
 function _M.get_rules(kind)
     local storage = require "storage"
     local config = require "config"
-    local body = storage.get_shared(config.dict.rules, "active_trigger_rules")
-    if not body then return nil end
-    local rs = storage.decode(body)
+    local version = storage.get_shared(config.dict.rules, "trigger_rules_version")
+    if version ~= trigger_cache.version or trigger_cache.value == nil then
+        local body = storage.get_shared(config.dict.rules, "active_trigger_rules")
+        trigger_cache.version = version
+        trigger_cache.value = storage.decode(body)
+    end
+    local rs = trigger_cache.value
     if type(rs) ~= "table" or type(rs.rules) ~= "table" then return nil end
     local rules = {}
     for _, r in ipairs(rs.rules) do
