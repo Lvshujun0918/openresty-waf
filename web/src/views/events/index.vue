@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, onMounted, reactive, ref } from 'vue';
+import { computed, h, onMounted, reactive, ref } from 'vue';
 import {
   NButton,
   NCard,
@@ -13,7 +13,7 @@ import {
   NSpace,
   NTag
 } from 'naive-ui';
-import { consumeEvents, fetchEventDetail, fetchEvents } from '@/service/api';
+import { consumeEvents, fetchEventDetail, fetchEvents, fetchSites } from '@/service/api';
 
 const groupMeta: Record<string, { label: string; color: string }> = {
   sqli: { label: 'SQL 注入', color: '#ef4444' },
@@ -37,7 +37,14 @@ const severityMeta: Record<number, { label: string; type: 'error' | 'warning' | 
 const events = ref<Api.Waf.EventItem[]>([]);
 const total = ref(0);
 const loading = ref(false);
+const sites = ref<Api.Waf.Site[]>([]);
 const query = reactive({ page: 1, page_size: 20, group: '', action: '', client_ip: '', host: '' });
+const siteOptions = computed(() => sites.value.map(s => ({ label: `${s.name}（${s.domain}）`, value: s.domain })));
+
+async function loadSites() {
+  const res = await fetchSites();
+  sites.value = res.data ?? [];
+}
 
 function fmtTime(t: string) {
   if (!t) return '-';
@@ -222,7 +229,10 @@ const headerColumns = [
   { title: '值', key: 'value', render: (row: HeaderKV) => h('span', { class: 'break-all font-mono text-xs text-[rgb(125,125,125)]' }, row.value) }
 ];
 
-onMounted(load);
+onMounted(() => {
+  load();
+  loadSites();
+});
 </script>
 
 <template>
@@ -255,8 +265,8 @@ onMounted(load);
         <NFormItem label="IP">
           <NInput v-model:value="query.client_ip" placeholder="如 1.2.3.4" class="w-36" clearable />
         </NFormItem>
-        <NFormItem label="域名">
-          <NInput v-model:value="query.host" placeholder="如 example.com" class="w-36" clearable />
+        <NFormItem label="站点">
+          <NSelect v-model:value="query.host" :options="siteOptions" clearable filterable placeholder="全部站点" class="w-44" />
         </NFormItem>
         <NFormItem>
           <NSpace>
