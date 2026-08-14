@@ -117,3 +117,94 @@ t.test("record: issue 事件异步上报且含规则名", function()
     t.eq(#ngx.timer._at, 1, "应调度 1 个异步上报定时器")
 end)
 
+-- ============ 工作量证明（basic 模式 POW） ============
+
+-- 与 challenge.lua 一致的 FNV-1a 32 位哈希（测试内复算找合法 nonce）
+local bit = require "bit"
+local function fnv1a(s)
+    local h = 2166136261
+    for i = 1, #s do
+        h = bit.bxor(h, string.byte(s, i))
+        h = (h * 16777619) % 4294967296
+    end
+    return h
+end
+
+local function find_nonce(challenge, bits)
+    local nonce = 0
+    while nonce < 100000000 do
+        if fnv1a(challenge .. ":" .. tostring(nonce)) < 2 ^ (32 - bits) then
+            return nonce
+        end
+        nonce = nonce + 1
+    end
+    return nil
+end
+
+t.test("verify_pow: 合法 nonce 通过，非法 nonce 拒绝", function()
+    local cfg = { pow_bits = 8 }
+    local tok = "tok123"
+    local nonce = find_nonce(tok, 8)
+    t.notnil(nonce, "应找到合法 nonce")
+    t.ok(challenge.verify_pow(tok, nonce, cfg))
+    -- 相邻 nonce 的判定与服务端复算结果一致（确定性）
+    local expected = fnv1a(tok .. ":" .. (nonce + 1)) < 2 ^ 24
+    t.eq(challenge.verify_pow(tok, nonce + 1, cfg), expected)
+end)
+
+t.test("verify_pow: pow_bits=0 关闭校验，非法 nonce 拒绝", function()
+    t.ok(challenge.verify_pow("x", "0", { pow_bits = 0 }))
+    t.no(challenge.verify_pow("x", "-1", { pow_bits = 0 }))
+    t.no(challenge.verify_pow("x", "abc", { pow_bits = 0 }))
+    t.no(challenge.verify_pow("x", "1000000001", { pow_bits = 0 }))
+end)
+
+t.test("verify_challenge_token: 签名/时效/IP 绑定", function()
+    local cfg = base_cfg().challenge
+    local ts = os.time()
+    local sign = ngx.md5(cfg.cookie_secret .. ":1.2.3.4:" .. ts)
+    t.ok(challenge.verify_challenge_token(ts .. ":" .. sign, "1.2.3.4", cfg))
+    -- IP 不匹配
+    t.no(challenge.verify_challenge_token(ts .. ":" .. sign, "9.9.9.9", cfg))
+    -- 过期
+    local old = os.time() - 301
+    local old_sign = ngx.md5(cfg.cookie_secret .. ":1.2.3.4:" .. old)
+    t.no(challenge.verify_challenge_token(old .. ":" .. old_sign, "1.2.3.4", cfg))
+    -- 未来时间戳
+    local fut = os.time() + 60
+    local fut_sign = ngx.md5(cfg.cookie_secret .. ":1.2.3.4:" .. fut)
+    t.no(challenge.verify_challenge_token(fut .. ":" .. fut_sign, "1.2.3.4", cfg))
+    -- 格式非法
+    t.no(challenge.verify_challenge_token("abc", "1.2.3.4", cfg))
+end)
+
+t.test("serve_verify basic: 无有效 POW 不下发 cookie", function()
+    ngx_reset()
+    local cfg = base_cfg()
+    cfg.challenge.pow_bits = 8
+    ngx.req._body = '{"challenge":"bad-token","nonce":0}'
+    t.exits(function()
+        challenge.serve_verify({ client_ip = "1.2.3.4" }, cfg)
+    end, 200)
+    t.isnil(ngx.header["Set-Cookie"], "未通过校验不得下发 cookie")
+end)
+
+t.test("serve_verify basic: 合法 token+POW 下发 cookie", function()
+    ngx_reset()
+    local cjson = require "cjson.safe"
+    local cfg = base_cfg()
+    cfg.challenge.pow_bits = 8
+    local ch = cfg.challenge
+    local ts = os.time()
+    local sign = ngx.md5(ch.cookie_secret .. ":1.2.3.4:" .. ts)
+    local token = ts .. ":" .. sign
+    local nonce = find_nonce(token, 8)
+    t.notnil(nonce)
+    ngx.req._body = cjson.encode({ challenge = token, nonce = nonce })
+    t.exits(function()
+        challenge.serve_verify({ client_ip = "1.2.3.4" }, cfg)
+    end, 200)
+    t.notnil(ngx.header["Set-Cookie"], "通过后应下发 cookie")
+    t.match(ngx.header["Set-Cookie"], "waf_pass=")
+end)
+

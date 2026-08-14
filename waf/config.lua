@@ -111,6 +111,8 @@ _M.challenge = {
     cookie_ttl    = 300,       -- 通过验证后的放行时长（秒）
     page_path     = "/__waf_challenge__",
     verify_path   = "/__waf_challenge_verify__",
+    -- basic 模式工作量证明难度（哈希前导零位数，平均 2^bits 次哈希；0 关闭）
+    pow_bits      = 20,
     -- 高级验证码（geetest / gitee）配置
     captcha = {
         id         = "",       -- captcha_id

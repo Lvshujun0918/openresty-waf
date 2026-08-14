@@ -1,6 +1,8 @@
 -- detectors/challenge.lua
 -- 人机验证：
---   mode = "basic"    基础 JS Challenge（自包含，服务端签名 token，无第三方依赖）
+--   mode = "basic"    基础 JS Challenge（自包含，无第三方依赖）：服务端签发挑战 token，
+--                      前端 JS 计算工作量证明（FNV-1a 前导零）后回调验证，
+--                      服务端校验通过才下发放行 cookie——无 JS 能力的 bot 无法通过
 --   mode = "geetest"  极验验证码 GT4
 --   mode = "gitee"    Gitee 验证码（与极验 GT4 协议兼容）
 --
@@ -12,6 +14,37 @@
 local _M = {}
 
 local cjson = require "cjson.safe"
+local bit = require "bit"
+
+-- ============================================================================
+-- 工作量证明（basic 模式）：JS 与 Lua 两侧同一 FNV-1a 32 位哈希。
+-- 挑战页 JS 循环找 nonce 使 hash(challenge:nonce) 前 pow_bits 位为 0，
+-- 服务端仅需复算一次即可验证——无 JS 执行能力的 bot 无法通过。
+-- ============================================================================
+local function fnv1a(s)
+    local h = 2166136261
+    for i = 1, #s do
+        h = bit.bxor(h, string.byte(s, i))
+        h = (h * 16777619) % 4294967296
+    end
+    return h
+end
+
+-- 校验工作量证明：nonce 合法且 hash 前 pow_bits 位全 0（pow_bits<=0 视为关闭）
+function _M.verify_pow(challenge, nonce, cfg)
+    nonce = tonumber(nonce)
+    if not nonce or nonce < 0 or nonce > 1000000000 then
+        return false
+    end
+    local bits = tonumber(cfg.pow_bits) or 20
+    if bits <= 0 then
+        return true
+    end
+    if bits > 28 then
+        bits = 28
+    end
+    return fnv1a(tostring(challenge) .. ":" .. tostring(nonce)) < 2 ^ (32 - bits)
+end
 
 -- URL 编码
 local function urlencode(s)
@@ -24,6 +57,22 @@ end
 -- 计算签名（服务端 secret，不暴露给前端）
 local function calc_sign(ip, ts, secret)
     return ngx.md5(tostring(secret) .. ":" .. tostring(ip) .. ":" .. tostring(ts))
+end
+
+-- 校验挑战 token "ts:sign"（签发 5 分钟内有效，绑定客户端 IP）
+function _M.verify_challenge_token(token, ip, cfg)
+    local ts, sign = tostring(token or ""):match("^(%d+):([0-9a-f]+)$")
+    if not ts then return false end
+    local now = os.time()
+    if tonumber(ts) > now then return false end
+    if now - tonumber(ts) > 300 then return false end
+    return sign == calc_sign(ip, ts, cfg.cookie_secret)
+end
+
+-- 签发挑战 token（不暴露 secret，绑定 IP 与时间）
+local function issue_token(cfg, ip)
+    local ts = os.time()
+    return ts .. ":" .. calc_sign(ip, ts, cfg.cookie_secret)
 end
 
 -- 校验验证 cookie 值 "ts:sign"
@@ -61,12 +110,10 @@ local function set_pass_cookie(cfg, ip)
         "; Path=/; HttpOnly; Max-Age=" .. cfg.cookie_ttl
 end
 
--- 基础 JS 挑战页：token 由服务端签名，前端 JS 执行后种 cookie 并跳转回原请求
-local function basic_page(cfg, ip, redirect)
-    local ts = os.time()
-    local token = calc_sign(ip, ts, cfg.cookie_secret)
-    local cookie = cfg.cookie_name .. "=" .. ts .. ":" .. token
-    -- 验证通过后跳回原始请求 URI（避免停留在挑战页造成无限刷新）
+-- 基础 JS 挑战页：前端 JS 计算工作量证明，通过后 POST 验证路径，
+-- 服务端校验成功才下发放行 cookie——无 JS 能力的 bot 跟随重定向也拿不到 cookie
+local function basic_page(ch, ip, redirect, token, bits)
+    local verify = ch.verify_path or "/__waf_challenge_verify__"
     local js = "location.reload();"
     if redirect and redirect ~= "" then
         local safe = redirect:gsub("'", "\\'"):gsub("\n", ""):gsub("\r", "")
@@ -79,10 +126,21 @@ local function basic_page(cfg, ip, redirect)
 .spinner{width:36px;height:36px;margin:0 auto 16px;border:3px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}</style>
 </head><body><div class="box"><div class="spinner"></div>
-<h2>正在验证您的浏览器…</h2><p>请稍候，正在执行安全检测。</p></div>
+<h2>正在验证您的浏览器…</h2><p>请稍候，正在执行浏览器环境检测。</p></div>
 <script>
-document.cookie = ']] .. cookie .. [[; Path=/; Max-Age=]] .. cfg.cookie_ttl .. [[';
-setTimeout(function(){ ]] .. js .. [[ }, 300);
+var challenge = ']] .. token .. [[', bits = ]] .. tostring(bits) .. [[;
+function fnv1a(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*16777619)>>>0;}return h>>>0;}
+function checkNonce(n){return (fnv1a(challenge+':'+n) >>> (32-bits)) === 0;}
+var nonce = 0;
+while (!checkNonce(nonce)) { nonce++; }
+fetch(']] .. verify .. [[', {method:'POST', headers:{'Content-Type':'application/json'},
+  body: JSON.stringify({challenge: challenge, nonce: nonce})})
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.status === 'ok') { ]] .. js .. [[ }
+    else { location.reload(); }
+  })
+  .catch(function(){ location.reload(); });
 </script></body></html>]]
 end
 
@@ -273,23 +331,47 @@ function _M.serve_page(waf_ctx, cfg)
     waf_ctx.evidence = { headers = hdrs }
     record(waf_ctx, "issue")
     ngx.header.content_type = "text/html; charset=utf-8"
-    -- 双保险：HTTP Set-Cookie 直接种下（不依赖前端 JS 执行），
-    -- JS 侧也种一份并负责跳回原始 URI
-    set_pass_cookie(ch, waf_ctx.client_ip)
     if ch.mode == "basic" then
-        ngx.say(basic_page(ch, waf_ctx.client_ip, redirect))
+        -- 签发挑战 token：前端 JS 完成工作量证明后回调验证路径，
+        -- 服务端校验通过才下发放行 cookie（不再无条件 Set-Cookie 放行）
+        local token = issue_token(ch, waf_ctx.client_ip)
+        local bits = tonumber(ch.pow_bits) or 20
+        ngx.say(basic_page(ch, waf_ctx.client_ip, redirect, token, bits))
     else
         ngx.say(advanced_page(ch, redirect))
     end
     ngx.exit(ngx.HTTP_OK)
 end
 
--- 处理验证回调（高级模式）：校验第三方结果，成功则种 cookie
+-- 处理验证回调：
+--   basic 模式：校验挑战 token 与工作量证明，通过才种 cookie；
+--   高级模式：校验第三方验证接口结果，成功则种 cookie
 function _M.serve_verify(waf_ctx, cfg)
     local ch = cfg.challenge
     ngx.req.read_body()
     local body = ngx.req.get_body_data() or "{}"
     local params = cjson.decode(body) or {}
+
+    if ch.mode == "basic" then
+        local token = params.challenge or ""
+        if not _M.verify_challenge_token(token, waf_ctx.client_ip, ch) then
+            record(waf_ctx, "fail")
+            ngx.say(cjson.encode({ status = "fail", error = "挑战已过期，请刷新重试" }))
+            ngx.exit(ngx.HTTP_OK)
+            return
+        end
+        if not _M.verify_pow(token, params.nonce, ch) then
+            record(waf_ctx, "fail")
+            ngx.say(cjson.encode({ status = "fail", error = "浏览器环境检测未通过" }))
+            ngx.exit(ngx.HTTP_OK)
+            return
+        end
+        set_pass_cookie(ch, waf_ctx.client_ip)
+        record(waf_ctx, "pass")
+        ngx.say(cjson.encode({ status = "ok" }))
+        ngx.exit(ngx.HTTP_OK)
+        return
+    end
 
     local ok, err = verify_geetest(ch, params)
     if ok then
