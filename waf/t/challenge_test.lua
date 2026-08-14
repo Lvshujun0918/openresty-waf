@@ -208,3 +208,14 @@ t.test("serve_verify basic: 合法 token+POW 下发 cookie", function()
     t.match(ngx.header["Set-Cookie"], "waf_pass=")
 end)
 
+t.test("serve_page: 同 IP 签发挑战页限频（超限 444 拒绝）", function()
+    ngx_reset()
+    local cfg = base_cfg()
+    cfg.challenge.issue_limit = 2
+    cfg.challenge.issue_window = 60
+    local ctx = { client_ip = "5.5.5.5", req_id = "r", trigger_rule = "", evidence = {} }
+    t.exits(function() challenge.serve_page(ctx, cfg) end, 200)
+    t.exits(function() challenge.serve_page(ctx, cfg) end, 200)
+    t.exits(function() challenge.serve_page(ctx, cfg) end, 444)
+end)
+

@@ -113,6 +113,9 @@ _M.challenge = {
     verify_path   = "/__waf_challenge_verify__",
     -- basic 模式工作量证明难度（哈希前导零位数，平均 2^bits 次哈希；0 关闭）
     pow_bits      = 20,
+    -- 同 IP 挑战页签发限频：窗口内签发超过 issue_limit 次直接拒绝渲染（444）
+    issue_limit   = 20,
+    issue_window  = 60,
     -- 高级验证码（geetest / gitee）配置
     captcha = {
         id         = "",       -- captcha_id

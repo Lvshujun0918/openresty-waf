@@ -15,6 +15,8 @@ local _M = {}
 
 local cjson = require "cjson.safe"
 local bit = require "bit"
+local config  = require "config"
+local storage = require "storage"
 
 -- ============================================================================
 -- 工作量证明（basic 模式）：JS 与 Lua 两侧同一 FNV-1a 32 位哈希。
@@ -305,6 +307,8 @@ local record = _M.record
 
 -- 渲染挑战页
 function _M.serve_page(waf_ctx, cfg)
+    -- 挑战页请求均为终态响应（渲染/拒绝），标记 _exited 避免外层 fail-open 误报
+    waf_ctx._exited = true
     local ch = cfg.challenge
     -- 携带原始请求 URI（access.lua 重定向时 ?redirect=...），验证通过后跳回。
     -- 注意：nginx $arg_redirect 不解码 %2F，需用 ngx.unescape_uri 还原，
@@ -329,6 +333,21 @@ function _M.serve_page(waf_ctx, cfg)
     end
     table.sort(hdrs, function(a, b) return a.name < b.name end)
     waf_ctx.evidence = { headers = hdrs }
+
+    -- 同 IP 签发挑战页限频：防攻击者反复刷新挑战页消耗日志/验证通道
+    -- （POW 计算在客户端，服务端成本低，此处主要保护 issue 事件通道与日志容量）
+    local issue_limit = tonumber(ch.issue_limit) or 20
+    local issue_window = tonumber(ch.issue_window) or 60
+    if issue_limit > 0 then
+        local ikey = "waf:ch:issue:" .. waf_ctx.client_ip
+        local n = storage.incr_shared(config.dict.counter, ikey, 1, 0, issue_window)
+        if n and n > issue_limit then
+            ngx.log(ngx.WARN, "[waf] 挑战页签发超限，拒绝渲染: ", waf_ctx.client_ip)
+            ngx.exit(444)
+            return
+        end
+    end
+
     record(waf_ctx, "issue")
     ngx.header.content_type = "text/html; charset=utf-8"
     if ch.mode == "basic" then
@@ -347,6 +366,8 @@ end
 --   basic 模式：校验挑战 token 与工作量证明，通过才种 cookie；
 --   高级模式：校验第三方验证接口结果，成功则种 cookie
 function _M.serve_verify(waf_ctx, cfg)
+    -- 验证回调均为终态响应，标记 _exited 避免外层 fail-open 误报
+    waf_ctx._exited = true
     local ch = cfg.challenge
     ngx.req.read_body()
     local body = ngx.req.get_body_data() or "{}"
