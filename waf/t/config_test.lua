@@ -26,6 +26,7 @@ t.test("默认配置字段完整", function()
     t.eq(config.log.backend, "file")
     t.eq(config.log.redis_key, "waf:event:list")
     t.eq(config.whitelist.ips[1], "127.0.0.1")
+    t.eq(#config.trusted_proxies, 0)   -- 可信代理默认空（兼容无条件信任 XFF）
     t.ok(config.upload.deny_ext[1] == "php")    -- 全量流量记录默认
     t.no(config.traffic_log.enabled)
     t.eq(config.traffic_log.retention_days, 7)

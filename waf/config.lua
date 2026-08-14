@@ -171,6 +171,12 @@ _M.blacklist = {
     urls = { },
 }
 
+-- 可信反向代理列表（精确 IP 或 CIDR，IPv4）。
+-- 仅当直连地址（remote_addr）命中此列表时才信任 X-Forwarded-For 最左值，
+-- 防止公网直接暴露时攻击者伪造 XFF 绕过 IP 名单/CC/人机验证。
+-- 列表为空时保持兼容行为（无条件信任 XFF），适合确认部署在可信反代之后。
+_M.trusted_proxies = { }
+
 -- 文件上传黑名单后缀
 _M.upload = {
     deny_ext = { "php", "php3", "php5", "phtml", "jsp", "jspx", "asp",

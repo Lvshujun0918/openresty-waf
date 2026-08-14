@@ -32,6 +32,51 @@ t.test("get_client_ip: XFF 空白回退", function()
     t.eq(storage.get_client_ip(), "10.0.0.1")
 end)
 
+-- 可信代理：列表为空时保持兼容行为（无条件信任 XFF）
+t.test("get_client_ip: 可信代理列表为空时信任 XFF", function()
+    ngx_reset()
+    local config = require "config"
+    local orig = config.trusted_proxies
+    config.trusted_proxies = {}
+    ngx.var.remote_addr = "10.0.0.1"
+    ngx.var.http_x_forwarded_for = "8.8.8.8"
+    t.eq(storage.get_client_ip(), "8.8.8.8")
+    config.trusted_proxies = orig
+end)
+
+t.test("get_client_ip: 直连不在可信代理内时忽略 XFF", function()
+    ngx_reset()
+    local config = require "config"
+    local orig = config.trusted_proxies
+    config.trusted_proxies = { "10.0.0.0/8" }
+    ngx.var.remote_addr = "1.2.3.4"
+    ngx.var.http_x_forwarded_for = "8.8.8.8"
+    t.eq(storage.get_client_ip(), "1.2.3.4")
+    config.trusted_proxies = orig
+end)
+
+t.test("get_client_ip: 直连命中可信 CIDR 时取 XFF 最左", function()
+    ngx_reset()
+    local config = require "config"
+    local orig = config.trusted_proxies
+    config.trusted_proxies = { "10.0.0.0/8" }
+    ngx.var.remote_addr = "10.0.0.5"
+    ngx.var.http_x_forwarded_for = "8.8.8.8, 1.1.1.1"
+    t.eq(storage.get_client_ip(), "8.8.8.8")
+    config.trusted_proxies = orig
+end)
+
+t.test("get_client_ip: 可信代理精确 IP 匹配", function()
+    ngx_reset()
+    local config = require "config"
+    local orig = config.trusted_proxies
+    config.trusted_proxies = { "127.0.0.1" }
+    ngx.var.remote_addr = "127.0.0.1"
+    ngx.var.http_x_forwarded_for = "9.9.9.9"
+    t.eq(storage.get_client_ip(), "9.9.9.9")
+    config.trusted_proxies = orig
+end)
+
 t.test("shared: set/get/incr", function()
     ngx_reset()
     local ok, err = storage.set_shared("waf_counter", "k1", "v1", 0)

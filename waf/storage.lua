@@ -156,13 +156,29 @@ function _M.redis_incr(key, exptime)
 end
 
 -- ============================================================================
--- 客户端真实 IP（优先 X-Forwarded-For 最左值；仅在可信反代后部署时启用）
+-- 客户端真实 IP（优先 X-Forwarded-For 最左值）
+-- 仅当直连地址命中 config.trusted_proxies 时才信任 XFF；列表为空保持兼容行为。
 -- ============================================================================
+
+-- 直连地址是否在可信代理列表中（空列表 → 信任，保持旧行为）
+local function is_trusted_proxy(ip)
+    local list = config.trusted_proxies
+    if not list or #list == 0 then
+        return true
+    end
+    local operators = require "rule_engine.operators"
+    for _, entry in ipairs(list) do
+        if operators.eval("CIDR", ip, entry) then
+            return true
+        end
+    end
+    return false
+end
 
 function _M.get_client_ip()
     local ip = ngx.var.remote_addr or ""
     local xff = ngx.var.http_x_forwarded_for
-    if xff and xff ~= "" then
+    if xff and xff ~= "" and is_trusted_proxy(ip) then
         local first = xff:match("^%s*([^,%s]+)")
         if first and first ~= "unknown" then
             ip = first
