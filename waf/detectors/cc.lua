@@ -70,9 +70,11 @@ function _M.record(waf_ctx, cfg, rule_name)
 end
 
 -- 执行 CC 检查：
--- rate / ban_duration 可传触发规则级配置（nil 时回退全局 cfg.cc）
+-- rate / ban_duration 可传触发规则级配置（nil 时回退全局 cfg.cc）；
+-- dims 可选维度数组："ua"（按 UA 哈希独立计数）/ "cookie"（无 Cookie 与有 Cookie 分开计数），
+-- 封禁仍为 IP 级。
 -- 返回 "banned"（触发封禁或已在封禁期）/ nil（正常）
-function _M.check(waf_ctx, cfg, rate, ban_duration)
+function _M.check(waf_ctx, cfg, rate, ban_duration, dims)
     if not (cfg and cfg.cc) then
         return nil
     end
@@ -94,8 +96,19 @@ function _M.check(waf_ctx, cfg, rate, ban_duration)
     ban_duration = ban_duration or cfg.cc.ban_duration or 300
 
     local count, seconds = parse_rate(rate)
-    -- 计数维度：IP + Host + 路径（不含 query string）
+    -- 计数维度：IP + Host + 路径（不含 query string）+ 可选维度
     local counter_key = (cfg.cc.counter_prefix or "waf:cc:cnt:") .. ip .. ":" .. host .. ":" .. path
+    for _, d in ipairs(dims or {}) do
+        if d == "ua" then
+            -- UA 哈希（防超长 key）：同 IP 换 UA 绕过时各 UA 独立计数
+            local ua = ngx.var.http_user_agent or ""
+            counter_key = counter_key .. ":ua:" .. ngx.md5(ua)
+        elseif d == "cookie" then
+            -- 无 Cookie 请求（多为脚本/bot）与有 Cookie 请求分开计数
+            local has = (ngx.var.http_cookie or "") ~= ""
+            counter_key = counter_key .. ":ck:" .. (has and "1" or "0")
+        end
+    end
 
     local n = storage.incr_shared(config.dict.counter, counter_key, 1, 0, seconds)
     if n and n >= count then

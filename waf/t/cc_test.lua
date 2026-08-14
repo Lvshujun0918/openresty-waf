@@ -148,3 +148,40 @@ t.test("共享字典写满：封禁写入失败仍拦截不崩溃", function()
     t.eq(cc.check(ctx, cfg), "banned")
     ngx.shared.waf_counter._fail_set = false
 end)
+
+-- ============ 计数维度（ua / cookie） ============
+
+t.test("dims=ua: 不同 UA 独立计数，封禁仍 IP 级", function()
+    ngx_reset()
+    local cfg = base_cfg()
+    cfg.cc.rate = "2/60"
+    local ctx = { client_ip = "1.2.3.4", request = { host = "h.com", path = "/" } }
+    ngx.var.http_user_agent = "UA-A"
+    cc.check(ctx, cfg, nil, nil, { "ua" })
+    ngx.var.http_user_agent = "UA-B"
+    t.isnil(cc.check(ctx, cfg, nil, nil, { "ua" }), "UA-B 独立计数 1")
+    ngx.var.http_user_agent = "UA-B"
+    t.eq(cc.check(ctx, cfg, nil, nil, { "ua" }), "banned", "UA-B 计数 2 触发封禁")
+end)
+
+t.test("dims=cookie: 有/无 Cookie 分开计数", function()
+    ngx_reset()
+    local cfg = base_cfg()
+    cfg.cc.rate = "2/60"
+    local ctx = { client_ip = "1.2.3.4", request = { host = "h.com", path = "/" } }
+    ngx.var.http_cookie = ""
+    cc.check(ctx, cfg, nil, nil, { "cookie" })  -- 无 Cookie 计数 1
+    ngx.var.http_cookie = "sid=1"
+    t.isnil(cc.check(ctx, cfg, nil, nil, { "cookie" }), "有 Cookie 独立计数 1")
+    ngx.var.http_cookie = "sid=1"
+    t.eq(cc.check(ctx, cfg, nil, nil, { "cookie" }), "banned", "有 Cookie 计数 2 触发封禁")
+end)
+
+t.test("dims: 无维度时与原有计数一致", function()
+    ngx_reset()
+    local cfg = base_cfg()
+    cfg.cc.rate = "2/60"
+    local ctx = { client_ip = "1.2.3.4", request = { host = "h.com", path = "/" } }
+    cc.check(ctx, cfg, nil, nil, nil)
+    t.eq(cc.check(ctx, cfg, nil, nil, nil), "banned")
+end)

@@ -172,7 +172,9 @@ local function cc_section()
     local rule = trigger.match_first("cc", ctx)
     if not rule then return false end
     local rule_cfg = rule.config or {}
-    if cc.check(ctx, cfg, rule_cfg.rate, rule_cfg.ban_duration) == "banned" then
+    local dims = rule_cfg.dims
+    if type(dims) ~= "table" then dims = nil end
+    if cc.check(ctx, cfg, rule_cfg.rate, rule_cfg.ban_duration, dims) == "banned" then
         -- 上报 CC 触发事件（含详细参数）
         pcall(capture_evidence, ctx)
         cc.record(ctx, cfg, rule.name)
@@ -189,6 +191,7 @@ local function cc_section()
                 ngx.redirect(target, ngx.HTTP_TEMPORARY_REDIRECT)
                 return true
             end
+            ctx._exited = true
             ngx.exit(503)
         end
         -- detect 模式：仅记录

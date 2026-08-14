@@ -3,6 +3,8 @@ import { computed, h, onMounted, reactive, ref } from 'vue';
 import {
   NButton,
   NCard,
+  NCheckbox,
+  NCheckboxGroup,
   NDataTable,
   NForm,
   NFormItem,
@@ -200,7 +202,7 @@ const saving = ref(false);
 const editingId = ref<number | null>(null);
 const form = reactive({ name: '', kind: 'challenge', match_logic: 'and', enabled: true, sort_order: 0 });
 // 规则级动作配置
-const ccConfig = reactive({ rate_count: 100, rate_seconds: 60, ban_duration: 300 });
+const ccConfig = reactive({ rate_count: 100, rate_seconds: 60, ban_duration: 300, dims: [] as string[] });
 const challengeMode = ref('basic');
 const conditions = ref<Cond[]>([]);
 
@@ -221,6 +223,7 @@ function applyConfig(raw?: string, kind = '') {
     ccConfig.rate_count = m ? Number(m[1]) : 100;
     ccConfig.rate_seconds = m ? Number(m[2]) : 60;
     ccConfig.ban_duration = Number(cfg.ban_duration) || 300;
+    ccConfig.dims = Array.isArray(cfg.dims) ? (cfg.dims as string[]) : [];
   } else if (kind === 'challenge') {
     challengeMode.value = String(cfg.mode || 'basic');
   }
@@ -228,7 +231,11 @@ function applyConfig(raw?: string, kind = '') {
 
 function buildConfig(kind: string): string {
   if (kind === 'cc') {
-    return JSON.stringify({ rate: `${ccConfig.rate_count}/${ccConfig.rate_seconds}`, ban_duration: ccConfig.ban_duration });
+    return JSON.stringify({
+      rate: `${ccConfig.rate_count}/${ccConfig.rate_seconds}`,
+      ban_duration: ccConfig.ban_duration,
+      dims: ccConfig.dims
+    });
   }
   if (kind === 'challenge') {
     return JSON.stringify({ mode: challengeMode.value });
@@ -238,7 +245,7 @@ function buildConfig(kind: string): string {
 
 function resetConfigDefaults(kind: string) {
   if (kind === 'cc') {
-    Object.assign(ccConfig, { rate_count: 100, rate_seconds: 60, ban_duration: 300 });
+    Object.assign(ccConfig, { rate_count: 100, rate_seconds: 60, ban_duration: 300, dims: [] });
   } else if (kind === 'challenge') {
     challengeMode.value = 'basic';
   }
@@ -402,6 +409,15 @@ onMounted(load);
         <NFormItem v-if="form.kind === 'cc'" label="封禁时长(s)">
           <NInputNumber v-model:value="ccConfig.ban_duration" :min="1" class="w-32" />
           <span class="ml-2 text-xs text-[rgb(125,125,125)]">超限后封禁该 IP 的秒数</span>
+        </NFormItem>
+        <NFormItem v-if="form.kind === 'cc'" label="计数维度">
+          <NCheckboxGroup v-model:value="ccConfig.dims">
+            <NSpace>
+              <NCheckbox value="ua">按 UA 独立计数</NCheckbox>
+              <NCheckbox value="cookie">无 Cookie 单独计数</NCheckbox>
+            </NSpace>
+          </NCheckboxGroup>
+          <p class="mt-1 text-xs text-[rgb(125,125,125)]">封禁仍为 IP 级；维度用于拆分计数桶，防止单 UA/脚本流量占用共享配额</p>
         </NFormItem>
 
         <!-- 人机验证规则级配置 -->
