@@ -38,7 +38,7 @@ local function push_specific(args, specific, out)
 end
 
 -- 实际提取逻辑（无缓存）
-local function collect_raw(var)
+local function collect_raw(var, ctx)
     local typ = var.type
     local specific = var.specific
     local parse = var.parse or {}
@@ -131,6 +131,34 @@ local function collect_raw(var)
     elseif typ == "BODY" then
         ngx.req.read_body()
         push(out, ngx.req.get_body_data())
+
+    elseif typ == "RESPONSE_STATUS" then
+        push(out, tostring(ngx.status))
+
+    elseif typ == "RESPONSE_HEADERS" then
+        -- header_filter 起可用；优先 ngx.resp.get_headers（上游响应头），
+        -- 回退 ngx.header（Lua 设置的待发送响应头）
+        local hdrs
+        if ngx.resp and ngx.resp.get_headers then
+            hdrs = ngx.resp.get_headers()
+        end
+        if not hdrs then hdrs = ngx.header or {} end
+        if specific and specific ~= "" then
+            local v = hdrs[specific]
+            if type(v) == "table" then
+                for _, item in ipairs(v) do push(out, item) end
+            else
+                push(out, v)
+            end
+        else
+            collect_args(hdrs, out, false)
+        end
+
+    elseif typ == "RESPONSE_BODY" then
+        -- 响应体由 body_filter 阶段累积到 ctx.resp_body（上限 8KB，EOF 时检测）
+        if ctx then
+            push(out, ctx.resp_body)
+        end
     end
 
     return out
@@ -152,7 +180,7 @@ function _M.collect(var, ctx)
         ctx.var_cache = ctx.var_cache or {}
     end
 
-    local out = collect_raw(var)
+    local out = collect_raw(var, ctx)
 
     if ctx then
         ctx.var_cache[key] = out

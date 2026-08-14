@@ -133,6 +133,29 @@ t.test("BODY: body 数据", function()
     t.eq(out[1], "id=1 AND 1=1")
 end)
 
+t.test("RESPONSE_STATUS 取当前状态码", function()
+    ngx_reset()
+    ngx.status = 302
+    local vals = variables.collect({ type = "RESPONSE_STATUS" }, {})
+    t.eq(vals[1], "302")
+end)
+
+t.test("RESPONSE_HEADERS: 全部值与 specific", function()
+    ngx_reset()
+    ngx.resp._headers = { ["x-powered-by"] = "PHP/7.4", ["content-type"] = "text/html" }
+    local vals = variables.collect({ type = "RESPONSE_HEADERS" }, {})
+    t.eq(#vals, 2)
+    local v2 = variables.collect({ type = "RESPONSE_HEADERS", specific = "x-powered-by" }, {})
+    t.eq(v2[1], "PHP/7.4")
+end)
+
+t.test("RESPONSE_BODY 取 ctx.resp_body", function()
+    ngx_reset()
+    local vals = variables.collect({ type = "RESPONSE_BODY" }, { resp_body = "db error" })
+    t.eq(vals[1], "db error")
+    t.eq(#variables.collect({ type = "RESPONSE_BODY" }, {}), 0)
+end)
+
 t.test("CLIENT_IP: 取 remote_addr", function()
     ngx_reset()
     ngx.var.remote_addr = "9.9.9.9"

@@ -172,6 +172,12 @@ ngx = {
         ngx.redirect_called = { uri = uri, status = status }
     end,
 
+    -- 响应头读取（header_filter 起可用，模拟 ngx.resp.get_headers）
+    resp = {
+        _headers = {},
+        get_headers = function() return ngx.resp._headers end,
+    },
+
     -- 定时器（记录，不执行）
     timer = {
         _at = {},
@@ -201,6 +207,7 @@ function ngx_reset()
     ngx.header = {}
     ngx.exit_code = nil
     ngx.redirect_called = nil
+    ngx.resp._headers = {}
     ngx.req._method = "GET"
     ngx.req._args = {}
     ngx.req._post = {}
