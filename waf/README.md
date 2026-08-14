@@ -9,6 +9,9 @@ lua_shared_dict waf_counter 50m;   # 频控/统计计数
 init_by_lua_file   /opt/waf/init.lua;
 access_by_lua_file /opt/waf/access.lua;
 log_by_lua_file    /opt/waf/log.lua;
+# 响应检测（可选）
+header_filter_by_lua_file /opt/waf/header_filter.lua;
+body_filter_by_lua_file   /opt/waf/body_filter.lua;
 ```
 
 ## 目录结构
@@ -17,28 +20,29 @@ log_by_lua_file    /opt/waf/log.lua;
 waf/
 ├── init.lua            # 初始化入口（加载配置/规则/共享内存）
 ├── access.lua          # access_by_lua 检测编排入口
-├── header_filter.lua   # header_filter_by_lua 响应检测（可选）
+├── header_filter.lua   # header_filter_by_lua 响应检测（状态码拦截）
+├── body_filter.lua     # body_filter_by_lua 响应体检测与拦截页替换
 ├── log.lua             # log_by_lua 异步日志/统计入口
 ├── config.lua          # 全局配置（模式、阈值、路径、依赖开关）
 ├── storage.lua         # 共享内存 + Redis 读写封装
+├── ip_region.lua       # ip2region xdb 归属地查询（可选）
+├── libinjection_ffi.lua# libinjection 语义检测 FFI 绑定（可选）
 ├── rule_engine/        # 规则引擎
-│   ├── engine.lua      #   规则执行器（phase/offset 跳转/链）
+│   ├── engine.lua      #   规则执行器（phase 过滤/仲裁/异常打分）
 │   ├── operators.lua   #   运算符：REGEX/PM/EQUALS/CONTAINS/CIDR...
-│   ├── variables.lua   #   变量集合：URI_ARGS/POST_ARGS/HEADERS/COOKIE/BODY...
-│   ├── transforms.lua  #   变换链：url_decode/lowercase/多重解码
-│   └── actions.lua     #   动作：BLOCK/DROP/ACCEPT/REDIRECT/SCORE...
+│   ├── variables.lua   #   变量：URI_ARGS/POST_ARGS/HEADERS/BODY/RESPONSE_*
+│   ├── transforms.lua  #   变换链：url_decode/lowercase/去注释/空白压缩
+│   ├── actions.lua     #   动作：BLOCK/DROP/ACCEPT/REDIRECT/SCORE/LOG_ONLY
+│   ├── trigger.lua     #   触发规则（CC/人机验证/豁免）
+│   └── util.lua        #   JSON 结构化/静态路径剪枝工具
 ├── detectors/          # 检测器
-│   ├── sqli.lua  xss.lua  rce.lua  lfi.lua  ssrf.lua
-│   ├── protocol.lua    #   协议异常
-│   ├── leak.lua        #   敏感文件/目录泄露
-│   ├── cc.lua          #   频控（shared dict 令牌桶）
-│   ├── challenge.lua   #   人机验证（JS/Cookie）
-│   └── upload.lua      #   文件上传检测
-├── ip.lua  ua.lua  header.lua   # 名单/UA/Header 检查
-├── semisense.lua       # 语义增强探测（可选，libinjection 风格）
-└── ruleset/            # 内置规则集（JSON）
-    ├── sqli.json  xss.json  rce.json  lfi.json  ...
-    └── whitelist.json
+│   ├── cc.lua          #   CC 频控（shared dict 计数 + 封禁）
+│   ├── challenge.lua   #   人机验证（basic/geetest/gitee）
+│   └── upload.lua      #   文件上传检测（后缀/Content-Type 黑名单）
+├── ruleset/            # 内置规则集
+│   └── builtin.lua     #   SQLi/XSS/RCE/LFI/SSRF/协议/泄露/响应
+├── libinjection/       # libinjection C 源码（scripts/build-libinjection.sh 编译）
+└── t/                  # 单元测试（mock + run.lua，纯 luajit 可跑）
 ```
 
 ## IP 归属地（可选）

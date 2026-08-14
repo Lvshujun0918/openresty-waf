@@ -100,6 +100,9 @@ init_by_lua_file         /opt/waf/init.lua;
 init_worker_by_lua_file  /opt/waf/init.lua;   # Redis 规则热更新
 access_by_lua_file       /opt/waf/access.lua;
 log_by_lua_file          /opt/waf/log.lua;
+# 可选（响应检测：状态码/响应体拦截与泄露监控）
+header_filter_by_lua_file /opt/waf/header_filter.lua;
+body_filter_by_lua_file   /opt/waf/body_filter.lua;
 ```
 
 **3. 管理前端（开发模式）**：`cd web && npm install && npm run dev`

@@ -150,7 +150,10 @@ init_by_lua_file /opt/waf/init.lua;
 init_worker_by_lua_file /opt/waf/init.lua;
 # 在需要防护的 server / location 内追加：
 #   access_by_lua_file /opt/waf/access.lua;
-#   log_by_lua_file    /opt/waf/log.lua;`
+#   log_by_lua_file    /opt/waf/log.lua;
+# 可选（响应检测）：
+#   header_filter_by_lua_file /opt/waf/header_filter.lua;
+#   body_filter_by_lua_file   /opt/waf/body_filter.lua;`
 
 // installScript 一键接入/更新本机 OpenResty 的脚本
 // 支持两种场景：
@@ -270,6 +273,9 @@ init_worker_by_lua_file $INSTALL_DIR/init.lua;
 # 在需要防护的 server/location 内追加：
 #   access_by_lua_file $INSTALL_DIR/access.lua;
 #   log_by_lua_file    $INSTALL_DIR/log.lua;
+# 可选（响应检测）：
+#   header_filter_by_lua_file $INSTALL_DIR/header_filter.lua;
+#   body_filter_by_lua_file   $INSTALL_DIR/body_filter.lua;
 EOF
 
 echo "[4/4] 完成"
@@ -277,6 +283,6 @@ echo "  WAF 组件:   $INSTALL_DIR"
 echo "  Redis:      $REDIS_ADDR (db=$REDIS_DB)"
 echo "  下一步:"
 echo "    1. 首次接入: 将 $INSTALL_DIR/waf-nginx.conf 内容加入 nginx.conf，"
-echo "       并在目标 server/location 加 access_by_lua_file / log_by_lua_file"
+echo "       并在目标 server/location 加 access_by_lua_file / log_by_lua_file（响应检测可再加 header_filter/body_filter）"
 echo "    2. 更新组件: 组件文件已更新，执行 nginx -t && nginx -s reload 生效"
 `

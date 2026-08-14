@@ -66,4 +66,6 @@ init_by_lua_file         /opt/waf/init.lua;
 init_worker_by_lua_file  /opt/waf/init.lua;   # 启用 Redis 规则热更新
 access_by_lua_file       /opt/waf/access.lua;
 log_by_lua_file          /opt/waf/log.lua;
+header_filter_by_lua_file /opt/waf/header_filter.lua;   # 响应检测（可选）
+body_filter_by_lua_file   /opt/waf/body_filter.lua;     # 响应检测（可选）
 ```
