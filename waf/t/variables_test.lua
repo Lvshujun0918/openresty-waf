@@ -183,3 +183,78 @@ t.test("collect: 无 ctx 不缓存", function()
     local out = variables.collect({ type = "URI_ARGS" }, nil)
     t.eq(out[1], "2")
 end)
+
+-- ========== HPP / 计数 / XML 结构化 ==========
+
+t.test("URI_ARGS_DUP: 重复参数名与全部值", function()
+    ngx_reset()
+    ngx.req._args = { id = { "1", "2" }, name = "x" }
+    local out = variables.collect({ type = "URI_ARGS_DUP" }, {})
+    -- 输出应包含参数名 id 与两个值
+    local found_id, found_1, found_2 = false, false, false
+    for _, v in ipairs(out) do
+        if v == "id" then found_id = true end
+        if v == "1" then found_1 = true end
+        if v == "2" then found_2 = true end
+    end
+    t.ok(found_id and found_1 and found_2, "应含重复参数名与全部值")
+end)
+
+t.test("URI_ARGS_DUP: 单值参数不收集", function()
+    ngx_reset()
+    ngx.req._args = { id = "1", name = "x" }
+    local out = variables.collect({ type = "URI_ARGS_DUP" }, {})
+    t.eq(#out, 0)
+end)
+
+t.test("POST_ARGS_DUP: 重复 POST 参数", function()
+    ngx_reset()
+    ngx.req._method = "POST"
+    ngx.req._post = { q = { "a", "b" } }
+    local out = variables.collect({ type = "POST_ARGS_DUP" }, {})
+    t.ok(#out == 3, "应收集参数名 + 两个值")
+end)
+
+t.test("HEADERS_COUNT: 请求头数量", function()
+    ngx_reset()
+    ngx.req._headers = { a = "1", b = "2", c = "3" }
+    local out = variables.collect({ type = "HEADERS_COUNT" }, {})
+    t.eq(out[1], "3")
+end)
+
+t.test("ARGS_COUNT: URI + POST 参数总量", function()
+    ngx_reset()
+    ngx.req._args = { a = "1", b = "2" }
+    local out = variables.collect({ type = "ARGS_COUNT" }, {})
+    t.eq(out[1], "2")
+    ngx_reset()
+    ngx.req._method = "POST"
+    ngx.req._args = { a = "1" }
+    ngx.req._post = { b = "2", c = "3" }
+    out = variables.collect({ type = "ARGS_COUNT" }, {})
+    t.eq(out[1], "3")
+end)
+
+t.test("POST_ARGS: XML body 展平标签/属性/文本", function()
+    ngx_reset()
+    ngx.req._method = "POST"
+    ngx.var.content_type = "application/xml"
+    ngx.req._body = '<a><b>hello</b><c x="1"/></a>'
+    local out = variables.collect({ type = "POST_ARGS" }, {})
+    local joined = table.concat(out, "|")
+    t.match(joined, "b")
+    t.match(joined, "hello")
+    t.match(joined, "c")
+    t.match(joined, "1")
+end)
+
+t.test("POST_ARGS: XML DOCTYPE 保留（XXE 特征可检测）", function()
+    ngx_reset()
+    ngx.req._method = "POST"
+    ngx.var.content_type = "application/xml"
+    ngx.req._body = '<!DOCTYPE foo [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]><foo/>'
+    local out = variables.collect({ type = "POST_ARGS" }, {})
+    local joined = table.concat(out, "|")
+    t.match(joined, "SYSTEM")
+    t.match(joined, "file:///etc/passwd")
+end)

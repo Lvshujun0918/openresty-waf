@@ -69,6 +69,30 @@ local function collect_raw(var, ctx)
             collect_args(args, out, include_keys)
         end
 
+    elseif typ == "ARGS_COUNT" then
+        -- 参数总量（URI + POST 表单），用于参数洪泛/DoS 防护
+        local n = 0
+        local args = ngx.req.get_uri_args() or {}
+        for _ in pairs(args) do n = n + 1 end
+        if ngx.req.get_method() ~= "GET" then
+            ngx.req.read_body()
+            local post = ngx.req.get_post_args() or {}
+            for _ in pairs(post) do n = n + 1 end
+        end
+        push(out, tostring(n))
+
+    elseif typ == "URI_ARGS_DUP" then
+        -- HPP：收集重复出现的参数名及其全部值（同参数多次提交）
+        local args = ngx.req.get_uri_args()
+        for k, v in pairs(args or {}) do
+            if type(v) == "table" and #v > 1 then
+                push(out, k)
+                for _, item in ipairs(v) do
+                    push(out, item)
+                end
+            end
+        end
+
     elseif typ == "POST_ARGS" then
         ngx.req.read_body()
         local body = ngx.req.get_body_data()
@@ -82,6 +106,12 @@ local function collect_raw(var, ctx)
                 json_vals = vals
             end
         end
+        -- XML/SOAP body 结构化：标签/属性/文本展平，避免 XML 标记被误判
+        local xml_vals
+        if body and (ct:find("xml", 1, true) or ct:find("soap", 1, true)) then
+            local util = require "rule_engine.util"
+            xml_vals = util.try_parse_xml(body)
+        end
         if json_vals then
             if not (specific and specific ~= "") then
                 for _, v in ipairs(json_vals) do
@@ -92,12 +122,29 @@ local function collect_raw(var, ctx)
                 local args = ngx.req.get_post_args()
                 push_specific(args, specific, out)
             end
+        elseif xml_vals then
+            for _, v in ipairs(xml_vals) do
+                push(out, v)
+            end
         else
             local args = ngx.req.get_post_args()
             if specific and specific ~= "" then
                 push_specific(args, specific, out)
             else
                 collect_args(args, out, include_keys)
+            end
+        end
+
+    elseif typ == "POST_ARGS_DUP" then
+        -- HPP：POST 表单重复参数名及其全部值
+        ngx.req.read_body()
+        local args = ngx.req.get_post_args()
+        for k, v in pairs(args or {}) do
+            if type(v) == "table" and #v > 1 then
+                push(out, k)
+                for _, item in ipairs(v) do
+                    push(out, item)
+                end
             end
         end
 
@@ -113,6 +160,13 @@ local function collect_raw(var, ctx)
         else
             collect_args(headers, out, false)
         end
+
+    elseif typ == "HEADERS_COUNT" then
+        -- 请求头数量，用于请求头洪泛/慢速攻击防护
+        local headers = ngx.req.get_headers() or {}
+        local n = 0
+        for _ in pairs(headers) do n = n + 1 end
+        push(out, tostring(n))
 
     elseif typ == "COOKIE" then
         local cookie_str = ngx.var.http_cookie or ""
