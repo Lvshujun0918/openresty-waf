@@ -36,17 +36,15 @@ func TestSite_CRUD(t *testing.T) {
 		t.Errorf("dup: %d", w.Code)
 	}
 
-	// 列表
+	// 列表（裸数组）
 	w = doReq(r, authedReq(http.MethodGet, "/api/sites", token, nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("list: %d", w.Code)
 	}
-	var list struct {
-		Sites []map[string]interface{} `json:"sites"`
-	}
+	var list []map[string]interface{}
 	_ = json.Unmarshal(w.Body.Bytes(), &list)
-	if len(list.Sites) != 1 {
-		t.Fatalf("sites = %d", len(list.Sites))
+	if len(list) != 1 {
+		t.Fatalf("sites = %d", len(list))
 	}
 
 	// 更新
@@ -65,8 +63,8 @@ func TestSite_CRUD(t *testing.T) {
 	}
 	w = doReq(r, authedReq(http.MethodGet, "/api/sites", token, nil))
 	_ = json.Unmarshal(w.Body.Bytes(), &list)
-	if len(list.Sites) != 0 {
-		t.Errorf("after delete: %d", len(list.Sites))
+	if len(list) != 0 {
+		t.Errorf("after delete: %d", len(list))
 	}
 }
 

@@ -37,14 +37,14 @@ func bindSite(c *gin.Context) (*model.Site, bool) {
 	return site, true
 }
 
-// List GET /api/sites 站点列表
+// List GET /api/sites 站点列表（裸数组，与 /rules、/ip-list-subs 一致）
 func (h *SiteHandler) List(c *gin.Context) {
 	sites, err := h.svc.List()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"sites": sites})
+	c.JSON(http.StatusOK, sites)
 }
 
 // Create POST /api/sites 新增站点
