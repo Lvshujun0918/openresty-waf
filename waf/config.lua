@@ -177,8 +177,9 @@ _M.blacklist = {
 -- 列表为空时保持兼容行为（无条件信任 XFF），适合确认部署在可信反代之后。
 _M.trusted_proxies = { }
 
--- 文件上传黑名单后缀
+-- 文件上传黑名单
 _M.upload = {
+    enabled  = true,   -- 上传检测开关（关闭后仅放行，不检测文件后缀/类型）
     deny_ext = { "php", "php3", "php5", "phtml", "jsp", "jspx", "asp",
                  "aspx", "asa", "cer", "cgi", "pl", "sh", "py", "exe" },
     deny_mime = { "application/x-php", "application/x-httpd-php",

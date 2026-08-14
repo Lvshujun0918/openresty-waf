@@ -183,6 +183,23 @@ if ruleset then
         else
             ngx.log(ngx.ERR, "[waf] 规则引擎执行异常，fail-open 放行: " .. tostring(result))
         end
+        -- 上传检测（multipart 文件名后缀 / Content-Type 黑名单），fail-open。
+        -- 命中写入 ctx.matched 由 log 阶段统一落盘；active 模式直接拦截。
+        local up_cfg = cfg.upload
+        if up_cfg and up_cfg.enabled ~= false then
+            local up = require "detectors.upload"
+            local ok2, hit = pcall(up.check, ctx, up_cfg)
+            if ok2 and hit then
+                ctx.matched[#ctx.matched + 1] = {
+                    id = "UPLOAD", group = "upload", msg = hit, severity = 3,
+                }
+                if ctx.mode == "active" then
+                    block(cfg)
+                end
+            elseif not ok2 then
+                ngx.log(ngx.ERR, "[waf] 上传检测异常，fail-open 放行: " .. tostring(hit))
+            end
+        end
     end
 end
 
