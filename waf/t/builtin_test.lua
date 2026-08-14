@@ -103,4 +103,35 @@ t.test("26002: 响应头 X-Powered-By 命中监控不拦截", function()
         if m.id == "26002" then hit = true end
     end
     t.ok(hit, "应记录 26002 命中")
+
+-- ============ 爬虫/客户端指纹（28001-28004，LOG_ONLY 仅记录） ============
+
+t.test("28002: 空 User-Agent 命中（仅记录不拦截）", function()
+    ngx_reset()
+    ngx.req._method = "GET"
+    ngx.var.http_user_agent = ""
+    local ctx = { mode = "active" }
+    local res = engine.run(builtin, "access", ctx)
+    t.eq(res, "matched")
+    t.isnil(ngx.exit_code, "LOG_ONLY 不应触发拦截")
+end)
+
+t.test("28001: 搜索引擎爬虫 UA 命中", function()
+    ngx_reset()
+    ngx.req._method = "GET"
+    ngx.req._headers = { ["user-agent"] = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" }
+    local ctx = { mode = "active" }
+    local res = engine.run(builtin, "access", ctx)
+    t.eq(res, "matched")
+    t.isnil(ngx.exit_code)
+end)
+
+t.test("28003: HTTP 客户端库 UA 命中", function()
+    ngx_reset()
+    ngx.req._method = "GET"
+    ngx.req._headers = { ["user-agent"] = "python-requests/2.31.0" }
+    local ctx = { mode = "active" }
+    local res = engine.run(builtin, "access", ctx)
+    t.eq(res, "matched")
+end)
 end)

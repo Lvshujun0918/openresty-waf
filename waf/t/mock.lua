@@ -144,7 +144,7 @@ ngx = {
 
     -- 请求变量
     var = {
-        uri = "/", request_uri = "/", http_user_agent = "",
+        uri = "/", request_uri = "/", http_user_agent = "Mozilla/5.0 (Test)",
         http_cookie = "", remote_addr = "1.2.3.4",
         http_x_forwarded_for = nil,
     },
@@ -223,7 +223,7 @@ function ngx_reset()
     ngx.req._body = nil
     ngx.var.uri = "/"
     ngx.var.request_uri = "/"
-    ngx.var.http_user_agent = ""
+    ngx.var.http_user_agent = "Mozilla/5.0 (Test)"
     ngx.var.http_cookie = ""
     ngx.var.remote_addr = "1.2.3.4"
     ngx.var.http_x_forwarded_for = nil

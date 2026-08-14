@@ -30,7 +30,8 @@ const message = useMessage();
 const kindMeta: Record<string, { label: string; type: 'primary' | 'success' | 'warning' | 'error'; desc: string }> = {
   challenge: { label: '人机验证', type: 'primary', desc: '命中后需先通过人机验证（JS 挑战 / 验证码）才可访问，验证模式可在此规则内单独配置' },
   exempt: { label: '豁免检测', type: 'success', desc: '命中后跳过全部规则检测，直接放行（用于可信来源 / 静态资源等）' },
-  cc: { label: 'CC 限流', type: 'warning', desc: '命中后参与频率限制，超限自动封禁 IP，频率阈值与封禁时长可在此规则内单独配置' }
+  cc: { label: 'CC 限流', type: 'warning', desc: '命中后参与频率限制，超限自动封禁 IP，频率阈值与封禁时长可在此规则内单独配置' },
+  block: { label: '直接拦截', type: 'error', desc: '命中后直接拦截（403），用于对特定爬虫/采集器/来源做分级封禁，detect 模式下仅记录' }
 };
 const fieldMeta: Record<string, { label: string }> = {
   host: { label: '域名' },
@@ -353,7 +354,8 @@ onMounted(load);
             { label: '全部用途', value: '' },
             { label: '人机验证', value: 'challenge' },
             { label: '豁免检测', value: 'exempt' },
-            { label: 'CC 限流', value: 'cc' }
+            { label: 'CC 限流', value: 'cc' },
+            { label: '直接拦截', value: 'block' }
           ]"
           class="w-32"
           @update:value="load"

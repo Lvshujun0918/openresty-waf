@@ -243,6 +243,25 @@ local function protection_flow()
         return
     end
 
+    -- 1.8 触发规则拦截（kind=block：host/UA/请求头/IP 等条件命中即拦截，
+    --     可用于爬虫/采集器分级处置；detect 模式仅记录事件）
+    local okb, ruleb = pcall(function()
+        return require("rule_engine.trigger").match_first("block", ctx)
+    end)
+    if not okb then
+        ngx.log(ngx.ERR, "[waf] block 触发规则检查异常，fail-open 放行: ", tostring(ruleb))
+    elseif ruleb then
+        ctx.matched[#ctx.matched + 1] = {
+            id = "TRIGGER-BLOCK", group = "trigger", severity = 3,
+            msg = "触发规则拦截: " .. tostring(ruleb.name),
+        }
+        if ctx.mode == "active" then
+            block(cfg, ctx)
+        end
+        -- detect 模式：仅记录（log 阶段落盘）
+        return
+    end
+
     -- 2. 规则引擎（URL / Args / Cookie / Header / Body 等规则，按 Host 过滤站点规则）
     local ruleset = engine.get_rules_for_host((ngx.var.host or ""):gsub(":%d+$", ""))
     if ruleset then

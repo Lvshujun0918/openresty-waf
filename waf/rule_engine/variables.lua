@@ -59,7 +59,8 @@ local function collect_raw(var, ctx)
         push(out, require("storage").get_client_ip())
 
     elseif typ == "USER_AGENT" then
-        push(out, ngx.var.http_user_agent)
+        -- 空 UA 兜底为空串（配合 ^$ 正则检出无 UA 请求）
+        push(out, ngx.var.http_user_agent or "")
 
     elseif typ == "URI_ARGS" then
         local args = ngx.req.get_uri_args()

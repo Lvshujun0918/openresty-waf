@@ -6,7 +6,9 @@ package model
 // v4: 942460 pattern 限定 ASCII 特殊字符 4 连，彻底避免 UTF-8 中文误报
 // v5: 新增协议异常规则 25003-25006（方法字符集/Content-Length/编码与控制字符）
 // v6: 新增响应泄露检测规则 26001/26002（默认 LOG_ONLY 监控，可改 BLOCK）
-const SeedVersion = "6"
+// v7: 新增协议计数 25007/25008、HPP 27001/27002、API 安全 27010-27012、
+//     编码混淆 27013、DLP 26010-26014、爬虫/客户端指纹 28001-28004
+const SeedVersion = "7"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -73,4 +75,84 @@ var baseRules = []Rule{
 		Operator: "EXISTS", Pattern: ``,
 		Transforms: `[]`, Vars: `[{"type":"RESPONSE_HEADERS","specific":"x-powered-by"}]`,
 		Actions: `{"disrupt":"LOG_ONLY","msg":"响应头泄露：X-Powered-By 版本信息"}`, Status: 200, Message: "响应头泄露：X-Powered-By 版本信息", SortOrder: 10},
+
+	// ---- 协议计数 / 参数洪泛（应用层 DoS） ----
+	{RuleID: "25007", Name: "请求头数量异常", Group: "protocol", Phase: "access", Severity: 2, Enabled: true,
+		Operator: "REGEX", Pattern: `\d\d\d`,
+		Transforms: `[]`, Vars: `[{"type":"HEADERS_COUNT"}]`,
+		Actions: `{"disrupt":"BLOCK","status":400,"msg":"请求头数量异常（>=100 个）"}`, Status: 400, Message: "请求头数量异常（>=100 个）", SortOrder: 11},
+	{RuleID: "25008", Name: "请求参数数量异常", Group: "protocol", Phase: "access", Severity: 2, Enabled: true,
+		Operator: "REGEX", Pattern: `\d\d\d`,
+		Transforms: `[]`, Vars: `[{"type":"ARGS_COUNT"}]`,
+		Actions: `{"disrupt":"BLOCK","status":400,"msg":"请求参数数量异常（>=100 个）"}`, Status: 400, Message: "请求参数数量异常（>=100 个）", SortOrder: 12},
+
+	// ---- HPP 参数污染（默认仅监控） ----
+	{RuleID: "27001", Name: "URI 重复参数", Group: "hpp", Phase: "access", Severity: 2, Enabled: true,
+		Operator: "EXISTS", Pattern: ``,
+		Transforms: `[]`, Vars: `[{"type":"URI_ARGS_DUP"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"HPP：URI 重复参数（同参数多值提交）"}`, Status: 200, Message: "HPP：URI 重复参数（同参数多值提交）", SortOrder: 13},
+	{RuleID: "27002", Name: "POST 重复参数", Group: "hpp", Phase: "access", Severity: 2, Enabled: true,
+		Operator: "EXISTS", Pattern: ``,
+		Transforms: `[]`, Vars: `[{"type":"POST_ARGS_DUP"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"HPP：POST 重复参数（同参数多值提交）"}`, Status: 200, Message: "HPP：POST 重复参数（同参数多值提交）", SortOrder: 14},
+
+	// ---- API 安全 ----
+	{RuleID: "27010", Name: "敏感端点/调试接口暴露", Group: "api", Phase: "access", Severity: 2, Enabled: true,
+		Operator: "REGEX", Pattern: `(swagger|openapi\.json|api-docs|actuator|phpinfo|phpmyadmin|debug/pprof|server-status|docker\.sock)`,
+		Transforms: `["url_decode","to_lowercase"]`, Vars: `[{"type":"URI"}]`,
+		Actions: `{"disrupt":"BLOCK","status":403,"msg":"API 安全：敏感端点/调试接口暴露"}`, Status: 403, Message: "API 安全：敏感端点/调试接口暴露", SortOrder: 15},
+	{RuleID: "27011", Name: "GraphQL 内省查询", Group: "api", Phase: "access", Severity: 1, Enabled: true,
+		Operator: "REGEX", Pattern: `(__schema|__type|introspection)`,
+		Transforms: `["url_decode","to_lowercase"]`, Vars: `[{"type":"URI_ARGS"},{"type":"POST_ARGS"},{"type":"BODY"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"API 安全：GraphQL 内省查询"}`, Status: 200, Message: "API 安全：GraphQL 内省查询", SortOrder: 16},
+	{RuleID: "27012", Name: "XML 外部实体（XXE）", Group: "api", Phase: "access", Severity: 3, Enabled: true,
+		Operator: "REGEX", Pattern: `<!DOCTYPE[^>]*(ENTITY|SYSTEM|PUBLIC)`,
+		Transforms: `["to_lowercase"]`, Vars: `[{"type":"BODY"}]`,
+		Actions: `{"disrupt":"BLOCK","status":403,"msg":"API 安全：XML 外部实体（XXE）"}`, Status: 403, Message: "API 安全：XML 外部实体（XXE）", SortOrder: 17},
+
+	// ---- 编码混淆绕过 ----
+	{RuleID: "27013", Name: "base64 载荷攻击", Group: "obfuscation", Phase: "access", Severity: 3, Enabled: true,
+		Operator: "REGEX", Pattern: `\b(union|select|sleep|information_schema)\b|<script|javascript:`,
+		Transforms: `["base64_decode","to_lowercase"]`, Vars: `[{"type":"URI_ARGS"},{"type":"POST_ARGS"},{"type":"BODY"}]`,
+		Actions: `{"disrupt":"BLOCK","status":403,"msg":"编码混淆：base64 载荷攻击"}`, Status: 403, Message: "编码混淆：base64 载荷攻击", SortOrder: 18},
+
+	// ---- DLP 敏感数据防泄露（默认仅监控） ----
+	{RuleID: "26010", Name: "响应体泄露身份证", Group: "dlp", Phase: "body_filter", Severity: 3, Enabled: true,
+		Operator: "REGEX", Pattern: `[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]`,
+		Transforms: `[]`, Vars: `[{"type":"RESPONSE_BODY"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"DLP：响应体疑似泄露身份证号码"}`, Status: 200, Message: "DLP：响应体疑似泄露身份证号码", SortOrder: 19},
+	{RuleID: "26011", Name: "响应体泄露银行卡", Group: "dlp", Phase: "body_filter", Severity: 3, Enabled: true,
+		Operator: "REGEX", Pattern: `\b(62[0-9]{14,17}|[3-6][0-9]{15,18})\b`,
+		Transforms: `[]`, Vars: `[{"type":"RESPONSE_BODY"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"DLP：响应体疑似泄露银行卡号"}`, Status: 200, Message: "DLP：响应体疑似泄露银行卡号", SortOrder: 20},
+	{RuleID: "26012", Name: "响应体泄露手机号", Group: "dlp", Phase: "body_filter", Severity: 2, Enabled: true,
+		Operator: "REGEX", Pattern: `1[3-9]\d{9}`,
+		Transforms: `[]`, Vars: `[{"type":"RESPONSE_BODY"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"DLP：响应体疑似泄露手机号"}`, Status: 200, Message: "DLP：响应体疑似泄露手机号", SortOrder: 21},
+	{RuleID: "26013", Name: "响应体泄露私钥", Group: "dlp", Phase: "body_filter", Severity: 3, Enabled: true,
+		Operator: "REGEX", Pattern: `-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----`,
+		Transforms: `[]`, Vars: `[{"type":"RESPONSE_BODY"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"DLP：响应体疑似泄露私钥"}`, Status: 200, Message: "DLP：响应体疑似泄露私钥", SortOrder: 22},
+	{RuleID: "26014", Name: "响应体泄露云密钥", Group: "dlp", Phase: "body_filter", Severity: 3, Enabled: true,
+		Operator: "REGEX", Pattern: `(AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|ghp_[0-9A-Za-z]{36}|sk-[0-9A-Za-z]{20,}|xox[baprs]-[0-9A-Za-z-]{10,})`,
+		Transforms: `[]`, Vars: `[{"type":"RESPONSE_BODY"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"DLP：响应体疑似泄露云服务密钥/令牌"}`, Status: 200, Message: "DLP：响应体疑似泄露云服务密钥/令牌", SortOrder: 23},
+
+	// ---- 爬虫/客户端指纹（默认仅监控；策略可通过触发规则 kind=exempt/block/challenge 分级） ----
+	{RuleID: "28001", Name: "已知搜索引擎爬虫", Group: "crawler", Phase: "access", Severity: 1, Enabled: true,
+		Operator: "PM", Pattern: `googlebot|bingbot|baiduspider|sogou|360spider|yisouspider|shenma|duckduckbot|applebot|slurp|ia_archiver`,
+		Transforms: `["to_lowercase"]`, Vars: `[{"type":"HEADERS","specific":"user-agent"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"爬虫指纹：已知搜索引擎爬虫"}`, Status: 200, Message: "爬虫指纹：已知搜索引擎爬虫", SortOrder: 24},
+	{RuleID: "28002", Name: "空 User-Agent", Group: "crawler", Phase: "access", Severity: 2, Enabled: true,
+		Operator: "REGEX", Pattern: `^$`,
+		Transforms: `[]`, Vars: `[{"type":"USER_AGENT"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"爬虫指纹：空 User-Agent"}`, Status: 200, Message: "爬虫指纹：空 User-Agent", SortOrder: 25},
+	{RuleID: "28003", Name: "HTTP 客户端库 UA", Group: "crawler", Phase: "access", Severity: 2, Enabled: true,
+		Operator: "PM", Pattern: `python-requests|go-http-client|okhttp|curl/|wget/|scrapy|apache-httpclient|node-fetch|axios|libwww-perl`,
+		Transforms: `["to_lowercase"]`, Vars: `[{"type":"HEADERS","specific":"user-agent"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"爬虫指纹：HTTP 客户端库 UA"}`, Status: 200, Message: "爬虫指纹：HTTP 客户端库 UA", SortOrder: 26},
+	{RuleID: "28004", Name: "监控探针", Group: "crawler", Phase: "access", Severity: 1, Enabled: true,
+		Operator: "PM", Pattern: `uptimerobot|uptime-kuma|pingdom|statuscake|monitoring|datadog-agent|healthchecks`,
+		Transforms: `["to_lowercase"]`, Vars: `[{"type":"HEADERS","specific":"user-agent"}]`,
+		Actions: `{"disrupt":"LOG_ONLY","msg":"爬虫指纹：监控探针"}`, Status: 200, Message: "爬虫指纹：监控探针", SortOrder: 27},
 }

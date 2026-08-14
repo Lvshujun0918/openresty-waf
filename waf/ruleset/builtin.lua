@@ -6,7 +6,7 @@
 -- 后续通过管理后台下发的规则将整体覆盖此内置集。
 
 local builtin = {
-    version = "builtin-0.6.0",
+    version = "builtin-0.6.1",
     rules = {
         -- ========== 敏感文件 / 扫描器 ==========
         {
@@ -309,6 +309,40 @@ local builtin = {
             pattern = [[\b(union|select|sleep|information_schema)\b|<script|javascript:]],
             transforms = { "base64_decode", "to_lowercase" },
             actions = { disrupt = "BLOCK", status = 403, msg = "编码混淆：base64 载荷攻击" },
+        },
+
+        -- ========== 爬虫/客户端指纹（默认仅监控；策略可用触发规则 kind=exempt/block/challenge 分级） ==========
+        {
+            id = "28001", group = "crawler", phase = "access", severity = 1, enabled = true,
+            vars = { { type = "HEADERS", specific = "user-agent" } },
+            operator = "PM",
+            pattern = [[googlebot|bingbot|baiduspider|sogou|360spider|yisouspider|shenma|duckduckbot|applebot|slurp|ia_archiver]],
+            transforms = { "to_lowercase" },
+            actions = { disrupt = "LOG_ONLY", msg = "爬虫指纹：已知搜索引擎爬虫" },
+        },
+        {
+            id = "28002", group = "crawler", phase = "access", severity = 2, enabled = true,
+            vars = { { type = "USER_AGENT" } },
+            operator = "REGEX",
+            pattern = [[^$]],
+            transforms = { },
+            actions = { disrupt = "LOG_ONLY", msg = "爬虫指纹：空 User-Agent" },
+        },
+        {
+            id = "28003", group = "crawler", phase = "access", severity = 2, enabled = true,
+            vars = { { type = "HEADERS", specific = "user-agent" } },
+            operator = "PM",
+            pattern = [[python-requests|go-http-client|okhttp|curl/|wget/|scrapy|apache-httpclient|node-fetch|axios|libwww-perl]],
+            transforms = { "to_lowercase" },
+            actions = { disrupt = "LOG_ONLY", msg = "爬虫指纹：HTTP 客户端库 UA" },
+        },
+        {
+            id = "28004", group = "crawler", phase = "access", severity = 1, enabled = true,
+            vars = { { type = "HEADERS", specific = "user-agent" } },
+            operator = "PM",
+            pattern = [[uptimerobot|uptime-kuma|pingdom|statuscake|monitoring|datadog-agent|healthchecks]],
+            transforms = { "to_lowercase" },
+            actions = { disrupt = "LOG_ONLY", msg = "爬虫指纹：监控探针" },
         },
 
         -- ========== 响应检测（默认仅监控 LOG_ONLY，可在后台改为 BLOCK 拦截） ==========

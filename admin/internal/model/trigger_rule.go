@@ -15,6 +15,7 @@ type TriggerCondition struct {
 
 // TriggerRule 触发规则：条件（AND/OR 组合）命中后执行对应动作。
 // Kind: challenge（触发人机验证）| exempt（豁免规则检测）| cc（触发 CC 限流）
+//       | block（直接拦截，爬虫/采集器分级封禁）
 // Config: 动作配置 JSON，kind=cc -> {"rate":"100/60","ban_duration":300}；
 //         kind=challenge -> {"mode":"basic"}；kind=exempt 可为空。
 type TriggerRule struct {
