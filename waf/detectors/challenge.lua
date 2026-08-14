@@ -30,7 +30,9 @@ end
 local function verify_pass(cookie_val, ip, cfg)
     local ts, sign = cookie_val:match("^(%d+):([0-9a-f]+)$")
     if not ts then return false end
-    if os.time() - tonumber(ts) > cfg.cookie_ttl then return false end
+    local now = os.time()
+    if tonumber(ts) > now then return false end  -- 拒绝未来时间戳（伪造/回拨风险）
+    if now - tonumber(ts) > cfg.cookie_ttl then return false end
     return sign == calc_sign(ip, ts, cfg.cookie_secret)
 end
 
@@ -41,7 +43,10 @@ function _M.check(waf_ctx, cfg, force)
     if not ch then return nil end
     if not force and not ch.enabled then return nil end
     local cookie = ngx.var.http_cookie or ""
-    local val = cookie:match(ch.cookie_name .. "=([^;]+)")
+    -- 纯文本查找 cookie 名（cookie_name 可含 Lua 模式特殊字符，不能直接拼 match pattern）
+    local pos = cookie:find(ch.cookie_name .. "=", 1, true)
+    if not pos then return "challenge" end
+    local val = cookie:sub(pos + #ch.cookie_name + 1):match("^([^;]*)")
     if val and verify_pass(val, waf_ctx.client_ip, ch) then
         return nil
     end
@@ -200,7 +205,7 @@ end
 
 -- 记录一次人机验证事件（含详细参数，供后台「触发记录」详情展示）
 -- action: "issue"（下发挑战页）| "pass"（验证通过）| "fail"（验证失败）
-local function record(waf_ctx, action)
+function _M.record(waf_ctx, action)
     local client_ip = waf_ctx and waf_ctx.client_ip or ngx.var.remote_addr or ""
     local ok, geo = pcall(function()
         return require("ip_region").lookup(client_ip)
@@ -230,6 +235,9 @@ local function record(waf_ctx, action)
         ngx.log(ngx.ERR, "[waf] 调度人机验证事件上报失败: ", tostring(err))
     end
 end
+
+-- 本地别名：模块内部（serve_page / serve_verify）沿用旧调用名
+local record = _M.record
 
 -- ============================================================================
 -- 入口

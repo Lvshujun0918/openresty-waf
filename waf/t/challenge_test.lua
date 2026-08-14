@@ -84,3 +84,36 @@ t.test("IP 维度：签名绑定 client_ip", function()
     t.eq(challenge.check({ client_ip = "9.9.9.9" }, cfg), "challenge")
 end)
 
+t.test("未来时间戳 → challenge", function()
+    ngx_reset()
+    local cfg = base_cfg()
+    local ts = os.time() + 3600
+    ngx.var.http_cookie = "waf_pass=" .. make_cookie(cfg, "1.2.3.4", ts)
+    t.eq(challenge.check({ client_ip = "1.2.3.4" }, cfg), "challenge")
+end)
+
+t.test("cookie_name 含模式特殊字符仍正常匹配", function()
+    ngx_reset()
+    local cfg = base_cfg()
+    cfg.challenge.cookie_name = "waf.pass+"
+    local ts = os.time()
+    local ch = cfg.challenge
+    local sign = ngx.md5(ch.cookie_secret .. ":1.2.3.4:" .. ts)
+    ngx.var.http_cookie = "waf.pass+=" .. ts .. ":" .. sign
+    t.isnil(challenge.check({ client_ip = "1.2.3.4" }, cfg))
+end)
+
+t.test("record: issue 事件异步上报且含规则名", function()
+    ngx_reset()
+    ngx.var.request_uri = "/"
+    local ctx = {
+        client_ip = "1.2.3.4",
+        req_id = "r1",
+        trigger_rule = "测试规则",
+        request = { method = "GET", host = "x.com" },
+        evidence = {},
+    }
+    challenge.record(ctx, "issue")
+    t.eq(#ngx.timer._at, 1, "应调度 1 个异步上报定时器")
+end)
+

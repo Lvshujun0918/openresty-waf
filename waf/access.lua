@@ -217,7 +217,8 @@ if cfg.challenge then
             ngx.redirect(target, ngx.HTTP_TEMPORARY_REDIRECT)
             return
         end
-        -- detect 模式：仅记录，放行
+        -- detect 模式：记录一次 issue 事件（含规则名与请求证据）后放行
+        ch.record(ctx, "issue")
         return
     end
 end
