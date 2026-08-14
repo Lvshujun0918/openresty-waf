@@ -58,3 +58,32 @@ t.test("25004: 合法 Content-Length 不误拦", function()
     local res = engine.run(builtin, "access", ctx)
     t.isnil(res)
 end)
+
+-- 响应检测规则（默认 LOG_ONLY：仅记录不拦截）
+
+-- 26001 模式含分组 alternation（mock 的 PCRE→Lua 转换不支持 alternation），
+-- 校验规则结构即可；执行语义由生产环境 PCRE 保证（见 26002 执行用例）。
+t.test("26001: 响应体泄露规则定义完整", function()
+    local rule = nil
+    for _, r in ipairs(builtin.rules) do
+        if r.id == "26001" then rule = r end
+    end
+    t.notnil(rule)
+    t.eq(rule.phase, "body_filter")
+    t.eq(rule.actions.disrupt, "LOG_ONLY")
+    t.eq(rule.vars[1].type, "RESPONSE_BODY")
+end)
+
+t.test("26002: 响应头 X-Powered-By 命中监控不拦截", function()
+    ngx_reset()
+    ngx.resp._headers = { ["x-powered-by"] = "PHP/7.4" }
+    local ctx = { mode = "active" }
+    local res = engine.run(builtin, "header_filter", ctx)
+    t.eq(res, "matched")
+    t.isnil(ngx.exit_code)
+    local hit = false
+    for _, m in ipairs(ctx.matched) do
+        if m.id == "26002" then hit = true end
+    end
+    t.ok(hit, "应记录 26002 命中")
+end)

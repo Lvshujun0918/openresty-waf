@@ -6,7 +6,7 @@
 -- 后续通过管理后台下发的规则将整体覆盖此内置集。
 
 local builtin = {
-    version = "builtin-0.3.0",
+    version = "builtin-0.4.0",
     rules = {
         -- ========== 敏感文件 / 扫描器 ==========
         {
@@ -228,6 +228,24 @@ local builtin = {
             pattern = "[\x00-\x08\x0B\x0C\x0E-\x1F]",
             transforms = { },
             actions = { disrupt = "BLOCK", status = 400, msg = "请求头控制字符" },
+        },
+
+        -- ========== 响应检测（默认仅监控 LOG_ONLY，可在后台改为 BLOCK 拦截） ==========
+        {
+            id = "26001", group = "response", phase = "body_filter", severity = 2, enabled = true,
+            vars = { { type = "RESPONSE_BODY" } },
+            operator = "REGEX",
+            pattern = [[(ORA-[0-9]+|SQLSTATE\s*\[|mysql_fetch_|Fatal error:|Parse error:|Traceback \(most recent call last\)|syntax error, unexpected)]],
+            transforms = { },
+            actions = { disrupt = "LOG_ONLY", msg = "响应体泄露：错误堆栈/数据库报错" },
+        },
+        {
+            id = "26002", group = "response", phase = "header_filter", severity = 1, enabled = true,
+            vars = { { type = "RESPONSE_HEADERS", specific = "x-powered-by" } },
+            operator = "EXISTS",
+            pattern = "",
+            transforms = { },
+            actions = { disrupt = "LOG_ONLY", msg = "响应头泄露：X-Powered-By 版本信息" },
         },
     },
 }
