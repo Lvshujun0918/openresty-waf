@@ -5,11 +5,12 @@
 ## 核心特性
 
 - **嵌入式接入**：纯 Lua 组件，挂载到任意 OpenResty 的 `access_by_lua` / `header_filter_by_lua` / `log_by_lua` 阶段，无需重新编译 Nginx。
-- **规则热更新**：规则经 Redis 下发，worker 内共享内存缓存 + 版本原子切换，配置变更不中断连接。
-- **完整防护能力**：SQLi / XSS / RCE / LFI / SSRF / 协议异常 / 敏感文件泄露 / 恶意 UA 与扫描器 / 文件上传检测。
-- **访问控制与限流**：IP / UA / Cookie / Header / URL / Args 黑白名单、CC 防刷、人机验证。
-- **灵活工作模式**：监控（仅记录）/ 拦截 / 放行，可全局一键切换，检测异常时 fail-open。
-- **Web 管理后台**：仪表盘、规则管理（含在线调试、导入导出）、事件检索与一键处置、站点管理、TOTP 认证。
+- **规则热更新**：规则经 Redis 下发，worker 内共享内存缓存 + 版本原子切换，配置变更不中断连接；版本单调校验 + 规则集结构校验（坏规则集拒载），发布历史快照支持一键回滚。
+- **完整防护能力**：SQLi / XSS / RCE / LFI / SSRF / 协议异常 / 敏感文件泄露 / 恶意 UA 与扫描器 / 文件上传检测（含超大上传落盘流式检测）；多层编码解码（base64/hex/HTML 实体）抗绕过、HPP 参数污染、IPv6 CIDR、API 安全（敏感端点/GraphQL 内省/XXE）、DLP 响应体敏感数据防泄露。
+- **访问控制与限流**：IP / UA / Cookie / Header / URL / Args 黑白名单、CC 防刷（支持 UA/无 Cookie 维度计数）、人机验证（JS 工作量证明，无 JS 的 bot 无法通过）。
+- **Bot 管理**：爬虫/客户端指纹规则组（搜索引擎爬虫/客户端库/监控探针），配合触发规则 豁免/挑战/限流/直接拦截 四级策略。
+- **灵活工作模式**：监控（仅记录）/ 拦截 / 放行，可全局一键切换；检测异常 fail-open，检测耗时 watchdog 超阈值强制放行。
+- **Web 管理后台**：仪表盘、规则管理（含在线调试、导入导出、发布历史与回滚）、事件检索与一键处置、站点管理、TOTP 认证、版本健康信息。
 
 ## 目录结构
 
@@ -107,7 +108,7 @@ body_filter_by_lua_file   /opt/waf/body_filter.lua;
 
 **3. 管理前端（开发模式）**：`cd web && npm install && npm run dev`
 
-更多：性能基准见 `docs/benchmark.md`，人机验证接入见 `docs/challenge.md`。
+更多：性能基准见 `docs/benchmark.md`，人机验证接入见 `docs/challenge.md`，慢速攻击与连接层加固见 `docs/hardening.md`。
 
 ## License
 
