@@ -75,6 +75,16 @@ func applyTransform(name, s string) string {
 	switch name {
 	case "url_decode":
 		return urlDecode(s)
+	case "url_decode_twice":
+		// 与 Lua transforms 对齐：最多 3 次直至不再变化
+		for i := 0; i < 3; i++ {
+			decoded := urlDecode(s)
+			if decoded == s {
+				break
+			}
+			s = decoded
+		}
+		return s
 	case "to_lowercase":
 		return strings.ToLower(s)
 	case "remove_comments":
