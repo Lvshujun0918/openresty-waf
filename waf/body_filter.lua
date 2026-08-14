@@ -31,12 +31,18 @@ if ctx.response_block ~= nil then
     return
 end
 
--- 2. 累积响应体（截断到 8KB，防大响应撑爆内存）
+-- 2. 累积响应体（上限可配置，默认 8KB，防大响应撑爆内存）
+--    注意：超上限截断意味着尾部内容不参与检测，DLP 类规则对大响应仅检测前缀
 local chunk = ngx.arg[1]
 if chunk and #chunk > 0 then
+    local cfg = engine.get_active_config()
+    local buf_limit = 8192
+    if cfg and cfg.detection and tonumber(cfg.detection.response_body_buffer) then
+        buf_limit = math.floor(tonumber(cfg.detection.response_body_buffer))
+    end
     ctx.resp_body = (ctx.resp_body or "") .. chunk
-    if #ctx.resp_body > 8192 then
-        ctx.resp_body = ctx.resp_body:sub(1, 8192)
+    if #ctx.resp_body > buf_limit then
+        ctx.resp_body = ctx.resp_body:sub(1, buf_limit)
     end
 end
 

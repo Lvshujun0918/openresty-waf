@@ -6,7 +6,7 @@
 -- 后续通过管理后台下发的规则将整体覆盖此内置集。
 
 local builtin = {
-    version = "builtin-0.5.0",
+    version = "builtin-0.6.0",
     rules = {
         -- ========== 敏感文件 / 扫描器 ==========
         {
@@ -240,6 +240,76 @@ local builtin = {
             transforms = { },
             actions = { disrupt = "BLOCK", status = 400, msg = "请求头控制字符" },
         },
+        {
+            id = "25007", group = "protocol", phase = "access", severity = 2, enabled = true,
+            vars = { { type = "HEADERS_COUNT" } },
+            operator = "REGEX",
+            pattern = [[\d\d\d]],
+            transforms = { },
+            actions = { disrupt = "BLOCK", status = 400, msg = "请求头数量异常（>=100 个）" },
+        },
+        {
+            id = "25008", group = "protocol", phase = "access", severity = 2, enabled = true,
+            vars = { { type = "ARGS_COUNT" } },
+            operator = "REGEX",
+            pattern = [[\d\d\d]],
+            transforms = { },
+            actions = { disrupt = "BLOCK", status = 400, msg = "请求参数数量异常（>=100 个）" },
+        },
+
+        -- ========== HPP 参数污染（默认仅监控；多参数提交业务差异大，先记录观察） ==========
+        {
+            id = "27001", group = "hpp", phase = "access", severity = 2, enabled = true,
+            vars = { { type = "URI_ARGS_DUP" } },
+            operator = "EXISTS",
+            pattern = "",
+            transforms = { },
+            actions = { disrupt = "LOG_ONLY", msg = "HPP：URI 重复参数（同参数多值提交）" },
+        },
+        {
+            id = "27002", group = "hpp", phase = "access", severity = 2, enabled = true,
+            vars = { { type = "POST_ARGS_DUP" } },
+            operator = "EXISTS",
+            pattern = "",
+            transforms = { },
+            actions = { disrupt = "LOG_ONLY", msg = "HPP：POST 重复参数（同参数多值提交）" },
+        },
+
+        -- ========== API 安全 ==========
+        {
+            id = "27010", group = "api", phase = "access", severity = 2, enabled = true,
+            vars = { { type = "URI" } },
+            operator = "REGEX",
+            pattern = [[(swagger|openapi\.json|api-docs|actuator|phpinfo|phpmyadmin|debug/pprof|server-status|docker\.sock)]],
+            transforms = { "url_decode", "to_lowercase" },
+            actions = { disrupt = "BLOCK", status = 403, msg = "API 安全：敏感端点/调试接口暴露" },
+        },
+        {
+            id = "27011", group = "api", phase = "access", severity = 1, enabled = true,
+            vars = { { type = "URI_ARGS" }, { type = "POST_ARGS" }, { type = "BODY" } },
+            operator = "REGEX",
+            pattern = [[(__schema|__type|introspection)]],
+            transforms = { "url_decode", "to_lowercase" },
+            actions = { disrupt = "LOG_ONLY", msg = "API 安全：GraphQL 内省查询" },
+        },
+        {
+            id = "27012", group = "api", phase = "access", severity = 3, enabled = true,
+            vars = { { type = "BODY" } },
+            operator = "REGEX",
+            pattern = [[<!DOCTYPE[^>]*(ENTITY|SYSTEM|PUBLIC)]],
+            transforms = { "to_lowercase" },
+            actions = { disrupt = "BLOCK", status = 403, msg = "API 安全：XML 外部实体（XXE）" },
+        },
+
+        -- ========== 编码混淆绕过（base64 载荷） ==========
+        {
+            id = "27013", group = "obfuscation", phase = "access", severity = 3, enabled = true,
+            vars = { { type = "URI_ARGS" }, { type = "POST_ARGS" }, { type = "BODY" } },
+            operator = "REGEX",
+            pattern = [[\b(union|select|sleep|information_schema)\b|<script|javascript:]],
+            transforms = { "base64_decode", "to_lowercase" },
+            actions = { disrupt = "BLOCK", status = 403, msg = "编码混淆：base64 载荷攻击" },
+        },
 
         -- ========== 响应检测（默认仅监控 LOG_ONLY，可在后台改为 BLOCK 拦截） ==========
         {
@@ -257,6 +327,48 @@ local builtin = {
             pattern = "",
             transforms = { },
             actions = { disrupt = "LOG_ONLY", msg = "响应头泄露：X-Powered-By 版本信息" },
+        },
+
+        -- ========== DLP 敏感数据防泄露（默认仅监控 LOG_ONLY） ==========
+        {
+            id = "26010", group = "dlp", phase = "body_filter", severity = 3, enabled = true,
+            vars = { { type = "RESPONSE_BODY" } },
+            operator = "REGEX",
+            pattern = [==[[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]]==],
+            transforms = { },
+            actions = { disrupt = "LOG_ONLY", msg = "DLP：响应体疑似泄露身份证号码" },
+        },
+        {
+            id = "26011", group = "dlp", phase = "body_filter", severity = 3, enabled = true,
+            vars = { { type = "RESPONSE_BODY" } },
+            operator = "REGEX",
+            pattern = [==[\b(62[0-9]{14,17}|[3-6][0-9]{15,18})\b]==],
+            transforms = { },
+            actions = { disrupt = "LOG_ONLY", msg = "DLP：响应体疑似泄露银行卡号" },
+        },
+        {
+            id = "26012", group = "dlp", phase = "body_filter", severity = 2, enabled = true,
+            vars = { { type = "RESPONSE_BODY" } },
+            operator = "REGEX",
+            pattern = [[1[3-9]\d{9}]],
+            transforms = { },
+            actions = { disrupt = "LOG_ONLY", msg = "DLP：响应体疑似泄露手机号" },
+        },
+        {
+            id = "26013", group = "dlp", phase = "body_filter", severity = 3, enabled = true,
+            vars = { { type = "RESPONSE_BODY" } },
+            operator = "REGEX",
+            pattern = [==[-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----]==],
+            transforms = { },
+            actions = { disrupt = "LOG_ONLY", msg = "DLP：响应体疑似泄露私钥" },
+        },
+        {
+            id = "26014", group = "dlp", phase = "body_filter", severity = 3, enabled = true,
+            vars = { { type = "RESPONSE_BODY" } },
+            operator = "REGEX",
+            pattern = [==[(AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|ghp_[0-9A-Za-z]{36}|sk-[0-9A-Za-z]{20,}|xox[baprs]-[0-9A-Za-z-]{10,})]==],
+            transforms = { },
+            actions = { disrupt = "LOG_ONLY", msg = "DLP：响应体疑似泄露云服务密钥/令牌" },
         },
     },
 }
