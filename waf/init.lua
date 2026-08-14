@@ -26,6 +26,37 @@ local function log(level, msg)
     ngx.log(level, "[waf] ", msg)
 end
 
+-- 版本号合法性：必须是纯数字（后台 INCR 生成）且严格大于当前版本。
+-- 当前版本为内置集（builtin-x.y.z，非数字）时接受首个数字版本。
+-- 拒绝非法/回退版本：防 Redis 版本键被误写导致规则降级或旧版本回放。
+function _M.version_newer(current, incoming)
+    local iv = tonumber(incoming)
+    if not iv then
+        return false
+    end
+    local cv = tonumber(current)
+    if not cv then
+        return true
+    end
+    return iv > cv
+end
+
+-- 规则集结构校验：rules 为非空数组且每条含非空 id 字符串。
+-- 不通过则拒绝加载，保持当前生效规则集（热更回滚保护）。
+function _M.validate_ruleset(ruleset)
+    if type(ruleset) ~= "table" or type(ruleset.rules) ~= "table" then
+        return false
+    end
+    local n = 0
+    for _, r in ipairs(ruleset.rules) do
+        if type(r) ~= "table" or type(r.id) ~= "string" or r.id == "" then
+            return false
+        end
+        n = n + 1
+    end
+    return n > 0
+end
+
 -- 将当前配置广播到共享内存（供各阶段模块读取，避免重复 require 各自持有旧值）
 local function publish_config()
     local ok, err = storage.set_shared(config.dict.rules, CONFIG_KEY,
@@ -63,6 +94,10 @@ local function refresh_rules()
     if current == version then
         return  -- 版本未变化
     end
+    if not _M.version_newer(current, version) then
+        log(ngx.WARN, "规则版本非法或回退，忽略本次更新: " .. tostring(version))
+        return
+    end
 
     local body, err2 = storage.redis_get(config.rule_refresh.ruleset_key)
     if err2 or not body then
@@ -71,8 +106,9 @@ local function refresh_rules()
     end
 
     local ruleset = storage.decode(body)
-    if type(ruleset) ~= "table" then
-        log(ngx.WARN, "Redis 返回的规则集非法，忽略本次更新")
+    if not _M.validate_ruleset(ruleset) then
+        -- 热更回滚保护：结构非法时保持当前规则集继续生效
+        log(ngx.ERR, "Redis 规则集结构非法，拒绝加载（保持当前规则集）")
         return
     end
 
@@ -100,6 +136,10 @@ local function refresh_config()
     local current = storage.get_shared(config.dict.rules, CFG_VERSION_KEY)
     if current == version then
         return  -- 版本未变化
+    end
+    if not _M.version_newer(current, version) then
+        log(ngx.WARN, "配置版本非法或回退，忽略本次更新: " .. tostring(version))
+        return
     end
 
     local body, err2 = storage.redis_get(config.rule_refresh.config_data_key)
@@ -141,6 +181,10 @@ local function refresh_trigger_rules()
 
     local current = storage.get_shared(config.dict.rules, TRIGGER_VERSION_KEY)
     if current == version then
+        return
+    end
+    if not _M.version_newer(current, version) then
+        log(ngx.WARN, "触发规则版本非法或回退，忽略本次更新: " .. tostring(version))
         return
     end
 
@@ -210,12 +254,14 @@ function _M.init_worker()
     end
 end
 
--- 脚本入口：按当前阶段分发
-local phase = ngx.get_phase()
-if phase == "init" then
-    _M.init()
-elseif phase == "init_worker" then
-    _M.init_worker()
+-- 脚本入口：按当前阶段分发（测试环境无 get_phase 时仅加载模块）
+if ngx.get_phase then
+    local phase = ngx.get_phase()
+    if phase == "init" then
+        _M.init()
+    elseif phase == "init_worker" then
+        _M.init_worker()
+    end
 end
 
 return _M
