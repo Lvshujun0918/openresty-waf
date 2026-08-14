@@ -141,3 +141,45 @@ t.test("check: 缺 boundary / 超大落盘（body nil）优雅跳过", function(
     ngx.req._body = nil
     t.isnil(upload.check({}, up_cfg()))
 end)
+
+t.test("check: 落盘临时文件读取前缀仍检测危险后缀", function()
+    ngx_reset()
+    local fname = os.tmpname()
+    local f = assert(io.open(fname, "wb"))
+    f:write("--" .. B .. "\r\n"
+        .. 'Content-Disposition: form-data; name="file"; filename="shell.php"\r\n'
+        .. "Content-Type: application/octet-stream\r\n\r\n"
+        .. "<?php system($_GET[c]);?>")
+    f:close()
+    ngx.var.content_type = "multipart/form-data; boundary=" .. B
+    ngx.req._body = nil
+    ngx.req._body_file = fname
+    local hit = upload.check({}, up_cfg())
+    os.remove(fname)
+    t.notnil(hit)
+    t.match(hit, "危险后缀")
+end)
+
+t.test("check: 落盘临时文件安全文件不命中", function()
+    ngx_reset()
+    local fname = os.tmpname()
+    local f = assert(io.open(fname, "wb"))
+    f:write("--" .. B .. "\r\n"
+        .. 'Content-Disposition: form-data; name="file"; filename="photo.jpg"\r\n'
+        .. "Content-Type: image/jpeg\r\n\r\n"
+        .. "JPEGDATA")
+    f:close()
+    ngx.var.content_type = "multipart/form-data; boundary=" .. B
+    ngx.req._body = nil
+    ngx.req._body_file = fname
+    t.isnil(upload.check({}, up_cfg()))
+    os.remove(fname)
+end)
+
+t.test("check: 落盘无临时文件路径优雅跳过", function()
+    ngx_reset()
+    ngx.var.content_type = "multipart/form-data; boundary=" .. B
+    ngx.req._body = nil
+    ngx.req._body_file = nil
+    t.isnil(upload.check({}, up_cfg()))
+end)

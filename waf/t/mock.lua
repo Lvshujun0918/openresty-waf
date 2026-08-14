@@ -150,12 +150,14 @@ ngx = {
         _post = {},
         _headers = {},
         _body = nil,
+        _body_file = nil,   -- body 落临时文件路径（超过 client_body_buffer_size）
         get_method    = function() return ngx.req._method end,
         get_uri_args  = function() return ngx.req._args end,
         get_post_args = function() return ngx.req._post end,
         get_headers   = function() return ngx.req._headers end,
         read_body     = function() end,
         get_body_data = function() return ngx.req._body end,
+        get_body_file = function() return ngx.req._body_file end,
     },
 
     -- 响应

@@ -168,6 +168,9 @@ _M.upload = {
                  "aspx", "asa", "cer", "cgi", "pl", "sh", "py", "exe" },
     deny_mime = { "application/x-php", "application/x-httpd-php",
                   "application/x-msdownload" },
+    -- 请求体落临时文件（超过 client_body_buffer_size）时，流式读取文件前
+    -- N 字节继续做后缀/类型检测（防超大上传绕过；超出部分不再读入内存）
+    spooled_scan_bytes = 524288,
 }
 
 -- 全量流量记录（后台配置中心可开关；开启后每个请求上报一条，含命中标记）

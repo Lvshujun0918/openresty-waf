@@ -2,8 +2,9 @@
 -- 文件上传检测：multipart/form-data 文件名后缀 / 文件 Content-Type 黑名单。
 --
 -- 纯 Lua 解析 multipart（不依赖 resty.upload），解析函数独立可单测；
--- 请求体超过 client_body_buffer_size 被 nginx 落临时文件时跳过内容检测
--- （此时 get_body_data 为 nil），避免把超大上传读入内存。
+-- 请求体超过 client_body_buffer_size 被 nginx 落临时文件时，改为流式读取
+-- 文件前 spooled_scan_bytes 字节做同样的后缀/类型检测（默认 512KB），
+-- 避免超大上传绕过上传检测；超出扫描上限的部分不再读入内存。
 
 local _M = {}
 
@@ -61,9 +62,33 @@ local function in_list(list, value)
     return false
 end
 
+-- 请求体落临时文件时：读取文件前缀做同样的检测
+local function check_spooled_file(boundary, up)
+    local path = ngx.req.get_body_file()
+    if not path or path == "" then
+        ngx.log(ngx.WARN, "[waf] 上传请求体过大且无临时文件路径，跳过上传检测")
+        return nil
+    end
+    local max_bytes = tonumber(up.spooled_scan_bytes) or 524288
+    local f, err = io.open(path, "rb")
+    if not f then
+        ngx.log(ngx.WARN, "[waf] 无法打开上传临时文件: ", tostring(err))
+        return nil
+    end
+    local head = f:read(max_bytes)
+    f:close()
+    if not head then
+        ngx.log(ngx.WARN, "[waf] 读取上传临时文件失败，跳过上传检测")
+        return nil
+    end
+    -- 文件头解析出文件部分（parse_multipart 对截断 body 兼容：
+    -- 找不到下一分隔行时取剩余全部内容作为文件数据）
+    return _M.scan_body(head, boundary, up)
+end
+
 -- 检测当前请求的上传内容。
 -- 命中返回描述文本（写入事件 msg），未命中 / 不适用返回 nil。
--- up：cfg.upload 配置（enabled / deny_ext / deny_mime）。
+-- up：cfg.upload 配置（enabled / deny_ext / deny_mime / spooled_scan_bytes）。
 function _M.check(waf_ctx, up)
     if not up or up.enabled == false then return nil end
     local content_type = ngx.var.content_type or ""
@@ -78,22 +103,33 @@ function _M.check(waf_ctx, up)
     ngx.req.read_body()
     local body = ngx.req.get_body_data()
     if not body then
-        -- body 已落临时文件（超过 client_body_buffer_size）：跳过内容检测，
-        -- 避免把超大上传读入内存；后端业务层仍需自行校验文件类型
-        ngx.log(ngx.WARN, "[waf] 上传请求体过大（已落临时文件），跳过上传检测")
-        return nil
+        -- body 已落临时文件（超过 client_body_buffer_size）：流式读取文件前
+        -- spooled_scan_bytes 字节继续检测，堵住超大上传绕过（超出部分不读入内存）
+        return check_spooled_file(boundary, up)
     end
+    return _M.scan_body(body, boundary, up)
+end
+
+-- 单个文件部分检测（后缀黑名单 + Content-Type 黑名单）
+local function scan_part(part, up)
+    -- 1. 文件名后缀黑名单（对伪装 Content-Type 的上传有效）
+    local ext = part.filename:match("%.([^%.]+)$")
+    if ext and in_list(up.deny_ext, ext) then
+        return "文件上传：危险后缀 ." .. ext .. "（" .. part.filename .. "）"
+    end
+    -- 2. 文件 Content-Type 黑名单（对伪造后缀的上传有效）
+    if in_list(up.deny_mime, part.content_type) then
+        return "文件上传：危险类型 " .. tostring(part.content_type)
+            .. "（" .. part.filename .. "）"
+    end
+    return nil
+end
+
+-- 扫描内存中的 multipart body，命中返回描述文本
+function _M.scan_body(body, boundary, up)
     for _, part in ipairs(_M.parse_multipart(body, boundary)) do
-        -- 1. 文件名后缀黑名单（对伪装 Content-Type 的上传有效）
-        local ext = part.filename:match("%.([^%.]+)$")
-        if ext and in_list(up.deny_ext, ext) then
-            return "文件上传：危险后缀 ." .. ext .. "（" .. part.filename .. "）"
-        end
-        -- 2. 文件 Content-Type 黑名单（对伪造后缀的上传有效）
-        if in_list(up.deny_mime, part.content_type) then
-            return "文件上传：危险类型 " .. tostring(part.content_type)
-                .. "（" .. part.filename .. "）"
-        end
+        local hit = scan_part(part, up)
+        if hit then return hit end
     end
     return nil
 end
