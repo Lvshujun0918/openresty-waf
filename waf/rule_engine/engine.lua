@@ -118,10 +118,7 @@ function _M.run(ruleset, phase, waf_ctx)
     -- 异常分阈值阻断
     local threshold = waf_ctx.score_threshold or 5
     if waf_ctx.score >= threshold and waf_ctx.mode ~= "detect" then
-        local config = require "config"
-        local storage = require "storage"
-        local body = storage.get_shared(config.dict.rules, "active_config")
-        local cfg = storage.decode(body) or config
+        local cfg = _M.get_active_config()
         ngx.status = 403
         ngx.header.content_type = "text/html; charset=utf-8"
         ngx.say(cfg.block and cfg.block.html or "Forbidden")
@@ -134,24 +131,44 @@ function _M.run(ruleset, phase, waf_ctx)
     return nil
 end
 
--- 读取当前生效规则集（共享内存）
+-- 模块级缓存：规则集 / 生效配置按共享内存版本号缓存解码结果。
+-- 版本号由 init.lua 热更新时与数据一并写入（ruleset_version / config_version），
+-- 版本未变化直接返回缓存表，避免每个请求重复 cjson.decode 整份 JSON。
+-- 注意：返回的表为共享缓存，调用方禁止修改（需改动请先浅拷贝）。
+local ruleset_cache = { version = false, value = nil }
+local config_cache  = { version = false, value = nil }
+
+-- 读取当前生效规则集（共享内存，按版本号缓存）
 function _M.get_ruleset()
     local config = require "config"
     local storage = require "storage"
+    local version = storage.get_shared(config.dict.rules, "ruleset_version")
+    if version == ruleset_cache.version and ruleset_cache.value ~= nil then
+        return ruleset_cache.value
+    end
     local body = storage.get_shared(config.dict.rules, "active_ruleset")
-    return storage.decode(body)
+    local ruleset = storage.decode(body)
+    ruleset_cache.version = version
+    ruleset_cache.value = ruleset
+    return ruleset
 end
 
--- 读取当前生效配置
+-- 读取当前生效配置（共享内存，按版本号缓存；无下发配置时回退默认 config）
 function _M.get_active_config()
     local config = require "config"
     local storage = require "storage"
+    local version = storage.get_shared(config.dict.rules, "config_version")
+    if version == config_cache.version and config_cache.value ~= nil then
+        return config_cache.value
+    end
     local body = storage.get_shared(config.dict.rules, "active_config")
     local cfg = storage.decode(body)
-    if type(cfg) == "table" then
-        return cfg
+    if type(cfg) ~= "table" then
+        cfg = config
     end
-    return config
+    config_cache.version = version
+    config_cache.value = cfg
+    return cfg
 end
 
 return _M

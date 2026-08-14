@@ -197,3 +197,39 @@ t.test("多 vars 任一命中即匹配", function()
     local ctx = { mode = "active" }
     t.exits(function() engine.run(rs, "access", ctx) end, 403)
 end)
+
+-- 版本化缓存：版本未变返回同一引用，变化后重新解码
+t.test("get_ruleset: 版本未变返回缓存，版本变化重新解码", function()
+    ngx_reset()
+    local storage = require "storage"
+    storage.set_shared("waf_rule", "ruleset_version", "v1")
+    storage.set_shared("waf_rule", "active_ruleset", storage.encode({ rules = {} }))
+    local a = engine.get_ruleset()
+    local b = engine.get_ruleset()
+    t.ok(a == b, "同版本应返回同一引用")
+    t.eq(#a.rules, 0)
+    -- 版本变化 → 重新解码
+    storage.set_shared("waf_rule", "ruleset_version", "v2")
+    storage.set_shared("waf_rule", "active_ruleset", storage.encode({ rules = { rule() } }))
+    local c = engine.get_ruleset()
+    t.ok(c ~= a, "版本变化应重新解码")
+    t.eq(#c.rules, 1)
+end)
+
+t.test("get_active_config: 版本未变返回缓存，无下发配置回退默认", function()
+    ngx_reset()
+    local storage = require "storage"
+    local config = require "config"
+    -- 未下发配置：返回默认 config 模块表
+    local a = engine.get_active_config()
+    t.ok(a == config, "无 active_config 应回退 config 模块")
+    -- 下发配置后版本变化 → 解码新配置
+    storage.set_shared("waf_rule", "config_version", "c1")
+    storage.set_shared("waf_rule", "active_config", storage.encode({ mode = "detect" }))
+    local b = engine.get_active_config()
+    t.eq(b.mode, "detect")
+    t.ok(b == engine.get_active_config(), "同版本应返回同一引用")
+    -- 版本不变但重写数据（模拟异常情况）不触发重新解码
+    storage.set_shared("waf_rule", "active_config", storage.encode({ mode = "off" }))
+    t.eq(engine.get_active_config().mode, "detect")
+end)
