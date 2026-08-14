@@ -143,17 +143,6 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
-    name: 'sites',
-    path: '/sites',
-    component: 'layout.base$view.sites',
-    meta: {
-      title: 'sites',
-      i18nKey: 'route.sites',
-      icon: 'mdi:web-check',
-      order: 9
-    }
-  },
-  {
     name: 'traffic',
     path: '/traffic',
     component: 'layout.base$view.traffic',

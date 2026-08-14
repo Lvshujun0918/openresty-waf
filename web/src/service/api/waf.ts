@@ -1,8 +1,8 @@
 import { request } from '../request';
 
-/** 仪表盘聚合统计（host 非空时仅统计该站点） */
-export function fetchDashboardStats(days = 14, host = '') {
-  return request<Api.Waf.DashboardStats>({ url: '/dashboard/stats', params: { days, host } });
+/** 仪表盘聚合统计 */
+export function fetchDashboardStats(days = 14) {
+  return request<Api.Waf.DashboardStats>({ url: '/dashboard/stats', params: { days } });
 }
 
 /** 攻击事件列表 */
@@ -86,26 +86,6 @@ export function fetchPublishHistory() {
 /** 回滚到指定发布历史快照 */
 export function rollbackRules(id: number) {
   return request<{ status: string }>({ url: `/rules/rollback/${id}`, method: 'post' });
-}
-
-/** 站点列表 */
-export function fetchSites() {
-  return request<Api.Waf.Site[]>({ url: '/sites' });
-}
-
-/** 新建站点 */
-export function createSite(data: Partial<Api.Waf.Site>) {
-  return request<Api.Waf.Site>({ url: '/sites', method: 'post', data });
-}
-
-/** 更新站点 */
-export function updateSite(id: number, data: Partial<Api.Waf.Site>) {
-  return request<Api.Waf.Site>({ url: `/sites/${id}`, method: 'put', data });
-}
-
-/** 删除站点 */
-export function deleteSite(id: number) {
-  return request<{ status: string }>({ url: `/sites/${id}`, method: 'delete' });
 }
 
 /** 规则测试 */

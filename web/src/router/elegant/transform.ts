@@ -175,7 +175,6 @@ const routeMap: RouteMap = {
   "ip-lists": "/ip-lists",
   "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?",
   "rules": "/rules",
-  "sites": "/sites",
   "traffic": "/traffic",
   "trigger-records": "/trigger-records",
   "trigger-rules": "/trigger-rules"

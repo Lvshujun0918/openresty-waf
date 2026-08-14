@@ -20,7 +20,6 @@ import {
   deleteRule,
   fetchPublishHistory,
   fetchRules,
-  fetchSites,
   publishRules,
   rollbackRules,
   setRuleEnabled,
@@ -31,21 +30,10 @@ import {
 const rules = ref<Api.Waf.Rule[]>([]);
 const loading = ref(false);
 const groupFilter = ref('');
-const siteFilter = ref<number | null>(null);
-const sites = ref<Api.Waf.Site[]>([]);
 const groupOptions = ['sqli', 'xss', 'rce', 'lfi', 'ssrf', 'protocol', 'leak', 'scanner', 'custom'].map(g => ({
   label: g,
   value: g
 }));
-const siteOptions = computed(() => [
-  { label: '全局规则', value: 0 },
-  ...sites.value.map(s => ({ label: `${s.name}（${s.domain}）`, value: s.id }))
-]);
-const siteNameMap = computed(() => Object.fromEntries(sites.value.map(s => [s.id, s.name])));
-const siteFilterOptions = computed(() => [
-  { label: '全局规则', value: 0 },
-  ...sites.value.map(s => ({ label: s.name, value: s.id }))
-]);
 const severityMeta: Record<number, { label: string; type: 'error' | 'warning' | 'info' | 'default' }> = {
   1: { label: '紧急', type: 'error' },
   2: { label: '高危', type: 'error' },
@@ -54,13 +42,8 @@ const severityMeta: Record<number, { label: string; type: 'error' | 'warning' | 
 };
 
 const filterRules = computed(() => {
-  let out = rules.value;
-  if (groupFilter.value) out = out.filter(r => r.group === groupFilter.value);
-  if (siteFilter.value !== null) {
-    const sid = siteFilter.value;
-    out = out.filter(r => (r.site_id || 0) === sid);
-  }
-  return out;
+  if (!groupFilter.value) return rules.value;
+  return rules.value.filter(r => r.group === groupFilter.value);
 });
 
 async function load() {
@@ -71,11 +54,6 @@ async function load() {
   } finally {
     loading.value = false;
   }
-}
-
-async function loadSites() {
-  const res = await fetchSites();
-  sites.value = res.data ?? [];
 }
 
 async function toggleEnabled(row: Api.Waf.Rule) {
@@ -243,15 +221,6 @@ async function doTest() {
 const columns = [
   { title: '规则 ID', key: 'rule_id', width: 100, render: (row: Api.Waf.Rule) => h('span', { class: 'font-mono text-xs' }, row.rule_id) },
   { title: '名称', key: 'name', minWidth: 160, ellipsis: { tooltip: true } },
-  {
-    title: '站点',
-    key: 'site_id',
-    width: 110,
-    render: (row: Api.Waf.Rule) =>
-      (row.site_id || 0) === 0
-        ? h('span', { class: 'text-xs text-[rgb(125,125,125)]' }, '全局')
-        : h(NTag, { size: 'small', bordered: false }, { default: () => siteNameMap.value[row.site_id] || row.site_id })
-  },
   { title: '类型', key: 'group', width: 100, render: (row: Api.Waf.Rule) => h(NTag, { size: 'small', bordered: false }, { default: () => row.group }) },
   { title: '阶段', key: 'phase', width: 110 },
   {
@@ -288,10 +257,7 @@ const columns = [
   }
 ];
 
-onMounted(() => {
-  load();
-  loadSites();
-});
+onMounted(load);
 </script>
 
 <template>
@@ -310,10 +276,7 @@ onMounted(() => {
 
     <NCard :bordered="false" class="card-wrapper">
       <template #header-extra>
-        <NSpace>
-          <NSelect v-model:value="siteFilter" :options="siteFilterOptions" clearable placeholder="按站点筛选" class="w-36" />
-          <NSelect v-model:value="groupFilter" :options="groupOptions" clearable placeholder="按类型筛选" class="w-32" />
-        </NSpace>
+        <NSelect v-model:value="groupFilter" :options="groupOptions" clearable placeholder="按类型筛选" class="w-32" />
       </template>
       <NDataTable :columns="columns" :data="filterRules" :loading="loading" :bordered="false" size="small" />
     </NCard>
@@ -327,10 +290,6 @@ onMounted(() => {
           <NSelect v-else-if="f.type === 'select'" v-model:value="(form as any)[f.key]" :options="f.options || groupOptions" />
           <NSwitch v-else-if="f.type === 'switch'" v-model:value="(form as any)[f.key]" />
           <NInputNumber v-else-if="f.type === 'number'" v-model:value="(form as any)[f.key]" :min="0" :max="4" />
-        </NFormItem>
-        <NFormItem label="归属站点">
-          <NSelect v-model:value="form.site_id" :options="siteOptions" />
-          <p class="mt-1 text-xs text-[rgb(125,125,125)]">全局规则对所有域名生效；站点规则仅对对应域名生效，修改后需发布</p>
         </NFormItem>
       </NForm>
       <template #footer>

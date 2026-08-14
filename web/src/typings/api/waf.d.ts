@@ -75,18 +75,7 @@ declare namespace Api {
       actions: string;
       status: number;
       message: string;
-      site_id: number;
       sort_order: number;
-      created_at?: string;
-      updated_at?: string;
-    }
-
-    /** 受保护站点 */
-    interface Site {
-      id: number;
-      name: string;
-      domain: string;
-      enabled: boolean;
       created_at?: string;
       updated_at?: string;
     }

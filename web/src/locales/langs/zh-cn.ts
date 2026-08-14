@@ -233,7 +233,6 @@ const local: App.I18n.Schema = {
     'trigger-rules': '触发规则',
     'trigger-records': '触发记录',
     'ip-lists': '黑白名单',
-    'sites': '站点管理',
     config: '系统配置',
     guide: '接入指引'
   },

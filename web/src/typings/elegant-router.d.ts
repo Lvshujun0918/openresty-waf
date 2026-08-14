@@ -29,7 +29,6 @@ declare module "@elegant-router/types" {
     "ip-lists": "/ip-lists";
     "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?";
     "rules": "/rules";
-    "sites": "/sites";
     "traffic": "/traffic";
     "trigger-records": "/trigger-records";
     "trigger-rules": "/trigger-rules";
@@ -76,7 +75,6 @@ declare module "@elegant-router/types" {
     | "ip-lists"
     | "login"
     | "rules"
-    | "sites"
     | "traffic"
     | "trigger-records"
     | "trigger-rules"
@@ -108,7 +106,6 @@ declare module "@elegant-router/types" {
     | "home"
     | "ip-lists"
     | "rules"
-    | "sites"
     | "traffic"
     | "trigger-records"
     | "trigger-rules"
