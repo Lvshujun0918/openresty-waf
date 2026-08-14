@@ -26,6 +26,12 @@ func TestConfig_GetDefault(t *testing.T) {
 	if resp.Config["mode"] == nil {
 		t.Errorf("config missing mode: %v", resp.Config)
 	}
+	if det, _ := resp.Config["detection"].(map[string]interface{}); det == nil || det["skip_static"] == nil {
+		t.Errorf("config missing detection.skip_static: %v", resp.Config)
+	}
+	if resp.Config["trusted_proxies"] == nil {
+		t.Errorf("config missing trusted_proxies: %v", resp.Config)
+	}
 }
 
 // TestConfig_SaveAndGet 保存配置下发 Redis，再回读

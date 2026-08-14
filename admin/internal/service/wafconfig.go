@@ -90,6 +90,13 @@ func defaultWafConfig() map[string]interface{} {
 			"exclude_paths":  []string{},
 			"geo":            true,
 			"paranoia_level": 1,
+			// 静态资源剪枝：命中后缀/前缀时跳过规则引擎检测（名单/CC/人机验证仍生效）
+			"skip_static": map[string]interface{}{
+				"ext": []string{".js", ".css", ".png", ".jpg", ".jpeg", ".gif",
+					".svg", ".ico", ".webp", ".avif", ".woff", ".woff2", ".ttf",
+					".eot", ".map", ".mp3", ".mp4", ".webm"},
+				"prefix": []string{},
+			},
 		},
 		"cc": map[string]interface{}{
 			"rate": "100/60", "ban_duration": 300,
@@ -118,6 +125,9 @@ h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
 			"urls":        []string{"/favicon.ico"},
 			"user_agents": []string{},
 		},
+		// 可信反向代理（精确 IP 或 CIDR）：仅直连地址命中时才信任 X-Forwarded-For；
+		// 留空 = 无条件信任 XFF（兼容旧行为），公网直连部署建议配置以防伪造。
+		"trusted_proxies": []string{},
 		"blacklist": map[string]interface{}{
 			"ips":  []string{},
 			"urls": []string{},
