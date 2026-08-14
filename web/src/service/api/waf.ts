@@ -78,6 +78,26 @@ export function publishRules() {
   return request<{ status: string }>({ url: '/rules/publish', method: 'post' });
 }
 
+/** 站点列表 */
+export function fetchSites() {
+  return request<Api.Waf.Site[]>({ url: '/sites' });
+}
+
+/** 新建站点 */
+export function createSite(data: Partial<Api.Waf.Site>) {
+  return request<Api.Waf.Site>({ url: '/sites', method: 'post', data });
+}
+
+/** 更新站点 */
+export function updateSite(id: number, data: Partial<Api.Waf.Site>) {
+  return request<Api.Waf.Site>({ url: `/sites/${id}`, method: 'put', data });
+}
+
+/** 删除站点 */
+export function deleteSite(id: number) {
+  return request<{ status: string }>({ url: `/sites/${id}`, method: 'delete' });
+}
+
 /** 规则测试 */
 export function testRule(data: Api.Waf.RuleTestReq) {
   return request<{ matched: boolean; note?: string }>({ url: '/rules/test', method: 'post', data });

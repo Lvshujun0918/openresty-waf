@@ -27,6 +27,7 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   home: () => import("@/views/home/index.vue"),
   "ip-lists": () => import("@/views/ip-lists/index.vue"),
   rules: () => import("@/views/rules/index.vue"),
+  sites: () => import("@/views/sites/index.vue"),
   traffic: () => import("@/views/traffic/index.vue"),
   "trigger-records": () => import("@/views/trigger-records/index.vue"),
   "trigger-rules": () => import("@/views/trigger-rules/index.vue"),

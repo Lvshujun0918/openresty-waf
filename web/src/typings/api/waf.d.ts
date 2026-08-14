@@ -81,6 +81,16 @@ declare namespace Api {
       updated_at?: string;
     }
 
+    /** 受保护站点 */
+    interface Site {
+      id: number;
+      name: string;
+      domain: string;
+      enabled: boolean;
+      created_at?: string;
+      updated_at?: string;
+    }
+
     /** IP 列表订阅 */
     interface IpListSub {
       id: number;
