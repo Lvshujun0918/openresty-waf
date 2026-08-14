@@ -6,7 +6,7 @@
 -- 后续通过管理后台下发的规则将整体覆盖此内置集。
 
 local builtin = {
-    version = "builtin-0.4.0",
+    version = "builtin-0.5.0",
     rules = {
         -- ========== 敏感文件 / 扫描器 ==========
         {
@@ -24,6 +24,17 @@ local builtin = {
             pattern = [[(sqlmap|nikto|nmap|nessus|acunetix|wpscan|masscan|zgrab|hydra|dirbuster|gobuster)]],
             transforms = { "to_lowercase" },
             actions = { disrupt = "BLOCK", status = 403, msg = "扫描器 UA 拦截" },
+        },
+
+        -- ========== 语义检测（libinjection 词法分析，需 libinjection.so；
+        --             .so 缺失时自动降级为不匹配，不影响其余规则） ==========
+        {
+            id = "940001", group = "sqli", phase = "access", severity = 3, enabled = true,
+            vars = { { type = "URI_ARGS" }, { type = "POST_ARGS" }, { type = "BODY" } },
+            operator = "LIBINJECTION_SQLI",
+            pattern = "",
+            transforms = { "url_decode" },
+            actions = { disrupt = "BLOCK", status = 403, msg = "SQL 注入语义检测" },
         },
 
         -- ========== SQL 注入 ==========

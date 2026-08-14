@@ -74,6 +74,23 @@ t.test("26001: 响应体泄露规则定义完整", function()
     t.eq(rule.vars[1].type, "RESPONSE_BODY")
 end)
 
+-- 940001 语义检测依赖 libinjection.so（mock 环境缺失，降级为不匹配），
+-- 校验规则结构；命中语义由生产环境 .so 保证。
+t.test("940001: libinjection 语义规则定义完整且降级不误拦", function()
+    local rule = nil
+    for _, r in ipairs(builtin.rules) do
+        if r.id == "940001" then rule = r end
+    end
+    t.notnil(rule)
+    t.eq(rule.operator, "LIBINJECTION_SQLI")
+    t.eq(rule.actions.disrupt, "BLOCK")
+    -- .so 缺失时普通请求不因语义规则误拦
+    ngx_reset()
+    ngx.req._args = { id = "普通文本" }
+    local ctx = { mode = "active" }
+    t.isnil(engine.run(builtin, "access", ctx))
+end)
+
 t.test("26002: 响应头 X-Powered-By 命中监控不拦截", function()
     ngx_reset()
     ngx.resp._headers = { ["x-powered-by"] = "PHP/7.4" }
