@@ -30,6 +30,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	challengeHandler := NewChallengeHandler(db, mgr, cfg)
 	ccLogHandler := NewCcLogHandler(db, mgr, cfg)
 	triggerRuleHandler := NewTriggerRuleHandler(db, mgr, cfg)
+	siteHandler := NewSiteHandler(db)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -99,6 +100,12 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.DELETE("/trigger-rules/:id", triggerRuleHandler.Delete)
 			authed.PATCH("/trigger-rules/:id/enabled", triggerRuleHandler.SetEnabled)
 			authed.POST("/trigger-rules/publish", triggerRuleHandler.Publish)
+
+			// 站点管理（多站点规则隔离）
+			authed.GET("/sites", siteHandler.List)
+			authed.POST("/sites", siteHandler.Create)
+			authed.PUT("/sites/:id", siteHandler.Update)
+			authed.DELETE("/sites/:id", siteHandler.Delete)
 
 			// WAF 运行配置
 			authed.GET("/config", configHandler.Get)
