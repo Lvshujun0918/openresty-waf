@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
+
+	"openresty-waf/admin/internal/model"
 )
 
 // TestConfig_GetDefault 未保存配置时返回默认配置
@@ -96,5 +99,35 @@ func TestConfig_SaveNoRedis(t *testing.T) {
 		map[string]interface{}{"config": map[string]interface{}{"mode": "detect"}}))
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("no redis: %d %s", w.Code, w.Body.String())
+	}
+}
+
+// TestConfig_Versions 版本健康信息：Redis 版本号 + 最近事件引擎版本
+func TestConfig_Versions(t *testing.T) {
+	db := newTestDB(t)
+	mr, mgr := newTestRedis(t)
+	r := newTestRouter(t, db, mgr)
+	token := doLogin(t, r)
+
+	// Redis 版本号 + 一个携带引擎版本的事件
+	mr.Set("waf:rule:version", "5")
+	mr.Set("waf:config:version", "3")
+	db.Create(&model.Event{Time: time.Now(), ClientIP: "1.2.3.4", EngineVersion: "0.6.0"})
+
+	w := doReq(r, authedReq(http.MethodGet, "/api/config/versions", token, nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("versions: %d %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		EngineVersion string `json:"engine_version"`
+		RuleVersion   string `json:"rule_version"`
+		ConfigVersion string `json:"config_version"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.EngineVersion != "0.6.0" {
+		t.Errorf("engine_version = %q", resp.EngineVersion)
+	}
+	if resp.RuleVersion != "5" || resp.ConfigVersion != "3" {
+		t.Errorf("versions = %q/%q", resp.RuleVersion, resp.ConfigVersion)
 	}
 }
