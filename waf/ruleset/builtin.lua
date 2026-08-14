@@ -6,7 +6,7 @@
 -- 后续通过管理后台下发的规则将整体覆盖此内置集。
 
 local builtin = {
-    version = "builtin-0.2.0",
+    version = "builtin-0.3.0",
     rules = {
         -- ========== 敏感文件 / 扫描器 ==========
         {
@@ -196,6 +196,38 @@ local builtin = {
             pattern = [[.{8192,}]],
             transforms = { },
             actions = { disrupt = "BLOCK", status = 414, msg = "请求 URI 过长" },
+        },
+        {
+            id = "25003", group = "protocol", phase = "access", severity = 2, enabled = true,
+            vars = { { type = "METHOD" } },
+            operator = "REGEX",
+            pattern = "[^A-Za-z0-9_-]",
+            transforms = { },
+            actions = { disrupt = "BLOCK", status = 405, msg = "HTTP 方法名非法字符" },
+        },
+        {
+            id = "25004", group = "protocol", phase = "access", severity = 2, enabled = true,
+            vars = { { type = "HEADERS", specific = "content-length" } },
+            operator = "REGEX",
+            pattern = [[\D]],
+            transforms = { },
+            actions = { disrupt = "BLOCK", status = 400, msg = "Content-Length 非法值" },
+        },
+        {
+            id = "25005", group = "protocol", phase = "access", severity = 2, enabled = true,
+            vars = { { type = "REQUEST_URI" } },
+            operator = "REGEX",
+            pattern = "%00|%0[dD]%0[aA]",
+            transforms = { },
+            actions = { disrupt = "BLOCK", status = 400, msg = "URI 编码控制字符" },
+        },
+        {
+            id = "25006", group = "protocol", phase = "access", severity = 2, enabled = true,
+            vars = { { type = "HEADERS" } },
+            operator = "REGEX",
+            pattern = "[\x00-\x08\x0B\x0C\x0E-\x1F]",
+            transforms = { },
+            actions = { disrupt = "BLOCK", status = 400, msg = "请求头控制字符" },
         },
     },
 }

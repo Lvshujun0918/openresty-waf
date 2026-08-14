@@ -23,6 +23,7 @@ dofile "/waf/t/engine_test.lua"
 dofile "/waf/t/trigger_test.lua"
 dofile "/waf/t/cc_test.lua"
 dofile "/waf/t/upload_test.lua"
+dofile "/waf/t/builtin_test.lua"
 dofile "/waf/t/challenge_test.lua"
 dofile "/waf/t/storage_test.lua"
 -- config 测试最后加载（依赖其它模块先 require 默认 config）
