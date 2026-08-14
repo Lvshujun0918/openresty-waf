@@ -91,8 +91,11 @@ func TestRuleService_BuildRuleset_Site(t *testing.T) {
 	// 站点已删除（site_id 悬空）→ 不下发 site 字段，按全局处理
 	db.Create(&model.Rule{RuleID: "s2", Operator: "REGEX", Pattern: "c", Enabled: true, SiteID: 999})
 	// 停用站点 → 专属规则不下发
-	st2 := &model.Site{Name: "停用站", Domain: "off.com", Enabled: false}
+	st2 := &model.Site{Name: "停用站", Domain: "off.com"}
 	if err := db.Create(st2).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&model.Site{}).Where("id = ?", st2.ID).Update("enabled", false).Error; err != nil {
 		t.Fatal(err)
 	}
 	db.Create(&model.Rule{RuleID: "s3", Operator: "REGEX", Pattern: "d", Enabled: true, SiteID: st2.ID})

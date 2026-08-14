@@ -79,7 +79,11 @@ func TestSite_SiteMeta(t *testing.T) {
 	db := newTestDB(t)
 	svc := NewSiteService(db)
 	svc.Create(&model.Site{Name: "a", Domain: "a.com"})
-	svc.Create(&model.Site{Name: "b", Domain: "b.com", Enabled: false})
+	svc.Create(&model.Site{Name: "b", Domain: "b.com"})
+	// bool 零值 false 在 Create 时被 gorm 跳过（走 DB default:true），显式置 false
+	if err := db.Model(&model.Site{}).Where("domain = ?", "b.com").Update("enabled", false).Error; err != nil {
+		t.Fatal(err)
+	}
 	var s1, s2 model.Site
 	db.Where("domain = ?", "a.com").First(&s1)
 	db.Where("domain = ?", "b.com").First(&s2)
