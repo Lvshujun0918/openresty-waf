@@ -18,6 +18,28 @@ t.test("url_decode: nil 安全", function()
     t.eq(transforms.apply(nil, { "url_decode" }), "")
 end)
 
+t.test("url_decode_twice: 双重编码还原", function()
+    t.eq(transforms.apply("%2520%2573elect", { "url_decode_twice" }), " select")
+end)
+
+t.test("url_decode_twice: 单重编码中文与普通文本不变", function()
+    t.eq(transforms.apply("%E6%B5%8B%E8%AF%95", { "url_decode_twice" }), "测试")
+    t.eq(transforms.apply("plain text", { "url_decode_twice" }), "plain text")
+end)
+
+t.test("url_decode_twice: 连续编码最多解码 3 次不循环", function()
+    local s = string.rep("%25", 10) .. "20"
+    local out = transforms.apply(s, { "url_decode_twice" })
+    t.ok(type(out) == "string" and #out > 0, "应返回字符串且不抛错")
+end)
+
+t.test("is_valid: 变换名校验", function()
+    t.ok(transforms.is_valid("url_decode"))
+    t.ok(transforms.is_valid("url_decode_twice"))
+    t.ok(transforms.is_valid("normalize_path"))
+    t.no(transforms.is_valid("nope"))
+end)
+
 t.test("to_lowercase: 大小写", function()
     t.eq(transforms.apply("UNION SELECT", { "to_lowercase" }), "union select")
     t.eq(transforms.apply(nil, { "to_lowercase" }), "")
@@ -60,10 +82,4 @@ end)
 
 t.test("apply: 未知变换名跳过", function()
     t.eq(transforms.apply("abc", { "no_such_transform" }), "abc")
-end)
-
-t.test("is_valid: 变换名校验", function()
-    t.ok(transforms.is_valid("url_decode"))
-    t.ok(transforms.is_valid("normalize_path"))
-    t.no(transforms.is_valid("nope"))
 end)

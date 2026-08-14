@@ -9,6 +9,21 @@ local transforms = {
         return ngx.unescape_uri(s or "")
     end,
 
+    -- 多重 URL 解码（最多 3 次直至不再变化）：识别双重/多重编码绕过
+    -- （如 %2520 单次解码后仍为 %20，多重解码还原为空格后被规则命中；
+    --   普通 URL 编码中文解码一次后不再含 %，不会误报）
+    url_decode_twice = function(s)
+        s = s or ""
+        for _ = 1, 3 do
+            local decoded = ngx.unescape_uri(s)
+            if decoded == s then
+                break
+            end
+            s = decoded
+        end
+        return s
+    end,
+
     -- 小写化
     to_lowercase = function(s)
         return string.lower(s or "")
