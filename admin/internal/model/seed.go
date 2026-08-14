@@ -4,7 +4,8 @@ package model
 // v2: libinjection 语义规则 + OWASP CRS 转译规则 + 基础兜底
 // v3: 修复 920230/942460 对 URL 编码中文/UTF-8 中文的误报（加 url_decode transform）
 // v4: 942460 pattern 限定 ASCII 特殊字符 4 连，彻底避免 UTF-8 中文误报
-const SeedVersion = "4"
+// v5: 新增协议异常规则 25003-25006（方法字符集/Content-Length/编码与控制字符）
+const SeedVersion = "5"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -43,4 +44,22 @@ var baseRules = []Rule{
 		Operator: "REGEX", Pattern: `(sqlmap|nikto|nmap|nessus|acunetix|wpscan|masscan|zgrab|hydra|dirbuster|gobuster)`,
 		Transforms: `["to_lowercase"]`, Vars: `[{"type":"HEADERS","specific":"user-agent"}]`,
 		Actions: `{"disrupt":"BLOCK","status":403,"msg":"扫描器 UA 拦截"}`, Status: 403, Message: "扫描器 UA 拦截", SortOrder: 4},
+
+	// ---- 协议异常（方法/请求头/编码控制字符） ----
+	{RuleID: "25003", Name: "HTTP 方法名非法字符", Group: "protocol", Phase: "access", Severity: 2, Enabled: true,
+		Operator: "REGEX", Pattern: `[^A-Za-z0-9_-]`,
+		Transforms: `[]`, Vars: `[{"type":"METHOD"}]`,
+		Actions: `{"disrupt":"BLOCK","status":405,"msg":"HTTP 方法名非法字符"}`, Status: 405, Message: "HTTP 方法名非法字符", SortOrder: 5},
+	{RuleID: "25004", Name: "Content-Length 非法值", Group: "protocol", Phase: "access", Severity: 2, Enabled: true,
+		Operator: "REGEX", Pattern: `\D`,
+		Transforms: `[]`, Vars: `[{"type":"HEADERS","specific":"content-length"}]`,
+		Actions: `{"disrupt":"BLOCK","status":400,"msg":"Content-Length 非法值"}`, Status: 400, Message: "Content-Length 非法值", SortOrder: 6},
+	{RuleID: "25005", Name: "URI 编码控制字符", Group: "protocol", Phase: "access", Severity: 2, Enabled: true,
+		Operator: "REGEX", Pattern: `%00|%0[dD]%0[aA]`,
+		Transforms: `[]`, Vars: `[{"type":"REQUEST_URI"}]`,
+		Actions: `{"disrupt":"BLOCK","status":400,"msg":"URI 编码控制字符"}`, Status: 400, Message: "URI 编码控制字符", SortOrder: 7},
+	{RuleID: "25006", Name: "请求头控制字符", Group: "protocol", Phase: "access", Severity: 2, Enabled: true,
+		Operator: "REGEX", Pattern: `[\x00-\x08\x0B\x0C\x0E-\x1F]`,
+		Transforms: `[]`, Vars: `[{"type":"HEADERS"}]`,
+		Actions: `{"disrupt":"BLOCK","status":400,"msg":"请求头控制字符"}`, Status: 400, Message: "请求头控制字符", SortOrder: 8},
 }
