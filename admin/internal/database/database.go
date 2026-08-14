@@ -17,7 +17,7 @@ func Init(cfg *config.Config) *gorm.DB {
 		log.Fatalf("初始化数据库失败: %v", err)
 	}
 
-	if err := db.AutoMigrate(&model.User{}, &model.Rule{}, &model.Site{},
+	if err := db.AutoMigrate(&model.User{}, &model.Rule{},
 		&model.Event{}, &model.Setup{}, &model.IpListSubscription{},
 		&model.TrafficLog{}, &model.ChallengeLog{}, &model.TriggerRule{},
 		&model.CcLog{}, &model.PublishHistory{}); err != nil {

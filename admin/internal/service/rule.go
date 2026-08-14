@@ -65,17 +65,15 @@ func (s *RuleService) toEngineRule(r model.Rule) map[string]interface{} {
 	}
 }
 
-// BuildRuleset 从数据库构建待下发规则集（仅启用的规则，按站点与排序）
+// BuildRuleset 从数据库构建待下发规则集（仅启用的规则，按排序）
 // 按 CRS 偏执级别过滤：仅下发 paranoia_level <= 当前配置档位的规则。
-// 站点规则（SiteID != 0）写入 site 域名字段，Lua 引擎按请求 Host 过滤子集。
 func (s *RuleService) BuildRuleset() (*Ruleset, error) {
 	var rules []model.Rule
 	if err := s.db.Where("enabled = ?", true).
-		Order("site_id asc, sort_order asc, id asc").Find(&rules).Error; err != nil {
+		Order("sort_order asc, id asc").Find(&rules).Error; err != nil {
 		return nil, err
 	}
 	level := s.currentParanoiaLevel()
-	meta := s.siteMeta(rules)
 	rs := &Ruleset{
 		Version: fmt.Sprintf("v%d", time.Now().UnixNano()),
 		Rules:   make([]map[string]interface{}, 0, len(rules)),
@@ -84,34 +82,9 @@ func (s *RuleService) BuildRuleset() (*Ruleset, error) {
 		if model.RuleParanoiaLevel(r.RuleID) > level {
 			continue // 高档位规则，当前档位不参与检测
 		}
-		if m, ok := meta[r.SiteID]; ok {
-			if !m.Enabled {
-				continue // 站点已停用：专属规则不下发
-			}
-			if m.Domain != "" {
-				er := s.toEngineRule(r)
-				er["site"] = m.Domain
-				rs.Rules = append(rs.Rules, er)
-				continue
-			}
-		}
 		rs.Rules = append(rs.Rules, s.toEngineRule(r))
 	}
 	return rs, nil
-}
-
-// siteMeta 规则集涉及的站点 ID → {域名, 启用} 映射
-func (s *RuleService) siteMeta(rules []model.Rule) map[uint]struct {
-	Domain  string
-	Enabled bool
-} {
-	ids := []uint{}
-	for _, r := range rules {
-		if r.SiteID != 0 {
-			ids = append(ids, r.SiteID)
-		}
-	}
-	return NewSiteService(s.db).SiteMeta(ids)
 }
 
 // currentParanoiaLevel 读取后台运行配置中的 CRS 偏执级别（1-4，缺省 1）
@@ -219,21 +192,18 @@ func (s *RuleService) GetByRuleID(ruleID string) (*model.Rule, error) {
 	return &r, nil
 }
 
-// List 规则列表（支持 group / site_id / keyword 过滤）
-func (s *RuleService) List(group, siteID, keyword string) ([]model.Rule, error) {
+// List 规则列表（支持 group / keyword 过滤）
+func (s *RuleService) List(group, keyword string) ([]model.Rule, error) {
 	q := s.db
 	if group != "" {
 		q = q.Where("`group` = ?", group)
-	}
-	if siteID != "" {
-		q = q.Where("site_id = ?", siteID)
 	}
 	if keyword != "" {
 		like := "%" + keyword + "%"
 		q = q.Where("rule_id LIKE ? OR name LIKE ? OR pattern LIKE ?", like, like, like)
 	}
 	var rules []model.Rule
-	if err := q.Order("site_id asc, sort_order asc, id asc").Find(&rules).Error; err != nil {
+	if err := q.Order("sort_order asc, id asc").Find(&rules).Error; err != nil {
 		return nil, err
 	}
 	return rules, nil

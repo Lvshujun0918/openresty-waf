@@ -21,9 +21,9 @@ func NewRuleHandler(db *gorm.DB, mgr *service.RedisManager, cfg *config.Config) 
 	return &RuleHandler{svc: service.NewRuleService(db, mgr, cfg)}
 }
 
-// List GET /api/rules?group=&site_id=&keyword=
+// List GET /api/rules?group=&keyword=
 func (h *RuleHandler) List(c *gin.Context) {
-	rules, err := h.svc.List(c.Query("group"), c.Query("site_id"), c.Query("keyword"))
+	rules, err := h.svc.List(c.Query("group"), c.Query("keyword"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

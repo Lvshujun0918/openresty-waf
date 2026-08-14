@@ -77,53 +77,6 @@ func TestRuleService_BuildRuleset(t *testing.T) {
 	}
 }
 
-// TestRuleService_BuildRuleset_Site 站点规则下发带 site 域名字段，全局规则不带
-func TestRuleService_BuildRuleset_Site(t *testing.T) {
-	db := newTestDB(t)
-	s := NewRuleService(db, nil, newTestConfig())
-
-	st := &model.Site{Name: "主站", Domain: "cszj.wang"}
-	if err := db.Create(st).Error; err != nil {
-		t.Fatal(err)
-	}
-	// 全局规则（site_id=0）
-	db.Create(&model.Rule{RuleID: "g1", Operator: "REGEX", Pattern: "a", Enabled: true})
-	// 站点规则
-	db.Create(&model.Rule{RuleID: "s1", Operator: "REGEX", Pattern: "b", Enabled: true, SiteID: st.ID})
-	// 站点已删除（site_id 悬空）→ 不下发 site 字段，按全局处理
-	db.Create(&model.Rule{RuleID: "s2", Operator: "REGEX", Pattern: "c", Enabled: true, SiteID: 999})
-	// 停用站点 → 专属规则不下发
-	st2 := &model.Site{Name: "停用站", Domain: "off.com"}
-	if err := db.Create(st2).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Model(&model.Site{}).Where("id = ?", st2.ID).Update("enabled", false).Error; err != nil {
-		t.Fatal(err)
-	}
-	db.Create(&model.Rule{RuleID: "s3", Operator: "REGEX", Pattern: "d", Enabled: true, SiteID: st2.ID})
-
-	rs, err := s.BuildRuleset()
-	if err != nil {
-		t.Fatalf("build: %v", err)
-	}
-	byID := map[string]map[string]interface{}{}
-	for _, r := range rs.Rules {
-		byID[r["id"].(string)] = r
-	}
-	if _, ok := byID["g1"]["site"]; ok {
-		t.Error("全局规则不应带 site 字段")
-	}
-	if v, ok := byID["s1"]["site"]; !ok || v != "cszj.wang" {
-		t.Errorf("站点规则 site = %v", byID["s1"]["site"])
-	}
-	if _, ok := byID["s2"]["site"]; ok {
-		t.Error("悬空站点规则不应带 site 字段")
-	}
-	if _, ok := byID["s3"]; ok {
-		t.Error("停用站点的专属规则不应下发")
-	}
-}
-
 func TestRuleParanoiaLevel(t *testing.T) {
 	cases := map[string]int{
 		// PL1：关键字/语义/自定义
@@ -186,15 +139,15 @@ func TestRuleService_CRUD(t *testing.T) {
 		t.Fatalf("create: %v", err)
 	}
 
-	rules, err := s.List("", "", "")
+	rules, err := s.List("", "")
 	if err != nil || len(rules) != 1 {
 		t.Fatalf("list = %v, err = %v", len(rules), err)
 	}
 	// 过滤
-	if rules, _ := s.List("custom", "", ""); len(rules) != 0 {
+	if rules, _ := s.List("custom", ""); len(rules) != 0 {
 		t.Fatalf("group filter should return 0, got %d", len(rules))
 	}
-	if rules, _ := s.List("", "", "100"); len(rules) != 1 {
+	if rules, _ := s.List("", "100"); len(rules) != 1 {
 		t.Fatalf("keyword filter should return 1, got %d", len(rules))
 	}
 
@@ -230,7 +183,7 @@ func TestRuleService_CRUD(t *testing.T) {
 	if err := s.Delete(r.ID); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
-	if rules, _ := s.List("", "", ""); len(rules) != 0 {
+	if rules, _ := s.List("", ""); len(rules) != 0 {
 		t.Fatalf("expected 0 rules after delete, got %d", len(rules))
 	}
 }
