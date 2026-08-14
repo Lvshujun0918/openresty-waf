@@ -78,3 +78,55 @@ t.test("match_regex_list: 空值/空列表/非法正则安全", function()
     t.ok(util.match_regex_list("/x", { "" }) == false, "空 pattern 跳过")
     t.ok(util.match_regex_list("/x", { "[unclosed" }) == false, "非法正则不抛错")
 end)
+
+-- ========== XML 结构化解析 ==========
+
+t.test("try_parse_xml: 非 XML 返回 nil", function()
+    t.isnil(util.try_parse_xml("hello world"))
+    t.isnil(util.try_parse_xml(""))
+    t.isnil(util.try_parse_xml(nil))
+end)
+
+t.test("try_parse_xml: 标签/属性/文本展平", function()
+    local vals = util.try_parse_xml('<root><item id="1">hello</item></root>')
+    t.notnil(vals)
+    local joined = table.concat(vals, "|")
+    t.match(joined, "root")
+    t.match(joined, "item")
+    t.match(joined, "id")
+    t.match(joined, "1")
+    t.match(joined, "hello")
+end)
+
+t.test("try_parse_xml: CDATA 与注释处理", function()
+    local vals = util.try_parse_xml('<a><!-- comment --><b><![CDATA[x<y>z]]></b></a>')
+    t.notnil(vals)
+    local joined = table.concat(vals, "|")
+    t.match(joined, "x<y>z")
+    t.no(joined:find("comment", 1, true), "注释内容不参与检测")
+end)
+
+t.test("try_parse_xml: DOCTYPE 整体保留（XXE 检测用）", function()
+    local vals = util.try_parse_xml('<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><foo/>')
+    t.notnil(vals)
+    local joined = table.concat(vals, "|")
+    t.match(joined, "ENTITY")
+    t.match(joined, "SYSTEM")
+    t.match(joined, "file:///etc/passwd")
+end)
+
+t.test("try_parse_xml: 单引号属性值", function()
+    local vals = util.try_parse_xml("<a x='1'/>")
+    t.notnil(vals)
+    local joined = table.concat(vals, "|")
+    t.match(joined, "x")
+    t.match(joined, "1")
+end)
+
+t.test("try_parse_xml: 超长输入片段数量受限不抛错", function()
+    local big = {}
+    for i = 1, 5000 do big[#big + 1] = "<x" .. i .. "/>" end
+    local ok, vals = pcall(util.try_parse_xml, table.concat(big))
+    t.ok(ok, "不抛错")
+    if ok then t.ok(vals == nil or #vals <= 1001, "片段数量受限") end
+end)
