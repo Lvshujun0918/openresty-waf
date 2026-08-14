@@ -47,6 +47,7 @@ function _M.record(waf_ctx, cfg, rule_name)
         time       = os.date("%Y-%m-%dT%H:%M:%S") .. tz_offset(),
         req_id     = waf_ctx and waf_ctx.req_id or "",
         client_ip  = client_ip,
+        engine_version = config.version or "",
         country    = ok and geo and geo.country or "",
         province   = ok and geo and geo.province or "",
         city       = ok and geo and geo.city or "",

@@ -8,6 +8,7 @@ type Event struct {
 	Time      time.Time `gorm:"index" json:"time"`   // 攻击时间
 	ReqID     string    `gorm:"size:64;index" json:"req_id"` // 每请求唯一 ID
 	ClientIP  string    `gorm:"size:64;index" json:"client_ip"`
+	EngineVersion string `gorm:"size:32" json:"engine_version"` // 上报事件时引擎版本
 	Country   string    `gorm:"size:64" json:"country"`
 	Province  string    `gorm:"size:64" json:"province"`
 	City      string    `gorm:"size:64" json:"city"`

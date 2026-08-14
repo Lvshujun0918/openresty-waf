@@ -112,6 +112,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			// WAF 运行配置
 			authed.GET("/config", configHandler.Get)
 			authed.PUT("/config", configHandler.Save)
+			authed.GET("/config/versions", configHandler.Versions)
 		}
 	}
 

@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { NButton, NCard, NForm, NFormItem, NInput, NRadio, NRadioGroup, NSpace, NSwitch, NTag } from 'naive-ui';
-import { fetchConfig, saveConfig } from '@/service/api';
+import { NButton, NCard, NForm, NFormItem, NInput, NInputNumber, NRadio, NRadioGroup, NSpace, NSwitch, NTag } from 'naive-ui';
+import { fetchConfig, fetchConfigVersions, saveConfig } from '@/service/api';
 
 const saving = ref(false);
 const loaded = ref(false);
+const versions = ref({ engine_version: '', rule_version: '', config_version: '' });
 const cfg = reactive({
   mode: 'active',
-  detection: { exclude_paths: [] as string[], geo: true, paranoia_level: 1 },
+  detection: { exclude_paths: [] as string[], geo: true, paranoia_level: 1, watchdog_ms: 10, response_body_buffer: 8192 },
   log: { enabled: true, backend: 'redis' },
-  upload: { enabled: true }
+  upload: { enabled: true, spooled_scan_bytes: 524288 }
 });
 const excludeText = ref('');
 const staticExtText = ref('');
@@ -37,14 +38,17 @@ async function load() {
     detection: {
       exclude_paths: Array.isArray(det.exclude_paths) ? (det.exclude_paths as string[]) : [],
       geo: det.geo !== false,
-      paranoia_level: Number(det.paranoia_level) || 1
+      paranoia_level: Number(det.paranoia_level) || 1,
+      watchdog_ms: Number(det.watchdog_ms) || 0,
+      response_body_buffer: Number(det.response_body_buffer) || 8192
     },
     log: {
       enabled: log.enabled !== false,
       backend: log.backend || 'redis'
     },
     upload: {
-      enabled: ((rawConfig.upload as Record<string, unknown>) ?? {}).enabled !== false
+      enabled: ((rawConfig.upload as Record<string, unknown>) ?? {}).enabled !== false,
+      spooled_scan_bytes: Number(((rawConfig.upload as Record<string, unknown>) ?? {}).spooled_scan_bytes) || 524288
     }
   });
   excludeText.value = cfg.detection.exclude_paths.join('\n');
@@ -55,6 +59,11 @@ async function load() {
   uploadExtText.value = (Array.isArray(up.deny_ext) ? (up.deny_ext as string[]) : []).join('\n');
   uploadMimeText.value = (Array.isArray(up.deny_mime) ? (up.deny_mime as string[]) : []).join('\n');
   loaded.value = true;
+}
+
+async function loadVersions() {
+  const res = await fetchConfigVersions();
+  if (res.data) versions.value = res.data;
 }
 
 async function save() {
@@ -92,6 +101,8 @@ async function save() {
         exclude_paths: excludePaths,
         geo: cfg.detection.geo,
         paranoia_level: cfg.detection.paranoia_level,
+        watchdog_ms: cfg.detection.watchdog_ms,
+        response_body_buffer: cfg.detection.response_body_buffer,
         skip_static: {
           ...(((rawConfig.detection as Record<string, unknown>)?.skip_static as Record<string, unknown>) ?? {}),
           ext: staticExt,
@@ -106,6 +117,7 @@ async function save() {
       upload: {
         ...((rawConfig.upload as Record<string, unknown>) ?? {}),
         enabled: cfg.upload.enabled,
+        spooled_scan_bytes: cfg.upload.spooled_scan_bytes,
         deny_ext: uploadExt,
         deny_mime: uploadMime
       },
@@ -119,6 +131,7 @@ async function save() {
 }
 
 onMounted(load);
+onMounted(loadVersions);
 </script>
 
 <template>
@@ -127,6 +140,24 @@ onMounted(load);
       <h2 class="text-xl font-semibold">系统配置</h2>
       <p class="text-sm text-[rgb(125,125,125)]">防护模式、检测策略与日志后端配置</p>
     </div>
+
+    <NCard :bordered="false" class="card-wrapper" title="版本健康">
+      <NSpace size="large">
+        <div>
+          <p class="text-xs text-[rgb(125,125,125)]">引擎版本（最近事件上报）</p>
+          <p class="mt-1 font-mono text-sm">{{ versions.engine_version || '尚未上报' }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-[rgb(125,125,125)]">规则下发版本（Redis）</p>
+          <p class="mt-1 font-mono text-sm">{{ versions.rule_version ? '#' + versions.rule_version : '未下发' }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-[rgb(125,125,125)]">配置下发版本（Redis）</p>
+          <p class="mt-1 font-mono text-sm">{{ versions.config_version ? '#' + versions.config_version : '未下发' }}</p>
+        </div>
+        <NButton size="small" quaternary type="primary" @click="loadVersions">刷新</NButton>
+      </NSpace>
+    </NCard>
 
     <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="防护模式">
       <NRadioGroup v-model:value="cfg.mode">
@@ -174,6 +205,14 @@ onMounted(load);
             <NInput v-model:value="staticPrefixText" type="textarea" :rows="2" placeholder="每行一个路径前缀，如 /static/、/assets/" />
           </div>
         </NFormItem>
+        <NFormItem label="检测 watchdog（毫秒）">
+          <NInputNumber v-model:value="cfg.detection.watchdog_ms" :min="0" :max="1000" :step="1" class="w-40" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">检测总耗时超阈值强制放行（0 关闭），灾难性回溯的最后防线</span>
+        </NFormItem>
+        <NFormItem label="响应体检测缓冲（字节）">
+          <NInputNumber v-model:value="cfg.detection.response_body_buffer" :min="1024" :max="1048576" :step="1024" class="w-40" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">响应体 DLP 检测的缓冲上限，默认 8192</span>
+        </NFormItem>
       </NForm>
     </NCard>
 
@@ -205,6 +244,10 @@ onMounted(load);
             <NInput v-model:value="uploadMimeText" type="textarea" :rows="2" placeholder="每行一个 Content-Type，如 application/x-php" />
             <p class="mt-1 text-xs text-[rgb(125,125,125)]">伪造后缀但类型命中黑名单同样拦截</p>
           </div>
+        </NFormItem>
+        <NFormItem label="落盘扫描字节数">
+          <NInputNumber v-model:value="cfg.upload.spooled_scan_bytes" :min="65536" :max="10485760" :step="65536" class="w-48" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">超大上传落临时文件时流式扫描文件前缀字节数，默认 512KB</span>
         </NFormItem>
       </NForm>
     </NCard>

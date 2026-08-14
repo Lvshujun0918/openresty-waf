@@ -9,6 +9,7 @@
 --   "redis"  推送到 Redis 列表（由后台消费落库）
 
 local storage = require "storage"
+local config  = require "config"
 local cjson   = require "cjson.safe"
 
 -- 查询 IP 归属（数据可用时；log 阶段微秒级，失败返回 nil 优雅降级）
@@ -63,6 +64,7 @@ local function build_event(ctx)
         req_id    = ctx.req_id or "",
         ts        = ngx.now(),
         client_ip = ctx.client_ip,
+        engine_version = config.version or "",
         method    = ctx.request and ctx.request.method,
         host      = ctx.request and ctx.request.host,
         uri       = ctx.request and ctx.request.uri,

@@ -28,6 +28,16 @@ func (h *ConfigHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"config": cfg})
 }
 
+// Versions GET /api/config/versions 版本健康信息（规则/配置/引擎版本）
+func (h *ConfigHandler) Versions(c *gin.Context) {
+	v, err := h.svc.Versions()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, v)
+}
+
 // Save PUT /api/config 保存并下发 WAF 配置
 func (h *ConfigHandler) Save(c *gin.Context) {
 	var req struct {

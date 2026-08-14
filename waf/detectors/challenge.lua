@@ -211,10 +211,12 @@ function _M.record(waf_ctx, action)
         return require("ip_region").lookup(client_ip)
     end)
     local evidence = (waf_ctx and waf_ctx.evidence) or {}
+    local config = require "config"
     local rec = {
         time       = os.date("%Y-%m-%dT%H:%M:%S") .. tz_offset(),
         req_id     = waf_ctx and waf_ctx.req_id or "",
         client_ip  = client_ip,
+        engine_version = config.version or "",
         action     = action,
         method     = waf_ctx and waf_ctx.request and waf_ctx.request.method or "",
         host       = waf_ctx and waf_ctx.request and waf_ctx.request.host or "",

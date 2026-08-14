@@ -153,6 +153,11 @@ export function saveConfig(config: Record<string, unknown>) {
   return request<{ status: string }>({ url: '/config', method: 'put', data: { config } });
 }
 
+/** 版本健康信息（规则/配置/引擎版本） */
+export function fetchConfigVersions() {
+  return request<{ engine_version: string; rule_version: string; config_version: string }>({ url: '/config/versions' });
+}
+
 /** 获取接入指引（一键安装命令 / 组件下载 / nginx 配置） */
 export function fetchSetupGuide() {
   return request<{

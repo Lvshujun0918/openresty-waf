@@ -74,6 +74,31 @@ func (s *WafConfigService) Save(cfg map[string]interface{}) error {
 	return nil
 }
 
+// Versions 版本健康信息：rule_version / config_version 来自 Redis
+// （后台下发的当前版本号）；engine_version 来自最近事件上报的引擎版本
+// （无事件时为空，代表引擎尚未上报）。
+func (s *WafConfigService) Versions() (map[string]string, error) {
+	out := map[string]string{
+		"engine_version": "",
+		"rule_version":   "",
+		"config_version": "",
+	}
+	rdb := s.mgr.GetClient()
+	if rdb != nil {
+		if v, err := rdb.Get(s.ctx, s.cfg.Rule.VersionKey).Result(); err == nil && v != "" {
+			out["rule_version"] = v
+		}
+		if v, err := rdb.Get(s.ctx, s.cfg.WAFConfig.VersionKey).Result(); err == nil && v != "" {
+			out["config_version"] = v
+		}
+	}
+	var ev model.Event
+	if err := s.db.Where("engine_version <> ''").Order("id desc").First(&ev).Error; err == nil {
+		out["engine_version"] = ev.EngineVersion
+	}
+	return out, nil
+}
+
 // defaultWafConfig 出厂默认配置（与 waf/config.lua 默认值一致，
 // 不含 redis 连接——该信息由部署引导 config_local.lua 提供）
 func defaultWafConfig() map[string]interface{} {
@@ -84,6 +109,9 @@ func defaultWafConfig() map[string]interface{} {
 			"exclude_paths":  []string{},
 			"geo":            true,
 			"paranoia_level": 1,
+			// 响应体检测缓冲上限（字节，默认 8KB）；检测 watchdog（毫秒，0 关闭）
+			"response_body_buffer": 8192,
+			"watchdog_ms":          10,
 			// 静态资源剪枝：命中后缀/前缀时跳过规则引擎检测（名单/CC/人机验证仍生效）
 			"skip_static": map[string]interface{}{
 				"ext": []string{".js", ".css", ".png", ".jpg", ".jpeg", ".gif",
@@ -130,6 +158,8 @@ h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
 			"enabled":   true,
 			"deny_ext":  []string{"php", "php3", "php5", "phtml", "jsp", "jspx", "asp", "aspx", "asa", "cer", "cgi", "pl", "sh", "py", "exe"},
 			"deny_mime": []string{"application/x-php", "application/x-httpd-php", "application/x-msdownload"},
+			// 请求体落临时文件时扫描文件前缀字节数（防超大上传绕过）
+			"spooled_scan_bytes": 524288,
 		},
 		"challenge": map[string]interface{}{
 			"enabled": true, "mode": "basic", "cookie_name": "waf_pass",
