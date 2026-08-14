@@ -161,7 +161,13 @@ if ruleset then
         local trigger = require "rule_engine.trigger"
         exempt = trigger.match_any("exempt", ctx)
     end
+    -- 静态资源剪枝：命中后缀/前缀白名单时跳过规则检测（名单/CC/人机验证仍生效）
+    local skip_static = false
     if not exempt then
+        skip_static = require("rule_engine.util").is_static_path(
+            ngx.var.uri, cfg.detection and cfg.detection.skip_static)
+    end
+    if not exempt and not skip_static then
         -- 先捕获请求头/请求体：engine.run 内部 BLOCK 动作会直接 ngx.exit(403)，
         -- 因此必须在检测前捕获证据，否则永远执行不到。
         pcall(capture_evidence, ctx)

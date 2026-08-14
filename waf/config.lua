@@ -43,6 +43,14 @@ _M.detection = {
     -- 豁免路径前缀（按前缀匹配）：命中时跳过规则引擎检测，
     -- 用于规避 JSON API 等场景的误报（IP 黑白名单 / CC 防刷 / 人机验证仍生效）
     exclude_paths = {},
+    -- 静态资源剪枝：命中后缀/前缀时跳过规则引擎检测（其余防护仍生效），
+    -- 大幅降低静态文件请求的检测开销
+    skip_static = {
+        ext = { ".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg",
+                ".ico", ".webp", ".avif", ".woff", ".woff2", ".ttf", ".eot",
+                ".map", ".mp3", ".mp4", ".webm" },
+        prefix = {},
+    },
     -- IP 地理信息：有 /opt/waf/ip2region.xdb 时记录国家/省市（log 阶段查询）
     geo = true,
 }

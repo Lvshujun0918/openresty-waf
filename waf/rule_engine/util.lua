@@ -36,4 +36,23 @@ function _M.try_parse_json(body, include_keys)
     return true, flatten(obj, include_keys)
 end
 
+-- 静态资源剪枝判断：路径命中配置的后缀/前缀时返回 true。
+-- 静态文件（图片/字体/JS/CSS 等）极少作为攻击载荷，命中时跳过规则引擎检测，
+-- 降低普通请求的检测开销（IP 名单 / CC / 人机验证等仍生效）。
+function _M.is_static_path(path, skip)
+    if not skip or type(path) ~= "string" then return false end
+    local p = path:lower()
+    for _, ext in ipairs(skip.ext or {}) do
+        if type(ext) == "string" and ext ~= "" and p:sub(-#ext) == ext then
+            return true
+        end
+    end
+    for _, pre in ipairs(skip.prefix or {}) do
+        if type(pre) == "string" and pre ~= "" and p:sub(1, #pre) == pre then
+            return true
+        end
+    end
+    return false
+end
+
 return _M

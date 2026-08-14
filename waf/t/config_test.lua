@@ -20,6 +20,7 @@ t.test("默认配置字段完整", function()
     t.eq(config.cc.ban_duration, 300)
     t.eq(config.challenge.mode, "basic")
     t.eq(config.challenge.cookie_name, "waf_pass")
+    t.ok(config.detection.skip_static.ext[1] == ".js")   -- 静态资源剪枝默认开启
     t.eq(config.block.status, 403)
     t.match(config.block.html, "访问被拒绝")
     t.eq(config.log.backend, "file")

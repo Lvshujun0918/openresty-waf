@@ -45,3 +45,22 @@ t.test("try_parse_json: include_keys 收集字段路径", function()
     t.ok(set["a"] and set["b.c"], "字段路径")
     t.ok(set["1"] and set["2"])
 end)
+
+t.test("is_static_path: 后缀匹配忽略大小写", function()
+    local skip = { ext = { ".js", ".png" }, prefix = {} }
+    t.ok(util.is_static_path("/assets/app.JS", skip))
+    t.ok(util.is_static_path("/img/logo.png?x=1", skip) == false, "带 query 的 uri 不受剪枝")
+    t.ok(util.is_static_path("/api/user", skip) == false)
+end)
+
+t.test("is_static_path: 前缀匹配", function()
+    local skip = { ext = {}, prefix = { "/static/" } }
+    t.ok(util.is_static_path("/static/css/site.css", skip))
+    t.ok(util.is_static_path("/api/static-file", skip) == false, "前缀需从路径头匹配")
+end)
+
+t.test("is_static_path: 空配置与异常输入不命中", function()
+    t.ok(util.is_static_path("/a.js", nil) == false)
+    t.ok(util.is_static_path("/a.js", {}) == false)
+    t.ok(util.is_static_path(nil, { ext = { ".js" } }) == false)
+end)
