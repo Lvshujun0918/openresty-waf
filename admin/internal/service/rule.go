@@ -75,7 +75,7 @@ func (s *RuleService) BuildRuleset() (*Ruleset, error) {
 		return nil, err
 	}
 	level := s.currentParanoiaLevel()
-	domains := s.siteDomains(rules)
+	meta := s.siteMeta(rules)
 	rs := &Ruleset{
 		Version: fmt.Sprintf("v%d", time.Now().UnixNano()),
 		Rules:   make([]map[string]interface{}, 0, len(rules)),
@@ -84,24 +84,34 @@ func (s *RuleService) BuildRuleset() (*Ruleset, error) {
 		if model.RuleParanoiaLevel(r.RuleID) > level {
 			continue // 高档位规则，当前档位不参与检测
 		}
-		er := s.toEngineRule(r)
-		if d, ok := domains[r.SiteID]; ok && d != "" {
-			er["site"] = d
+		if m, ok := meta[r.SiteID]; ok {
+			if !m.Enabled {
+				continue // 站点已停用：专属规则不下发
+			}
+			if m.Domain != "" {
+				er := s.toEngineRule(r)
+				er["site"] = m.Domain
+				rs.Rules = append(rs.Rules, er)
+				continue
+			}
 		}
-		rs.Rules = append(rs.Rules, er)
+		rs.Rules = append(rs.Rules, s.toEngineRule(r))
 	}
 	return rs, nil
 }
 
-// siteDomains 规则集涉及的站点 ID → 域名映射
-func (s *RuleService) siteDomains(rules []model.Rule) map[uint]string {
+// siteMeta 规则集涉及的站点 ID → {域名, 启用} 映射
+func (s *RuleService) siteMeta(rules []model.Rule) map[uint]struct {
+	Domain  string
+	Enabled bool
+} {
 	ids := []uint{}
 	for _, r := range rules {
 		if r.SiteID != 0 {
 			ids = append(ids, r.SiteID)
 		}
 	}
-	return NewSiteService(s.db).DomainsByIDs(ids)
+	return NewSiteService(s.db).SiteMeta(ids)
 }
 
 // currentParanoiaLevel 读取后台运行配置中的 CRS 偏执级别（1-4，缺省 1）

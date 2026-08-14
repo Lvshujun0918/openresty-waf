@@ -75,23 +75,26 @@ func TestSite_UpdateAndDelete(t *testing.T) {
 	}
 }
 
-func TestSite_DomainsByIDs(t *testing.T) {
+func TestSite_SiteMeta(t *testing.T) {
 	db := newTestDB(t)
 	svc := NewSiteService(db)
 	svc.Create(&model.Site{Name: "a", Domain: "a.com"})
-	svc.Create(&model.Site{Name: "b", Domain: "b.com"})
+	svc.Create(&model.Site{Name: "b", Domain: "b.com", Enabled: false})
 	var s1, s2 model.Site
 	db.Where("domain = ?", "a.com").First(&s1)
 	db.Where("domain = ?", "b.com").First(&s2)
 
-	m := svc.DomainsByIDs([]uint{s1.ID, s2.ID, 999})
-	if m[s1.ID] != "a.com" || m[s2.ID] != "b.com" {
-		t.Errorf("domains: %v", m)
+	m := svc.SiteMeta([]uint{s1.ID, s2.ID, 999})
+	if m[s1.ID].Domain != "a.com" || !m[s1.ID].Enabled {
+		t.Errorf("meta a: %+v", m[s1.ID])
+	}
+	if m[s2.ID].Domain != "b.com" || m[s2.ID].Enabled {
+		t.Errorf("meta b: %+v", m[s2.ID])
 	}
 	if len(m) != 2 {
 		t.Errorf("len = %d", len(m))
 	}
-	if len(svc.DomainsByIDs(nil)) != 0 {
+	if len(svc.SiteMeta(nil)) != 0 {
 		t.Error("nil ids")
 	}
 }

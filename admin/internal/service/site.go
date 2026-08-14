@@ -78,9 +78,16 @@ func (s *SiteService) Delete(id uint) error {
 	return s.db.Delete(&model.Site{}, id).Error
 }
 
-// DomainsByIDs 批量查询站点域名（BuildRuleset 下发时写入规则 site 字段）
-func (s *SiteService) DomainsByIDs(ids []uint) map[uint]string {
-	out := map[uint]string{}
+// SiteMeta 批量查询站点元信息（ID → 域名 + 启用状态），BuildRuleset 下发时使用：
+// 停用站点的专属规则不下发。
+func (s *SiteService) SiteMeta(ids []uint) map[uint]struct {
+	Domain  string
+	Enabled bool
+} {
+	out := map[uint]struct {
+		Domain  string
+		Enabled bool
+	}{}
 	if len(ids) == 0 {
 		return out
 	}
@@ -89,7 +96,10 @@ func (s *SiteService) DomainsByIDs(ids []uint) map[uint]string {
 		return out
 	}
 	for _, st := range sites {
-		out[st.ID] = st.Domain
+		out[st.ID] = struct {
+			Domain  string
+			Enabled bool
+		}{st.Domain, st.Enabled}
 	}
 	return out
 }
