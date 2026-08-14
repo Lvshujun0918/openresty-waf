@@ -83,3 +83,52 @@ end)
 t.test("apply: 未知变换名跳过", function()
     t.eq(transforms.apply("abc", { "no_such_transform" }), "abc")
 end)
+
+-- ========== 编码解码（base64 / hex / html_entity） ==========
+
+t.test("base64_decode: 解码疑似 base64 串", function()
+    -- "union select" 的 base64：dW5pb24gc2VsZWN0
+    t.eq(transforms.apply("dW5pb24gc2VsZWN0", { "base64_decode" }), "union select")
+    -- "<script>" 的 base64：PHNjcmlwdD4=
+    t.eq(transforms.apply("PHNjcmlwdD4=", { "base64_decode" }), "<script>")
+end)
+
+t.test("base64_decode: 非 base64 文本不解码（护栏）", function()
+    t.eq(transforms.apply("hello world", { "base64_decode" }), "hello world")
+    t.eq(transforms.apply("a=b&c=d", { "base64_decode" }), "a=b&c=d")
+    t.eq(transforms.apply(nil, { "base64_decode" }), "")
+end)
+
+t.test("base64_decode: 长度非 4 倍数不解码", function()
+    t.eq(transforms.apply("abcde", { "base64_decode" }), "abcde")
+end)
+
+t.test("hex_decode: 解码 hex 串", function()
+    t.eq(transforms.apply("3c7363726970743e", { "hex_decode" }), "<script>")
+    t.eq(transforms.apply("756e696f6e", { "hex_decode" }), "union")
+end)
+
+t.test("hex_decode: 非 hex 文本不解码", function()
+    t.eq(transforms.apply("hello", { "hex_decode" }), "hello")
+    t.eq(transforms.apply("abc", { "hex_decode" }), "abc")  -- 奇数长度
+    t.eq(transforms.apply(nil, { "hex_decode" }), "")
+end)
+
+t.test("html_entity_decode: 命名与数字实体", function()
+    t.eq(transforms.apply("&lt;script&gt;alert(1)&lt;/script&gt;", { "html_entity_decode" }),
+         "<script>alert(1)</script>")
+    t.eq(transforms.apply("&#60;img&#62;", { "html_entity_decode" }), "<img>")
+    t.eq(transforms.apply("&#x3c;svg&#x3e;", { "html_entity_decode" }), "<svg>")
+end)
+
+t.test("html_entity_decode: 无实体/非法实体保持原样", function()
+    t.eq(transforms.apply("plain text", { "html_entity_decode" }), "plain text")
+    t.eq(transforms.apply("&unknown;", { "html_entity_decode" }), "&unknown;")
+    t.eq(transforms.apply(nil, { "html_entity_decode" }), "")
+end)
+
+t.test("is_valid: 新解码变换可校验", function()
+    t.ok(transforms.is_valid("base64_decode"))
+    t.ok(transforms.is_valid("hex_decode"))
+    t.ok(transforms.is_valid("html_entity_decode"))
+end)
