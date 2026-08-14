@@ -4,7 +4,8 @@
 -- 支持特性：
 --   - phase 过滤（access / header_filter / body_filter / log）
 --   - 变量提取 + 变换链 + 运算符匹配
---   - action.skip_after 规则跳转（链式规则后续可扩展 chain 支持）
+--   - action.skip_after 规则跳转
+--   - action.chain 链式规则（父规则命中后紧随规则须连续命中，链尾才执行动作）
 --   - SCORE 异常分累计与阈值阻断
 --   - 命中结果缓存到 ctx.matched（由 log 阶段统一写日志）
 
@@ -32,6 +33,37 @@ local function match_rule(rule, waf_ctx)
     return false
 end
 
+-- 记录单条规则命中（日志由 log 阶段统一落盘）
+local function record_hit(waf_ctx, rule)
+    waf_ctx.matched[#waf_ctx.matched + 1] = {
+        id       = rule.id,
+        group    = rule.group,
+        msg      = rule.actions and rule.actions.msg,
+        severity = rule.severity,
+    }
+end
+
+-- 应用单条规则动作：SCORE 累计异常分 / 其余收集后仲裁；
+-- 返回 skip_after 跳转增量（0 表示不跳转）
+local function apply_action(waf_ctx, rule, hits)
+    local action = rule.actions or {}
+    local disrupt = action.disrupt
+    if disrupt == "SCORE" then
+        waf_ctx.score = (waf_ctx.score or 0) + (tonumber(action.value) or 1)
+    elseif disrupt and disrupt ~= "LOG_ONLY" then
+        -- 其余动作（BLOCK/DROP/ALLOW/ACCEPT/REDIRECT）收集后仲裁
+        hits[#hits + 1] = {
+            actions  = action,
+            salience = tonumber(rule.salience) or 10,
+        }
+    end
+    local skip = tonumber(action.skip_after)
+    if skip and skip > 0 then
+        return skip
+    end
+    return 0
+end
+
 -- 执行一个规则集（当前阶段）
 -- 返回 "blocked" / "accepted" / "matched" / nil
 -- 动作仲裁：收集全部命中 → 高 salience 优先；同级按 拦截 > 放行 > 记录。
@@ -46,46 +78,67 @@ function _M.run(ruleset, phase, waf_ctx)
     local i, n = 1, #rules
     -- 命中动作收集（仲裁用）
     local hits = {}
+    -- chain 链式状态（ModSecurity 语义）：
+    --   - 链成员（含链尾）均带 actions.chain=true，链尾同时携带实际动作
+    --     （disrupt 非空且非 SCORE/LOG_ONLY）；成员必须紧随排列。
+    --   - 链首命中开启链；后续成员连续命中则继续，链尾命中执行动作并记录整条链；
+    --   - 任一成员未命中/被禁用 → 链中断，后续成员整体跳过，
+    --     直到出现不带 chain 的普通规则后重置。
+    local chain = nil        -- 进行中的链 { ids = {...} }
+    local chain_broken = false
 
     while i <= n do
         local rule = rules[i]
+        local eligible = rule.enabled and (not rule.phase or rule.phase == phase)
+        local action = rule.actions or {}
+        local is_member = action.chain == true
+        local disrupt = action.disrupt
+        local has_disrupt = disrupt ~= nil and disrupt ~= "SCORE" and disrupt ~= "LOG_ONLY"
+        local skip = 0
 
-        if rule.enabled and (not rule.phase or rule.phase == phase) then
-            if match_rule(rule, waf_ctx) then
-                -- 记录命中（日志由 log 阶段统一落盘）
-                waf_ctx.matched[#waf_ctx.matched + 1] = {
-                    id       = rule.id,
-                    group    = rule.group,
-                    msg      = rule.actions and rule.actions.msg,
-                    severity = rule.severity,
-                }
-
-                local action = rule.actions or {}
-                local disrupt = action.disrupt
-
-                -- SCORE：累计异常分，不参与动作仲裁（最后阈值判定）
-                if disrupt == "SCORE" then
-                    waf_ctx.score = (waf_ctx.score or 0) + (tonumber(action.value) or 1)
-                elseif disrupt and disrupt ~= "LOG_ONLY" then
-                    -- 其余动作（BLOCK/DROP/ALLOW/ACCEPT/REDIRECT）收集后仲裁
-                    hits[#hits + 1] = {
-                        actions  = action,
-                        salience = tonumber(rule.salience) or 10,
-                    }
-                end
-
-                -- 跳转处理
-                if action.skip_after then
-                    i = i + tonumber(action.skip_after)
+        if is_member then
+            if chain_broken then
+                -- 链已断：跳过后续成员
+            elseif chain then
+                if eligible and match_rule(rule, waf_ctx) then
+                    if has_disrupt then
+                        -- 链尾：记录整条链（此前成员 + 链尾自身）并执行尾规则动作
+                        for _, id in ipairs(chain.ids) do
+                            record_hit(waf_ctx, { id = id, group = rule.group, severity = rule.severity })
+                        end
+                        chain = nil
+                        record_hit(waf_ctx, rule)
+                        skip = apply_action(waf_ctx, rule, hits)
+                    else
+                        chain.ids[#chain.ids + 1] = rule.id
+                    end
                 else
-                    i = i + 1
+                    chain, chain_broken = nil, true  -- 链中断
                 end
             else
-                i = i + 1
+                -- 链首：正常评估
+                if eligible and match_rule(rule, waf_ctx) then
+                    chain = { ids = { rule.id } }
+                    if has_disrupt then
+                        -- 单成员链（链尾即链首）：直接记录并执行
+                        chain = nil
+                        record_hit(waf_ctx, rule)
+                        skip = apply_action(waf_ctx, rule, hits)
+                    end
+                else
+                    chain_broken = true  -- 链首未命中：后续成员跳过
+                end
             end
         else
-            i = i + 1
+            if eligible and match_rule(rule, waf_ctx) then
+                record_hit(waf_ctx, rule)
+                skip = apply_action(waf_ctx, rule, hits)
+            end
+            -- 普通规则重置链状态（链块到此结束）
+            chain, chain_broken = nil, false
         end
+
+        i = i + (skip > 0 and skip or 1)
     end
 
     -- 动作仲裁：最高 salience 的命中集内，按 拦截(3) > 放行(2) > 记录(1) 取最终动作

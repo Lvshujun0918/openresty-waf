@@ -225,6 +225,65 @@ t.test("body_filter 阶段 BLOCK 仅标记 response_block", function()
     t.ok(ctx.response_block ~= nil, "应标记替换响应体")
 end)
 
+-- chain 链式规则（ModSecurity 语义）：成员（含链尾）均带 chain=true，
+-- 链尾同时携带实际动作；链首命中后成员须连续命中，任一中断则整链丢弃。
+
+local function chain_rules()
+    return {
+        rules = {
+            rule({ id = "c1", vars = { { type = "URI_ARGS", specific = "a" } },
+                   pattern = "union", actions = { chain = true } }),
+            rule({ id = "c2", vars = { { type = "URI_ARGS", specific = "b" } },
+                   pattern = "sleep", actions = { chain = true, disrupt = "BLOCK", status = 403 } }),
+        },
+    }
+end
+
+t.test("chain: 父子连续命中才执行链尾动作", function()
+    ngx_reset()
+    ngx.req._args = { a = "union select", b = "sleep(5)" }
+    local ctx = { mode = "active" }
+    t.exits(function() engine.run(chain_rules(), "access", ctx) end, 403)
+    t.eq(#ctx.matched, 2, "整条链记录")
+    t.eq(ctx.matched[1].id, "c1")
+    t.eq(ctx.matched[2].id, "c2")
+end)
+
+t.test("chain: 链尾未命中则不动作不记录", function()
+    ngx_reset()
+    ngx.req._args = { a = "union select" }
+    local ctx = { mode = "active" }
+    local res = engine.run(chain_rules(), "access", ctx)
+    t.isnil(res)
+    t.eq(#ctx.matched, 0, "链中断丢弃")
+end)
+
+t.test("chain: 链首未命中时后续成员整体跳过", function()
+    ngx_reset()
+    ngx.req._args = { b = "sleep(5)" }
+    local ctx = { mode = "active" }
+    local res = engine.run(chain_rules(), "access", ctx)
+    t.isnil(res, "链首未命中，成员不得独立触发")
+    t.eq(#ctx.matched, 0)
+end)
+
+t.test("chain: 普通规则重置链状态，后续成员重新作为链首", function()
+    ngx_reset()
+    ngx.req._args = { b = "sleep(5)" }
+    local rs = {
+        rules = {
+            rule({ id = "c1", vars = { { type = "URI_ARGS", specific = "a" } },
+                   pattern = "union", actions = { chain = true } }),
+            rule({ id = "gap", enabled = false }),
+            rule({ id = "c2", vars = { { type = "URI_ARGS", specific = "b" } },
+                   pattern = "sleep", actions = { chain = true, disrupt = "BLOCK", status = 403 } }),
+        },
+    }
+    local ctx = { mode = "active" }
+    -- c1 未命中（a 缺失）；gap 普通规则重置；c2 作为新链首命中并带动作 → 403
+    t.exits(function() engine.run(rs, "access", ctx) end, 403)
+end)
+
 -- fail-open 机制：BLOCK/DROP 在 ngx.exit 前标记 _exited，外层据此区分拦截与异常
 t.test("BLOCK 动作 exit 前标记 _exited", function()
     ngx_reset()
