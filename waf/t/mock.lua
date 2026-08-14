@@ -41,6 +41,8 @@ end
 local function new_dict()
     local store, expires = {}, {}
     local dict = {}
+    -- 测试钩子：置 true 模拟 lua_shared_dict 写满（set 返回 nil, "no memory"）
+    dict._fail_set = false
     function dict:get(k)
         local v = store[k]
         if v == nil then return nil end
@@ -51,6 +53,9 @@ local function new_dict()
         return v
     end
     function dict:set(k, v, exptime)
+        if self._fail_set then
+            return nil, "no memory"
+        end
         if v == nil then
             store[k], expires[k] = nil, nil
             return true
@@ -79,6 +84,7 @@ local function new_dict()
     end
     function dict:flush_all()
         store, expires = {}, {}
+        self._fail_set = false
     end
     -- 测试钩子：强制将 key 置为已过期（模拟 TTL 到期）
     function dict:_expire_at(k, ts)

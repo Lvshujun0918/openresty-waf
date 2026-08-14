@@ -58,11 +58,22 @@ function _M.validate_ruleset(ruleset)
 end
 
 -- 将当前配置广播到共享内存（供各阶段模块读取，避免重复 require 各自持有旧值）
+-- 写入失败重试 3 次（间隔 100ms，init 阶段可用 ngx.sleep）；仍失败仅告警，
+-- 各阶段模块会回退读取 config.lua 默认值，不影响业务。
 local function publish_config()
-    local ok, err = storage.set_shared(config.dict.rules, CONFIG_KEY,
-                                      storage.encode(config))
-    if not ok then
-        log(ngx.WARN, "发布配置到共享内存失败: " .. tostring(err))
+    for attempt = 1, 3 do
+        local ok, err = storage.set_shared(config.dict.rules, CONFIG_KEY,
+                                          storage.encode(config))
+        if ok then
+            return
+        end
+        if attempt < 3 then
+            log(ngx.WARN, "发布配置到共享内存失败（第 " .. attempt .. " 次）: "
+                .. tostring(err) .. "，100ms 后重试")
+            ngx.sleep(0.1)
+        else
+            log(ngx.ERR, "发布配置到共享内存失败: " .. tostring(err))
+        end
     end
 end
 
@@ -117,7 +128,9 @@ local function refresh_rules()
     if ok1 and ok2 then
         log(ngx.INFO, "规则集已热更新至版本: " .. tostring(version))
     else
-        log(ngx.WARN, "规则集热更新写入失败: " .. tostring(ok1) .. "/" .. tostring(ok2))
+        -- 版本键未写入成功 → 下个轮询周期自动重试（写入顺序保证不会读到中间态）
+        log(ngx.WARN, "规则集热更新写入失败: " .. tostring(ok1) .. "/" .. tostring(ok2)
+            .. "，将在下个轮询周期重试")
     end
 end
 
@@ -163,7 +176,8 @@ local function refresh_config()
     if ok1 and ok2 then
         log(ngx.INFO, "配置已热更新至版本: " .. tostring(version))
     else
-        log(ngx.WARN, "配置热更新写入失败: " .. tostring(ok1) .. "/" .. tostring(ok2))
+        log(ngx.WARN, "配置热更新写入失败: " .. tostring(ok1) .. "/" .. tostring(ok2)
+            .. "，将在下个轮询周期重试")
     end
 end
 
@@ -205,7 +219,8 @@ local function refresh_trigger_rules()
     if ok1 and ok2 then
         log(ngx.INFO, "触发规则集已热更新至版本: " .. tostring(version))
     else
-        log(ngx.WARN, "触发规则集热更新写入失败: " .. tostring(ok1) .. "/" .. tostring(ok2))
+        log(ngx.WARN, "触发规则集热更新写入失败: " .. tostring(ok1) .. "/" .. tostring(ok2)
+            .. "，将在下个轮询周期重试")
     end
 end
 

@@ -100,7 +100,12 @@ function _M.check(waf_ctx, cfg, rate, ban_duration)
     if n and n >= count then
         -- 触发封禁（IP 级）
         local ban_key = (cfg.cc.ban_key_prefix or "waf:cc:ban:") .. ip
-        storage.set_shared(config.dict.counter, ban_key, ngx.time(), ban_duration)
+        local ok, serr = storage.set_shared(config.dict.counter, ban_key, ngx.time(), ban_duration)
+        if not ok then
+            -- 共享字典写满降级：封禁状态写不进去时仍拦截本次请求，
+            -- 并告警（下一请求会再次尝试写入；计数键仍能正常读，不影响限流本身）
+            ngx.log(ngx.ERR, "[waf] CC 封禁写入共享内存失败（字典可能已满）: ", tostring(serr))
+        end
         return "banned"
     end
 

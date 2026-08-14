@@ -134,3 +134,17 @@ t.test("全局阈值生效", function()
     cc.check(ctx, cfg)
     t.eq(cc.check(ctx, cfg), "banned", "default rate 3")
 end)
+
+t.test("共享字典写满：封禁写入失败仍拦截不崩溃", function()
+    ngx_reset()
+    local cfg = base_cfg()
+    cfg.cc.rate = "2/60"
+    local ctx = { client_ip = "9.9.9.9", request = { host = "h.com", path = "/p" } }
+    cc.check(ctx, cfg)  -- 计数 1
+    ngx.shared.waf_counter._fail_set = true
+    -- 达到阈值：ban 写入失败（告警），但本次请求仍拦截
+    t.eq(cc.check(ctx, cfg), "banned", "写满时仍拦截本次请求")
+    -- 封禁键未写入 → 后续请求按计数已达阈值继续拦截，且不崩溃
+    t.eq(cc.check(ctx, cfg), "banned")
+    ngx.shared.waf_counter._fail_set = false
+end)
