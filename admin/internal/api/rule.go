@@ -135,3 +135,27 @@ func (h *RuleHandler) Publish(c *gin.Context) {
 		"status": "ok", "version": rs.Version, "rule_count": len(rs.Rules),
 	})
 }
+
+// PublishHistory GET /api/rules/publish-history  发布历史列表（新→旧）
+func (h *RuleHandler) PublishHistory(c *gin.Context) {
+	list, err := h.svc.ListPublishHistory()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, list)
+}
+
+// Rollback POST /api/rules/rollback/:id  回滚到指定发布历史快照
+func (h *RuleHandler) Rollback(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
+		return
+	}
+	if err := h.svc.Rollback(uint(id)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "回滚失败: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}

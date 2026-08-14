@@ -18,9 +18,11 @@ import {
 import {
   createRule,
   deleteRule,
+  fetchPublishHistory,
   fetchRules,
   fetchSites,
   publishRules,
+  rollbackRules,
   setRuleEnabled,
   testRule,
   updateRule
@@ -91,6 +93,59 @@ async function remove(row: Api.Waf.Rule) {
 async function doPublish() {
   const res = await publishRules();
   window.$message?.success('规则已发布，引擎 5 秒内热更新生效');
+}
+
+// —— 发布历史与回滚 ——
+const historyOpen = ref(false);
+const historyLoading = ref(false);
+const rollingBackId = ref<number | null>(null);
+const history = ref<Api.Waf.PublishHistory[]>([]);
+
+function formatTime(t: string) {
+  return t.replace('T', ' ').replace(/\.\d+/, '').replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+}
+
+const historyColumns = [
+  { title: '版本', key: 'version', width: 100, render: (row: Api.Waf.PublishHistory) => h('span', { class: 'font-mono text-xs' }, `#${row.version}`) },
+  { title: '规则数', key: 'rule_count', width: 80 },
+  { title: '发布时间', key: 'created_at', render: (row: Api.Waf.PublishHistory) => h('span', { class: 'text-xs' }, formatTime(row.created_at)) },
+  {
+    title: '操作',
+    key: 'action',
+    width: 90,
+    render: (row: Api.Waf.PublishHistory) =>
+      h(
+        NPopconfirm,
+        { onPositiveClick: () => doRollback(row) },
+        {
+          trigger: () =>
+            h(NButton, { size: 'small', quaternary: true, type: 'warning', loading: rollingBackId.value === row.id }, { default: () => '回滚' }),
+          default: () => `回滚到版本 #${row.version}？将重新下发该版本的规则集`
+        }
+      )
+  }
+];
+
+async function loadHistory() {
+  historyLoading.value = true;
+  try {
+    const res = await fetchPublishHistory();
+    history.value = res.data ?? [];
+  } finally {
+    historyLoading.value = false;
+  }
+}
+
+async function doRollback(row: Api.Waf.PublishHistory) {
+  rollingBackId.value = row.id;
+  try {
+    await rollbackRules(row.id);
+    window.$message?.success(`已回滚到版本 #${row.version}，引擎 5 秒内热更新生效`);
+    await loadHistory();
+    await load();
+  } finally {
+    rollingBackId.value = null;
+  }
 }
 
 // —— 编辑表单 ——
@@ -247,6 +302,7 @@ onMounted(() => {
         <p class="text-sm text-[rgb(125,125,125)]">共 {{ filterRules.length }} 条 · 发布后引擎 5 秒内热更新生效</p>
       </div>
       <NSpace>
+        <NButton secondary @click="historyOpen = true; loadHistory()">发布历史</NButton>
         <NButton secondary type="warning" @click="doPublish">发布到引擎</NButton>
         <NButton type="primary" @click="openCreate">新建规则</NButton>
       </NSpace>
@@ -283,6 +339,12 @@ onMounted(() => {
           <NButton type="primary" :loading="saving" @click="save">保存</NButton>
         </NSpace>
       </template>
+    </NModal>
+
+    <!-- 发布历史 -->
+    <NModal v-model:show="historyOpen" preset="card" title="发布历史与回滚" class="w-[min(96vw,640px)]">
+      <p class="mb-3 text-xs text-[rgb(125,125,125)]">每次发布保存完整规则集快照，回滚后引擎按新版本号热更新（版本单调递增，可在发布历史中持续追踪）</p>
+      <NDataTable :columns="historyColumns" :data="history" :loading="historyLoading" :bordered="false" size="small" />
     </NModal>
 
     <!-- 规则测试 -->

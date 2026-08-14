@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"testing"
 
 	"openresty-waf/admin/internal/model"
@@ -261,4 +262,64 @@ func TestRuleService_Publish(t *testing.T) {
 	if err != nil || body == "" {
 		t.Errorf("ruleset key missing: %v", err)
 	}
+}
+
+func TestRuleService_PublishHistoryAndRollback(t *testing.T) {
+	db := newTestDB(t)
+	_, mgr := newTestRedis(t)
+	s := NewRuleService(db, mgr, newTestConfig())
+
+	// 第一次发布：1 条规则
+	db.Create(&model.Rule{RuleID: "1", Operator: "REGEX", Pattern: "a", Enabled: true})
+	rs1, err := s.Publish()
+	if err != nil {
+		t.Fatalf("publish #1: %v", err)
+	}
+	// 修改后再发布：2 条规则
+	db.Create(&model.Rule{RuleID: "2", Operator: "REGEX", Pattern: "b", Enabled: true})
+	if _, err := s.Publish(); err != nil {
+		t.Fatalf("publish #2: %v", err)
+	}
+
+	list, err := s.ListPublishHistory()
+	if err != nil {
+		t.Fatalf("list history: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("expected 2 history entries, got %d", len(list))
+	}
+	if list[0].Version <= list[1].Version {
+		t.Errorf("history order: newest first expected")
+	}
+	if list[1].RuleCount != 1 {
+		t.Errorf("first publish should contain 1 rule, got %d", list[1].RuleCount)
+	}
+
+	// 回滚到第一条历史（1 条规则）
+	if err := s.Rollback(list[1].ID); err != nil {
+		t.Fatalf("rollback: %v", err)
+	}
+	got, _ := s.mgr.GetClient().Get(s.ctx, "waf:rule:ruleset").Result()
+	var rs Ruleset
+	if err := json.Unmarshal([]byte(got), &rs); err != nil {
+		t.Fatalf("rolled back ruleset invalid: %v", err)
+	}
+	if len(rs.Rules) != 1 {
+		t.Fatalf("rollback should restore 1 rule, got %d", len(rs.Rules))
+	}
+	// 回滚也记录历史（共 3 条）
+	list, _ = s.ListPublishHistory()
+	if len(list) != 3 {
+		t.Errorf("rollback should append history, got %d", len(list))
+	}
+	// 版本号单调递增
+	ver, _ := s.mgr.GetClient().Get(s.ctx, "waf:rule:version").Int64()
+	if ver != 3 {
+		t.Errorf("expected version 3 after publish+rollback, got %d", ver)
+	}
+	// 回滚不存在的记录报错
+	if err := s.Rollback(9999); err == nil {
+		t.Error("expected error rolling back non-existent history")
+	}
+	_ = rs1
 }

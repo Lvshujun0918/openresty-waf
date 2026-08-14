@@ -61,6 +61,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.PATCH("/rules/:id/enabled", ruleHandler.SetEnabled)
 			authed.POST("/rules/publish", ruleHandler.Publish)
 			authed.POST("/rules/test", ruleHandler.Test)
+			authed.GET("/rules/publish-history", ruleHandler.PublishHistory)
+			authed.POST("/rules/rollback/:id", ruleHandler.Rollback)
 
 			// IP 列表订阅（远程威胁情报 IP 列表）
 			authed.GET("/ip-list-subs", ipListHandler.List)

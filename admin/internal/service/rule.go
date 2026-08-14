@@ -133,8 +133,17 @@ func (s *RuleService) currentParanoiaLevel() int {
 	return 1
 }
 
-// Publish 发布规则集到 Redis，并自增版本号触发 Lua 引擎热更新。
-// 与 waf/config.lua 的 rule_refresh 键约定保持一致。
+// publishScript 原子下发规则集并自增版本号：
+//   KEYS[1]=规则集键，KEYS[2]=版本键，ARGV[1]=规则集 JSON
+// 先 SET 规则集再 INCR 版本，保证引擎读到新版本时规则集已就绪；
+// 返回新版本号（数字，Lua 引擎侧做单调校验）。
+const publishScript = `redis.call('SET', KEYS[1], ARGV[1]) return redis.call('INCR', KEYS[2])`
+
+// historyKeep 每类发布历史保留条数
+const historyKeep = 10
+
+// Publish 发布规则集到 Redis：原子 SET+INCR 版本，触发 Lua 引擎热更新。
+// 发布前保存历史快照（保留最近 10 条，供一键回滚）。
 func (s *RuleService) Publish() (*Ruleset, error) {
 	rdb := s.mgr.GetClient()
 	if rdb == nil {
@@ -148,13 +157,57 @@ func (s *RuleService) Publish() (*Ruleset, error) {
 	if err != nil {
 		return nil, err
 	}
-	pipe := rdb.TxPipeline()
-	pipe.Set(s.ctx, s.cfg.Rule.RulesetKey, string(body), 0)
-	pipe.Incr(s.ctx, s.cfg.Rule.VersionKey)
-	if _, err := pipe.Exec(s.ctx); err != nil {
+	v, err := rdb.Eval(s.ctx, publishScript,
+		[]string{s.cfg.Rule.RulesetKey, s.cfg.Rule.VersionKey}, string(body)).Int64()
+	if err != nil {
 		return nil, err
 	}
+	rs.Version = fmt.Sprintf("%d", v)
+	s.saveHistory("rules", rs.Version, string(body), len(rs.Rules))
 	return rs, nil
+}
+
+// saveHistory 保存发布历史并裁剪到最近 historyKeep 条（裁剪失败不影响发布）
+func (s *RuleService) saveHistory(kind, version, content string, ruleCount int) {
+	h := model.PublishHistory{
+		Kind: kind, Version: version, Content: content, RuleCount: ruleCount,
+	}
+	if err := s.db.Create(&h).Error; err != nil {
+		return
+	}
+	var ids []uint
+	_ = s.db.Model(&model.PublishHistory{}).Where("kind = ?", kind).
+		Order("id desc").Offset(historyKeep).Limit(1000).Pluck("id", &ids).Error
+	if len(ids) > 0 {
+		_ = s.db.Where("id IN ?", ids).Delete(&model.PublishHistory{}).Error
+	}
+}
+
+// ListPublishHistory 发布历史列表（新→旧，最近 historyKeep 条；不含完整内容）
+func (s *RuleService) ListPublishHistory() ([]model.PublishHistory, error) {
+	var list []model.PublishHistory
+	err := s.db.Where("kind = ?", "rules").Order("id desc").Limit(historyKeep).Find(&list).Error
+	return list, err
+}
+
+// Rollback 回滚到指定历史快照：重新下发该版本规则集并自增版本号
+// （版本单调递增，引擎按新版本加载旧内容，回滚本身也记录历史）。
+func (s *RuleService) Rollback(id uint) error {
+	rdb := s.mgr.GetClient()
+	if rdb == nil {
+		return errors.New("Redis 未配置，请先在引导页完成 Redis 配置")
+	}
+	var h model.PublishHistory
+	if err := s.db.Where("id = ? AND kind = ?", id, "rules").First(&h).Error; err != nil {
+		return errors.New("发布记录不存在")
+	}
+	v, err := rdb.Eval(s.ctx, publishScript,
+		[]string{s.cfg.Rule.RulesetKey, s.cfg.Rule.VersionKey}, h.Content).Int64()
+	if err != nil {
+		return err
+	}
+	s.saveHistory("rules", fmt.Sprintf("%d", v), h.Content, h.RuleCount)
+	return nil
 }
 
 // GetByRuleID 按规则 ID 查询单条规则（规则测试用）

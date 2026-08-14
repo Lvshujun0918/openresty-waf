@@ -194,5 +194,14 @@ declare namespace Api {
       body: string;
       content_type: string;
     }
+
+    /** 规则发布历史（支持一键回滚） */
+    interface PublishHistory {
+      id: number;
+      kind: string;
+      version: string;
+      rule_count: number;
+      created_at: string;
+    }
   }
 }

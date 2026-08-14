@@ -78,6 +78,16 @@ export function publishRules() {
   return request<{ status: string }>({ url: '/rules/publish', method: 'post' });
 }
 
+/** 规则发布历史 */
+export function fetchPublishHistory() {
+  return request<Api.Waf.PublishHistory[]>({ url: '/rules/publish-history' });
+}
+
+/** 回滚到指定发布历史快照 */
+export function rollbackRules(id: number) {
+  return request<{ status: string }>({ url: `/rules/rollback/${id}`, method: 'post' });
+}
+
 /** 站点列表 */
 export function fetchSites() {
   return request<Api.Waf.Site[]>({ url: '/sites' });
