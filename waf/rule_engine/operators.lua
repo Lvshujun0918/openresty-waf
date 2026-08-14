@@ -112,6 +112,11 @@ local operators = {
     --     由规则自身 pattern 显式限定 ASCII 字符范围，避免对 UTF-8 中文误报。
     REGEX = function(value, pattern, compiled)
         if value == nil then return false end
+        -- 护栏：超长 pattern 直接不匹配（正常规则上限 32KB，与后台校验一致）
+        if type(pattern) == "string" and #pattern > 32768 then
+            ngx.log(ngx.WARN, "[waf] 正则 pattern 过长，跳过匹配（长度 ", #pattern, "）")
+            return false
+        end
         if compiled then
             local from, _, err = compiled:find(tostring(value))
             if err then

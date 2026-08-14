@@ -192,6 +192,12 @@ t.test("CIDR IPv6: 非法输入不匹配", function()
     t.no(operators.eval("CIDR", "2001:db8::1", "2001:db8::/129"))
 end)
 
+t.test("REGEX: 超长 pattern 护栏直接不匹配", function()
+    local long = string.rep("a", 32769)
+    t.no(operators.eval("REGEX", "aaa", long), "超过 32KB 的 pattern 不执行匹配")
+    t.ok(operators.eval("REGEX", "aaa", "aaa"), "正常长度不受影响")
+end)
+
 t.test("CIDR IPv6: 前缀边界", function()
     t.ok(operators.eval("CIDR", "fe80::1", "fe80::/10"))
     t.no(operators.eval("CIDR", "ff02::1", "fe80::/10"))

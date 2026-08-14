@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"openresty-waf/admin/internal/model"
@@ -261,6 +262,35 @@ func TestRuleService_Publish(t *testing.T) {
 	body, err := mr.Get("waf:rule:ruleset")
 	if err != nil || body == "" {
 		t.Errorf("ruleset key missing: %v", err)
+	}
+}
+
+func TestRuleService_validateRule(t *testing.T) {
+	s := NewRuleService(newTestDB(t), nil, newTestConfig())
+
+	// 非法运算符拒绝
+	if err := s.validateRule(&model.Rule{RuleID: "1", Operator: "BOGUS", Pattern: "a"}); err == nil {
+		t.Error("expected error for unknown operator")
+	}
+	// 合法运算符通过（含语义运算符）
+	for _, op := range []string{"REGEX", "PM", "CIDR", "EXISTS", "LIBINJECTION_SQLI", "LIBINJECTION_XSS"} {
+		if err := s.validateRule(&model.Rule{RuleID: "1", Operator: op, Pattern: "a"}); err != nil {
+			t.Errorf("operator %s should pass: %v", op, err)
+		}
+	}
+	// 超长 pattern 拒绝（> 32KB）
+	long := strings.Repeat("a", 32769)
+	if err := s.validateRule(&model.Rule{RuleID: "1", Operator: "REGEX", Pattern: long}); err == nil {
+		t.Error("expected error for overlong pattern")
+	}
+	// 长 CRS 正则（<= 32KB）通过
+	crs := strings.Repeat("a", 32768)
+	if err := s.validateRule(&model.Rule{RuleID: "1", Operator: "REGEX", Pattern: crs}); err != nil {
+		t.Errorf("32KB pattern should pass: %v", err)
+	}
+	// 空字段拒绝
+	if err := s.validateRule(&model.Rule{RuleID: "", Operator: "REGEX", Pattern: "a"}); err == nil {
+		t.Error("expected error for empty rule_id")
 	}
 }
 

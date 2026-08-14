@@ -239,9 +239,34 @@ func (s *RuleService) List(group, siteID, keyword string) ([]model.Rule, error) 
 	return rules, nil
 }
 
-func (s *RuleService) Create(r *model.Rule) error {
+// validOperators 引擎支持的运算符白名单（与 waf/rule_engine/operators.lua 保持一致）
+var validOperators = map[string]bool{
+	"REGEX": true, "PM": true, "EQUALS": true, "CONTAINS": true, "CIDR": true,
+	"STARTS_WITH": true, "ENDS_WITH": true, "EXISTS": true,
+	"LIBINJECTION_SQLI": true, "LIBINJECTION_XSS": true,
+}
+
+// maxPatternLen 规则 pattern 长度上限（字节）：容纳长 CRS 正则（可达 10KB+），
+// 同时防止异常巨型 pattern 拖慢引擎编译与执行。
+const maxPatternLen = 32768
+
+// validateRule 规则静态校验：运算符白名单 + pattern 长度护栏
+func (s *RuleService) validateRule(r *model.Rule) error {
 	if r.RuleID == "" || r.Operator == "" || r.Pattern == "" {
 		return errors.New("rule_id / operator / pattern 不能为空")
+	}
+	if !validOperators[r.Operator] {
+		return errors.New("不支持的运算符: " + r.Operator)
+	}
+	if len(r.Pattern) > maxPatternLen {
+		return errors.New("pattern 过长（上限 32KB），请拆分规则或精简正则")
+	}
+	return nil
+}
+
+func (s *RuleService) Create(r *model.Rule) error {
+	if err := s.validateRule(r); err != nil {
+		return err
 	}
 	return s.db.Create(r).Error
 }
@@ -250,6 +275,13 @@ func (s *RuleService) Update(id uint, r *model.Rule) error {
 	var existing model.Rule
 	if err := s.db.First(&existing, id).Error; err != nil {
 		return errors.New("规则不存在")
+	}
+	// 部分更新：仅校验本次提供的字段（空字段保持原值不参与校验）
+	if r.Operator != "" && !validOperators[r.Operator] {
+		return errors.New("不支持的运算符: " + r.Operator)
+	}
+	if len(r.Pattern) > maxPatternLen {
+		return errors.New("pattern 过长（上限 32KB），请拆分规则或精简正则")
 	}
 	return s.db.Model(&existing).Updates(r).Error
 }
