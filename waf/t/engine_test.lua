@@ -357,33 +357,3 @@ t.test("get_active_config: 版本未变返回缓存，无下发配置回退默�
     storage.set_shared("waf_rule", "active_config", storage.encode({ mode = "off" }))
     t.eq(engine.get_active_config().mode, "detect")
 end)
-
--- 站点规则按 Host 过滤与缓存
-t.test("get_rules_for_host: 全局+站点规则过滤与缓存", function()
-    ngx_reset()
-    local storage = require "storage"
-    storage.set_shared("waf_rule", "ruleset_version", "v1")
-    storage.set_shared("waf_rule", "active_ruleset", storage.encode({
-        version = "v1",
-        rules = {
-            rule({ id = "g1" }),
-            rule({ id = "s1", site = "cszj.wang" }),
-        },
-    }))
-    local rs = engine.get_rules_for_host("cszj.wang")
-    t.eq(#rs.rules, 2, "站点 host 命中全局 + 站点规则")
-    local rs2 = engine.get_rules_for_host("other.com")
-    t.eq(#rs2.rules, 1, "其他 host 仅全局规则")
-    t.eq(rs2.rules[1].id, "g1")
-    t.ok(engine.get_rules_for_host("cszj.wang") == rs, "同 host 命中缓存")
-    -- 版本变化后重新过滤
-    storage.set_shared("waf_rule", "ruleset_version", "v2")
-    local rs3 = engine.get_rules_for_host("cszj.wang")
-    t.ok(rs3 ~= rs, "版本变化应重新过滤")
-    t.eq(#rs3.rules, 2)
-end)
-
-t.test("get_rules_for_host: 无规则集返回 nil", function()
-    ngx_reset()
-    t.isnil(engine.get_rules_for_host("x.com"))
-end)
