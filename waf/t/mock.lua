@@ -24,6 +24,38 @@ local function pcre_to_lua(p)
     return p
 end
 
+-- 顶层 | 交替拆分（括号感知：括号/字符类/转义内的 | 不拆分，
+-- 避免破坏 (?!...) 负向断言等复杂 PCRE 语法；供 re.find 依次尝试）
+local function split_alt(p)
+    local parts, depth, cur = {}, 0, {}
+    local i = 1
+    while i <= #p do
+        local ch = p:sub(i, i)
+        if ch == "\\" and i < #p then
+            cur[#cur + 1] = ch
+            cur[#cur + 1] = p:sub(i + 1, i + 1)
+            i = i + 2
+        elseif ch == "(" or ch == "[" then
+            depth = depth + 1
+            cur[#cur + 1] = ch
+            i = i + 1
+        elseif ch == ")" or ch == "]" then
+            depth = math.max(0, depth - 1)
+            cur[#cur + 1] = ch
+            i = i + 1
+        elseif ch == "|" and depth == 0 then
+            parts[#parts + 1] = table.concat(cur)
+            cur = {}
+            i = i + 1
+        else
+            cur[#cur + 1] = ch
+            i = i + 1
+        end
+    end
+    parts[#parts + 1] = table.concat(cur)
+    return parts
+end
+
 -- ============================================================================
 -- 简单确定性哈希（替代 ngx.md5；仅用于验证签名校验逻辑，非真实 MD5）
 -- ============================================================================
@@ -110,14 +142,16 @@ ngx = {
     time = function() return os.time() end,
     now  = function() return os.time() end,
 
-    -- 正则（PCRE → Lua 模式）
+    -- 正则（PCRE → Lua 模式；顶层 | 交替拆分为多个候选依次尝试）
     re = {
         find = function(s, p, opts)
             if s == nil then return nil end
-            local lp = pcre_to_lua(p)
-            local ok, from = pcall(string.find, tostring(s), lp)
-            if ok and from then
-                return from, from + #s - 1
+            for _, part in ipairs(split_alt(p)) do
+                local lp = pcre_to_lua(part)
+                local ok, from = pcall(string.find, tostring(s), lp)
+                if ok and from then
+                    return from, from + #s - 1
+                end
             end
             return nil
         end,

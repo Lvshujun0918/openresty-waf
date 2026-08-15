@@ -180,6 +180,37 @@ if traffic and traffic.enabled then
                               payload = cjson.encode(rec) }
 end
 
+-- ===== 爬虫识别记录（可选：识别为爬虫的请求上报一条，供后台爬虫统计页） =====
+if ctx and ctx.bot_result then
+    local bot = ctx.bot_result
+    local geo = lookup_geo(ctx.client_ip)
+    local okb, malicious_ip = pcall(function()
+        return require("detectors.bot").is_malicious_ip(ctx)
+    end)
+    if not okb then malicious_ip = false end
+    local rec = {
+        time         = ts_now(),
+        req_id       = ctx.req_id or "",
+        client_ip    = ctx.client_ip or "",
+        country      = geo and geo.country or "",
+        province     = geo and geo.province or "",
+        city         = geo and geo.city or "",
+        method       = ctx.request and ctx.request.method or "",
+        host         = ctx.request and ctx.request.host or "",
+        uri          = ctx.request and ctx.request.uri or "",
+        ua           = ngx.var.http_user_agent or "",
+        fingerprint  = ctx.fingerprint or "",
+        profile      = bot.profile or "",
+        engine       = bot.engine and true or false,
+        fake         = bot.fake and true or false,
+        malicious_ip = malicious_ip and true or false,
+        malicious_fp = ctx.fp_malicious or "",
+        status       = ngx.status,
+    }
+    pending[#pending + 1] = { key = config.bot.report_key or "waf:bot:list",
+                              payload = cjson.encode(rec) }
+end
+
 -- ===== 攻击事件 =====
 if not ctx or not ctx.matched or #ctx.matched == 0 then
     return

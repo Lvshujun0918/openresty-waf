@@ -102,8 +102,20 @@ _M.rule_refresh = {
     -- 触发规则（host/UA/请求头/IP 等条件筛选，命中执行人机验证/豁免/CC）
     trigger_rules_key   = "waf:trigger:rules",   -- 触发规则集（JSON）
     trigger_version_key = "waf:trigger:version", -- 触发规则版本号
+    -- 爬虫画像库（UA + IP 段验证；后台发布热更新）
+    bot_profiles_key   = "waf:bot:profiles",
+    bot_profiles_version_key = "waf:bot:version",
     event_key     = "waf:event:list",       -- 攻击事件队列（LPUSH）
     stat_key      = "waf:stat:counter",     -- 统计计数
+}
+
+-- ============================================================================
+-- 爬虫识别与恶意指纹
+-- ============================================================================
+_M.bot = {
+    enabled      = true,           -- 启用爬虫识别与统计（仅统计，拦截走触发规则/名单）
+    fingerprint  = true,           -- 启用 HTTP 客户端指纹计算（恶意指纹库比对 + 爬虫统计）
+    report_key   = "waf:bot:list", -- 爬虫访问记录队列（后台消费展示）
 }
 
 -- ============================================================================

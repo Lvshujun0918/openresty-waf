@@ -268,12 +268,41 @@ local function flush_stats(premature)
     end
 end
 
+-- 从 Redis 拉取爬虫画像库并热切换（UA + IP 段验证；bot.lua 版本化缓存读取）
+local function refresh_bot_profiles()
+    local version, err = storage.redis_get(config.rule_refresh.bot_profiles_version_key)
+    if err then
+        log(ngx.WARN, "读取爬虫画像版本失败: " .. tostring(err))
+        return
+    end
+    if not version then
+        return  -- 尚未发布，引擎使用内置画像
+    end
+    local current = storage.get_shared(config.dict.rules, "bot_profiles_version")
+    if current == version then
+        return
+    end
+    local body, err2 = storage.redis_get(config.rule_refresh.bot_profiles_key)
+    if err2 or not body then
+        log(ngx.WARN, "读取爬虫画像库失败: " .. tostring(err2))
+        return
+    end
+    local ok1 = storage.set_shared(config.dict.rules, "active_bot_profiles", body)
+    local ok2 = storage.set_shared(config.dict.rules, "bot_profiles_version", version)
+    if ok1 and ok2 then
+        log(ngx.INFO, "爬虫画像库已热更新至版本: " .. tostring(version))
+    else
+        log(ngx.WARN, "爬虫画像库热更新写入失败，将在下个轮询周期重试")
+    end
+end
+
 -- worker 定时器主回调：规则 + 运行配置 + 触发规则热更新
 local function refresh_from_redis(premature)
     if premature then return end
     refresh_rules()
     refresh_config()
     refresh_trigger_rules()
+    refresh_bot_profiles()
 end
 
 -- init 阶段：加载配置与内置规则

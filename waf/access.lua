@@ -8,6 +8,7 @@ local engine    = require "rule_engine.engine"
 local storage   = require "storage"
 local operators = require "rule_engine.operators"
 local auto_ban  = require "detectors.auto_ban"
+local config    = require "config"
 
 -- 每请求唯一 ID：worker pid + 毫秒时间戳 + 连接序号 + 请求内自增
 local req_seq = 0
@@ -297,6 +298,34 @@ local function protection_flow()
         end
         -- detect 模式：仅记录
         return
+    end
+
+    -- 1.6 恶意指纹拦截（HTTP 客户端指纹命中恶意指纹库；库为空时零开销）
+    local fingerprint = require "fingerprint"
+    local fp_hit = fingerprint.match_malicious(ctx, fingerprint.get(ctx))
+    if fp_hit then
+        ctx.fp_malicious = fp_hit
+        ctx.matched[#ctx.matched + 1] = {
+            id = "FP-BLOCK", group = "fingerprint", severity = 3,
+            msg = "恶意指纹拦截: " .. tostring(fp_hit),
+        }
+        if ctx.mode == "active" then
+            block(cfg, ctx)
+        end
+        -- detect 模式：仅记录（log 阶段落盘）
+        return
+    end
+
+    -- 1.7 爬虫识别（仅统计与标记，不阻断；拦截交由触发规则的 ua 条件或指纹库）
+    if config.bot and config.bot.enabled ~= false then
+        local okb7, botres = pcall(function()
+            return require("detectors.bot").classify(ctx)
+        end)
+        if okb7 and botres then
+            ctx.bot_result = botres
+        elseif not okb7 then
+            ngx.log(ngx.ERR, "[waf] 爬虫识别异常: ", tostring(botres))
+        end
     end
 
     -- 1.8 触发规则拦截（kind=block：host/UA/请求头/IP 等条件命中即拦截，
