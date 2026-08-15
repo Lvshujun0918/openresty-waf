@@ -24,7 +24,8 @@ const cfg = reactive({
     captcha_id: '',
     captcha_key: ''
   },
-  traffic_log: { enabled: false, retention_days: 7 }
+  traffic_log: { enabled: false, retention_days: 7 },
+  auto_ban: { enabled: true, threshold: 10, window: 60, duration: 600 }
 });
 const excludeText = ref('');
 const staticExtText = ref('');
@@ -67,6 +68,7 @@ async function load() {
   const ch = (rawConfig.challenge as Record<string, unknown>) ?? {};
   const captcha = (ch.captcha as Record<string, unknown>) ?? {};
   const tl = (rawConfig.traffic_log as Record<string, unknown>) ?? {};
+  const ab = (rawConfig.auto_ban as Record<string, unknown>) ?? {};
   const wl = (rawConfig.whitelist as Record<string, unknown>) ?? {};
   const bl = (rawConfig.blacklist as Record<string, unknown>) ?? {};
   const rate = parseRate(cc.rate);
@@ -113,6 +115,12 @@ async function load() {
     traffic_log: {
       enabled: tl.enabled === true,
       retention_days: Number(tl.retention_days) || 7
+    },
+    auto_ban: {
+      enabled: ab.enabled !== false,
+      threshold: Number(ab.threshold) || 10,
+      window: Number(ab.window) || 60,
+      duration: Number(ab.duration) || 600
     }
   });
   excludeText.value = cfg.detection.exclude_paths.join('\n');
@@ -163,6 +171,7 @@ async function save() {
     const rawCh = (rawConfig.challenge as Record<string, unknown>) ?? {};
     const rawCaptcha = (rawCh.captcha as Record<string, unknown>) ?? {};
     const rawTl = (rawConfig.traffic_log as Record<string, unknown>) ?? {};
+    const rawAb = (rawConfig.auto_ban as Record<string, unknown>) ?? {};
     const rawWl = (rawConfig.whitelist as Record<string, unknown>) ?? {};
     const rawBl = (rawConfig.blacklist as Record<string, unknown>) ?? {};
     const next = {
@@ -226,6 +235,13 @@ async function save() {
         ...rawTl,
         enabled: cfg.traffic_log.enabled,
         retention_days: cfg.traffic_log.retention_days
+      },
+      auto_ban: {
+        ...rawAb,
+        enabled: cfg.auto_ban.enabled,
+        threshold: cfg.auto_ban.threshold,
+        window: cfg.auto_ban.window,
+        duration: cfg.auto_ban.duration
       },
       whitelist: {
         ...rawWl,
@@ -365,6 +381,28 @@ onMounted(loadVersions);
         <NFormItem label="落盘扫描字节数">
           <NInputNumber v-model:value="cfg.upload.spooled_scan_bytes" :min="65536" :max="10485760" :step="65536" class="w-48" />
           <span class="text-xs text-[rgb(125,125,125)] ml-2">超大上传落临时文件时流式扫描文件前缀字节数，默认 512KB</span>
+        </NFormItem>
+      </NForm>
+    </NCard>
+
+    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="高频攻击自动封禁">
+      <NForm label-placement="left" label-width="140">
+        <NFormItem label="自动封禁">
+          <NSwitch v-model:value="cfg.auto_ban.enabled" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">同 IP 短窗口内多次攻击命中后自动临时封禁（白名单不受影响）</span>
+        </NFormItem>
+        <NFormItem label="触发条件">
+          <NSpace align="center" :wrap="true">
+            <span class="text-sm text-[rgb(125,125,125)]">窗口</span>
+            <NInputNumber v-model:value="cfg.auto_ban.window" :min="10" :max="3600" class="w-28" />
+            <span class="text-sm text-[rgb(125,125,125)]">秒内攻击</span>
+            <NInputNumber v-model:value="cfg.auto_ban.threshold" :min="2" :max="1000" class="w-28" />
+            <span class="text-sm text-[rgb(125,125,125)]">次</span>
+          </NSpace>
+        </NFormItem>
+        <NFormItem label="封禁时长(s)">
+          <NInputNumber v-model:value="cfg.auto_ban.duration" :min="60" :max="86400" class="w-32" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">默认 10 次/60 秒触发，封禁 10 分钟</span>
         </NFormItem>
       </NForm>
     </NCard>
