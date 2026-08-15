@@ -172,11 +172,16 @@ end
 
 local ctx = new_ctx(cfg)
 
--- 读取本连接的 JA4 TLS 指纹（ssl_client_hello 阶段写入共享内存；
--- 同一连接所有请求共享；非 TLS 连接/未挂载钩子时为 nil，回退 TLS/HTTP 指纹）
-local _ja4d = ngx.shared[config.dict.rules]
-if _ja4d then
-    ctx.ja4 = _ja4d:get("ja4:conn:" .. tostring(ngx.var.connection))
+-- 读取本连接的 JA4 TLS 指纹：
+--   优先 ngx.ctx.ja4（官方 OpenResty 中 ssl_client_hello 阶段写入，与请求阶段共享）；
+--   兜底共享内存（ja4.lua 按 worker pid 写入，同 worker 内握手与请求顺序执行）
+if ngx.ctx and ngx.ctx.ja4 then
+    ctx.ja4 = ngx.ctx.ja4
+else
+    local _ja4d = ngx.shared[config.dict.rules]
+    if _ja4d then
+        ctx.ja4 = _ja4d:get("ja4:conn:w" .. tostring(ngx.worker.pid()))
+    end
 end
 
 -- watchdog：检测耗时超阈值（默认 10ms，config.detection.watchdog_ms 可调）时
