@@ -22,6 +22,7 @@ import {
 import { useEcharts } from '@/hooks/common/echarts';
 import type { ECOption } from '@/hooks/common/echarts';
 import {
+  blacklistBotLog,
   consumeBotLogs,
   createBotFingerprint,
   createBotProfile,
@@ -287,7 +288,31 @@ const logColumns = [
       ])
   },
   { title: '请求', key: 'uri', ellipsis: { tooltip: true }, render: (row: Api.Waf.BotLog) => h('span', { class: 'text-xs' }, `${row.method} ${row.host}${row.uri}`) },
-  { title: '状态', key: 'status', width: 70 }
+  { title: '状态', key: 'status', width: 70 },
+  {
+    title: '操作',
+    key: 'action',
+    width: 110,
+    render: (row: Api.Waf.BotLog) =>
+      h(
+        NPopconfirm,
+        {
+          onPositiveClick: async () => {
+            await blacklistBotLog(row.id);
+            message.success('指纹已加入恶意指纹库并下发，同指纹请求将被拦截');
+          }
+        },
+        {
+          trigger: () =>
+            h(
+              NButton,
+              { size: 'small', quaternary: true, type: 'error', disabled: !row.ja4 && !row.fingerprint },
+              { default: () => '指纹拉黑' }
+            ),
+          default: () => '将该请求的 TLS 指纹加入恶意指纹库？同指纹客户端将被拦截'
+        }
+      )
+  }
 ];
 
 async function consume() {

@@ -422,3 +422,8 @@ export function fetchBotTop(dim: string, limit = 20) {
 export function fetchBotTrend(days = 7) {
   return request<{ items: { date: string; total: number; fake: number }[] }>({ url: '/bots/trend', params: { days } });
 }
+
+/** 一键把爬虫记录指纹加入恶意指纹库 */
+export function blacklistBotLog(id: number) {
+  return request<{ ok: boolean; fingerprint_id: number }>({ url: `/bots/logs/${id}/blacklist`, method: 'post' });
+}

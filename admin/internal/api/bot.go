@@ -172,3 +172,18 @@ func (h *BotHandler) Trend(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
+
+// BlacklistLog POST /api/bots/logs/:id/blacklist 一键把记录指纹加入恶意指纹库并下发
+func (h *BotHandler) BlacklistLog(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	if id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "非法记录 ID"})
+		return
+	}
+	fpID, err := h.svc.BlacklistLog(uint(id))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "fingerprint_id": fpID})
+}

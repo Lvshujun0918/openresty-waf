@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"encoding/json"
 	"errors"
 	"time"
@@ -395,3 +396,43 @@ func (s *BotService) Trend(days int) ([]BotTrendPoint, error) {
 	return out, nil
 }
 
+
+// BlacklistLog 把爬虫记录的指纹（TLS 指纹优先，HTTP 指纹兜底）一键加入恶意指纹库
+// 并下发引擎（同指纹请求后续直接拦截）
+func (s *BotService) BlacklistLog(id uint) (uint, error) {
+	var rec model.BotLog
+	if err := s.db.First(&rec, id).Error; err != nil {
+		return 0, errors.New("记录不存在")
+	}
+	fp := rec.Ja4
+	if fp == "" {
+		fp = rec.Fingerprint
+	}
+	if fp == "" {
+		return 0, errors.New("该记录无指纹可拉黑")
+	}
+	var exist int64
+	s.db.Model(&model.BotFingerprint{}).Where("value = ? AND match = ?", fp, "exact").Count(&exist)
+	if exist > 0 {
+		return 0, errors.New("该指纹已在恶意指纹库中")
+	}
+	desc := "爬虫记录拉黑"
+	if rec.Profile != "" {
+		desc += ": " + rec.Profile
+	}
+	if rec.ClientIP != "" {
+		desc += " (" + rec.ClientIP + ")"
+	}
+	f := model.BotFingerprint{
+		Name: "记录#" + fmt.Sprintf("%d", rec.ID) + "-" + rec.Profile,
+		Value: fp, Match: "exact", Description: desc,
+		Enabled: true,
+	}
+	if err := s.db.Create(&f).Error; err != nil {
+		return 0, err
+	}
+	if err := s.publishFingerprints(); err != nil {
+		return 0, err
+	}
+	return f.ID, nil
+}
