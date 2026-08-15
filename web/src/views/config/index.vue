@@ -39,6 +39,15 @@ const wlUrlText = ref('');
 const wlUaText = ref('');
 const blIpText = ref('');
 const blUrlText = ref('');
+// 证据脱敏 / 响应安全头 / 品牌化
+const maskEnabled = ref(true);
+const maskFieldsText = ref('');
+const maskRegexText = ref('');
+const rhAddText = ref('');
+const rhRemoveText = ref('');
+const brandTitle = ref('');
+const brandCompany = ref('');
+const brandContact = ref('');
 let rawConfig: Record<string, unknown> = {};
 
 function asList(v: unknown): string[] {
@@ -127,6 +136,22 @@ async function load() {
   staticExtText.value = asList(skip.ext).join('\n');
   staticPrefixText.value = asList(skip.prefix).join('\n');
   trustedText.value = asList(rawConfig.trusted_proxies).join('\n');
+  // 证据脱敏
+  const mask = (det.evidence_mask as Record<string, unknown>) ?? {};
+  maskEnabled.value = mask.enabled !== false;
+  maskFieldsText.value = asList(mask.fields).join('\n');
+  maskRegexText.value = asList(mask.regex).join('\n');
+  // 响应安全头
+  const rh = (det.response_headers as Record<string, unknown>) ?? {};
+  rhAddText.value = Object.entries((rh.add as Record<string, unknown>) ?? {})
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('\n');
+  rhRemoveText.value = asList(rh.remove).join('\n');
+  // 品牌化
+  const brand = (ch.brand as Record<string, unknown>) ?? {};
+  brandTitle.value = String(brand.title || '');
+  brandCompany.value = String(brand.company || '');
+  brandContact.value = String(brand.contact || '');
   const up = (rawConfig.upload as Record<string, unknown>) ?? {};
   uploadExtText.value = asList(up.deny_ext).join('\n');
   uploadMimeText.value = asList(up.deny_mime).join('\n');
@@ -188,6 +213,22 @@ async function save() {
           ...((rawDet.skip_static as Record<string, unknown>) ?? {}),
           ext: staticExt,
           prefix: staticPrefix
+        },
+        evidence_mask: {
+          enabled: maskEnabled.value,
+          fields: lines(maskFieldsText.value),
+          regex: lines(maskRegexText.value)
+        },
+        response_headers: {
+          add: Object.fromEntries(
+            lines(rhAddText.value)
+              .map(l => {
+                const idx = l.indexOf(':');
+                return idx > 0 ? [l.slice(0, idx).trim(), l.slice(idx + 1).trim()] : null;
+              })
+              .filter((x): x is [string, string] => !!x)
+          ),
+          remove: lines(rhRemoveText.value)
         }
       },
       log: {
@@ -229,6 +270,11 @@ async function save() {
           ...rawCaptcha,
           id: cfg.challenge.captcha_id,
           key: cfg.challenge.captcha_key
+        },
+        brand: {
+          title: brandTitle.value,
+          company: brandCompany.value,
+          contact: brandContact.value
         }
       },
       traffic_log: {
@@ -292,7 +338,7 @@ onMounted(loadVersions);
       </NSpace>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="防护模式">
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="防护模式">
       <NRadioGroup v-model:value="cfg.mode">
         <NSpace>
           <NCard v-for="m in modeOptions" :key="m.value" size="small" :class="cfg.mode === m.value ? 'ring-2 ring-[#2563eb]' : ''" style="width: 220px">
@@ -306,7 +352,7 @@ onMounted(loadVersions);
       <p v-if="currentMode" class="mt-2 text-xs text-[rgb(125,125,125)]">当前：{{ currentMode.label }}</p>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="检测策略">
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="检测策略">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="CRS 偏执级别">
           <NSpace>
@@ -349,7 +395,7 @@ onMounted(loadVersions);
       </NForm>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="可信代理（X-Forwarded-For）">
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="可信代理（X-Forwarded-For）">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="可信代理列表">
           <div class="w-full">
@@ -360,7 +406,7 @@ onMounted(loadVersions);
       </NForm>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="文件上传检测">
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="文件上传检测">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="上传检测">
           <NSwitch v-model:value="cfg.upload.enabled" />
@@ -385,7 +431,7 @@ onMounted(loadVersions);
       </NForm>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="高频攻击自动封禁">
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="高频攻击自动封禁">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="自动封禁">
           <NSwitch v-model:value="cfg.auto_ban.enabled" />
@@ -407,7 +453,75 @@ onMounted(loadVersions);
       </NForm>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="拦截响应">
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="证据脱敏（隐私合规）">
+      <NForm label-placement="left" label-width="120">
+        <NFormItem label="启用">
+          <NSwitch v-model:value="maskEnabled" />
+        </NFormItem>
+        <NFormItem label="敏感字段">
+          <NInput
+            v-model:value="maskFieldsText"
+            type="textarea"
+            :rows="3"
+            placeholder="每行一个字段名，如 password / token / secret（命中键名即打码）"
+          />
+        </NFormItem>
+        <NFormItem label="正则打码">
+          <NInput
+            v-model:value="maskRegexText"
+            type="textarea"
+            :rows="3"
+            placeholder="每行一个正则，如 1[3-9]\d{9}（手机号）"
+          />
+        </NFormItem>
+        <NFormItem label="说明">
+          <span class="text-xs text-[rgb(125,125,125)]">攻击事件入库前对请求头/请求体中的敏感值打码为 ***</span>
+        </NFormItem>
+      </NForm>
+    </NCard>
+
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="响应安全头加固">
+      <NForm label-placement="left" label-width="120">
+        <NFormItem label="添加/覆盖">
+          <NInput
+            v-model:value="rhAddText"
+            type="textarea"
+            :rows="4"
+            placeholder="每行一个「头: 值」，如&#10;Strict-Transport-Security: max-age=31536000&#10;Content-Security-Policy: default-src 'self'"
+          />
+        </NFormItem>
+        <NFormItem label="移除">
+          <NInput
+            v-model:value="rhRemoveText"
+            type="textarea"
+            :rows="2"
+            placeholder="每行一个头名，如 Server / X-Powered-By"
+          />
+        </NFormItem>
+        <NFormItem label="说明">
+          <span class="text-xs text-[rgb(125,125,125)]">需挂载 header_filter.lua；默认已加 X-Content-Type-Options 等基础头</span>
+        </NFormItem>
+      </NForm>
+    </NCard>
+
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="拦截/挑战页品牌化">
+      <NForm label-placement="left" label-width="120">
+        <NFormItem label="页面标题">
+          <NInput v-model:value="brandTitle" placeholder="如：XX 云安全验证（留空用默认）" />
+        </NFormItem>
+        <NFormItem label="公司/站点名">
+          <NInput v-model:value="brandCompany" placeholder="页脚展示，如：XX 科技有限公司" />
+        </NFormItem>
+        <NFormItem label="联系方式">
+          <NInput v-model:value="brandContact" placeholder="页脚展示，如：400-xxx-xxxx" />
+        </NFormItem>
+        <NFormItem label="说明">
+          <span class="text-xs text-[rgb(125,125,125)]">挑战页标题与页脚品牌信息；拦截页 HTML 在上方「拦截响应」卡片中自定义</span>
+        </NFormItem>
+      </NForm>
+    </NCard>
+
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="拦截响应">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="状态码">
           <NInputNumber v-model:value="cfg.block.status" :min="400" :max="599" class="w-32" />
@@ -422,7 +536,7 @@ onMounted(loadVersions);
       </NForm>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="CC 防刷（全局缺省）">
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="CC 防刷（全局缺省）">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="频率阈值">
           <NSpace align="center" :wrap="true">
@@ -441,7 +555,7 @@ onMounted(loadVersions);
       </NForm>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="人机验证">
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="人机验证">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="启用">
           <NSwitch v-model:value="cfg.challenge.enabled" />
@@ -490,7 +604,7 @@ onMounted(loadVersions);
       </NForm>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="黑白名单（内置兜底）">
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="黑白名单（内置兜底）">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="白名单 IP">
           <div class="w-full">
@@ -520,7 +634,7 @@ onMounted(loadVersions);
       </NForm>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="日志">
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="日志">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="攻击日志">
           <NSwitch v-model:value="cfg.log.enabled" />
@@ -558,7 +672,7 @@ onMounted(loadVersions);
       </NForm>
     </NCard>
 
-    <NCard :bordered="false" class="card-wrapper" v-if="loaded" title="全量流量记录">
+    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="全量流量记录">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="记录全量流量">
           <NSwitch v-model:value="cfg.traffic_log.enabled" />
