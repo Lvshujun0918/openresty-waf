@@ -1,26 +1,30 @@
 -- ja4.lua
 -- JA4 TLS 指纹（FoxIO JA4 规范，ja4_a 部分）：
 --   格式 t{version}{d}{c}{e}_{sha256(ciphers前16)前12hex}_{sha256(exts前16)前12hex}
---   version: TLS 1.3→13 / 1.2→12 / 1.1→11 / 1.0→10
+--   version: TLS 1.3→13 / 1.2→12 / 1.1→11 / 1.0→10（无 supported_versions 扩展时按 1.2 处理）
 --   d: SNI(+1)/ALPN(+2) 组合（0-3）；c/e: cipher/extension 数量（十六进制，>15 记 f）
 -- 挂载阶段：ssl_client_hello_by_lua（每 TLS 连接一次，握手时执行）。
 -- 计算结果存入 ngx.ctx.ja4，access 阶段供恶意指纹比对与爬虫记录使用。
 --
+-- 兼容性：使用 lua-resty-core ngx.ssl.clienthello 的底层 API
+--   （get_client_hello_server_name / get_supported_versions / get_client_hello_ext /
+--    get_client_hello_ciphers / get_client_hello_ext_present），
+--   不依赖较新版本才有的 get_client_hello()。
 -- 注意：JA4 仅 TLS 连接可用（HTTP 明文连接无 ClientHello），
 -- 非 TLS 场景回退使用 HTTP 组合指纹（fingerprint.lua）。
 
 local _M = {}
 
--- ClientHello 解析结果 → JA4（纯函数，可单测）。
--- hello 结构（lua-resty-core ngx.ssl.clienthello.get_client_hello 返回）：
---   { version="TLS 1.3", cipher_suites={0x1301,...}, extensions={{type=0x0,...},...}, sn="..", alpn=.. }
+-- 版本字符串 → JA4 版本号（lua-resty-core 返回 "TLSv1.3" 等）
 local VER_MAP = {
-    ["TLS 1.3"] = "13",
-    ["TLS 1.2"] = "12",
-    ["TLS 1.1"] = "11",
-    ["TLS 1.0"] = "10",
-    ["SSL 3.0"] = "09",
+    ["TLSv1.3"] = "13",
+    ["TLSv1.2"] = "12",
+    ["TLSv1.1"] = "11",
+    ["TLSv1"]   = "10",
 }
+
+-- ALPN 扩展类型（RFC 7301）
+local ALPN_EXT = 16
 
 local function hex1(n)
     n = tonumber(n) or 0
@@ -37,14 +41,14 @@ local function sha256_hex12(s)
     end)):sub(1, 12)
 end
 
+-- ClientHello 解析结果 → JA4（纯函数，可单测）。
+-- hello: { version="TLSv1.3", cipher_suites={0x1301,...}, extensions={{type=0x0,...},...}, sn="..", alpn=bool }
 function _M.calc(hello)
     if type(hello) ~= "table" then return nil end
-    local t = VER_MAP[hello.version] or "00"
+    local t = VER_MAP[hello.version] or "12"
     local d = 0
     if hello.sn and hello.sn ~= "" then d = d + 1 end
-    if hello.alpn and (type(hello.alpn) == "string" and hello.alpn ~= "" or type(hello.alpn) == "table" and #hello.alpn > 0) then
-        d = d + 2
-    end
+    if hello.alpn then d = d + 2 end
     local ciphers = hello.cipher_suites or {}
     local exts = hello.extensions or {}
 
@@ -66,19 +70,64 @@ function _M.calc(hello)
         sha256_hex12(table.concat(cbuf)), sha256_hex12(table.concat(ebuf)))
 end
 
--- ssl_client_hello 阶段入口：解析 ClientHello 并缓存 JA4 到 ngx.ctx
+-- 用底层 API 组装 ClientHello 解析结果（全部 pcall 保护，任一失败不影响其他字段）
+local function build_hello(ch)
+    local hello = {}
+    local ok, sn = pcall(ch.get_client_hello_server_name)
+    if ok and sn and sn ~= "" then hello.sn = sn end
+
+    local ok2, vers = pcall(ch.get_supported_versions)
+    if ok2 and type(vers) == "table" and #vers > 0 then
+        hello.version = vers[1]  -- 返回列表首项为最高版本
+    end
+
+    local ok3, alpn = pcall(ch.get_client_hello_ext, ALPN_EXT)
+    if ok3 and alpn and alpn ~= "" then hello.alpn = true end
+
+    local ok4, ciphers = pcall(ch.get_client_hello_ciphers)
+    if ok4 and type(ciphers) == "table" and #ciphers > 0 then
+        hello.cipher_suites = ciphers
+    end
+
+    local ok5, exts = pcall(ch.get_client_hello_ext_present)
+    if ok5 and type(exts) == "table" and #exts > 0 then
+        local list = {}
+        for i, t in ipairs(exts) do
+            list[i] = { type = t }
+        end
+        hello.extensions = list
+    end
+
+    return hello
+end
+
+-- ssl_client_hello 阶段入口：解析 ClientHello，将 JA4 写入共享内存
+-- （键 ja4:conn:<连接ID>，TTL 30s；access 阶段按连接 ID 读取）。
+-- 说明：ssl_client_hello 为连接级阶段，与请求级 ngx.ctx 不共享，
+-- HTTP/2 一个连接可复用多个请求（同一连接的 JA4 相同），故按连接传递。
+-- fail-open：任何解析/计算/写入错误都不影响 TLS 握手（仅记录错误并放行）。
 function _M.run()
     local ok, clienthello = pcall(require, "ngx.ssl.clienthello")
     if not ok or not clienthello then
         return  -- 环境不支持（应不会发生：OpenResty 1.19.3+ 内置）
     end
-    local hello, err = clienthello.get_client_hello()
-    if not hello then
+    local okb, hello = pcall(build_hello, clienthello)
+    if not okb or not hello then
         return
     end
-    local ja4 = _M.calc(hello)
-    if ja4 then
-        ngx.ctx.ja4 = ja4
+    local ok2, ja4 = pcall(_M.calc, hello)
+    if not ok2 or not ja4 then
+        ngx.log(ngx.ERR, "[waf] JA4 计算失败: ", tostring(ja4))
+        return
+    end
+    local ok3 = pcall(function()
+        local d = ngx.shared["waf_rule"]
+        if d then
+            d:set("ja4:conn:" .. tostring(ngx.var.connection), ja4, 30)
+        end
+    end)
+    if not ok3 then
+        ngx.log(ngx.ERR, "[waf] JA4 写入共享内存失败")
     end
 end
 

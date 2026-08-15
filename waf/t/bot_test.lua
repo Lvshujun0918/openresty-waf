@@ -93,7 +93,7 @@ local ja4 = require "ja4"
 
 t.test("ja4: TLS1.3 基础格式", function()
     local hello = {
-        version = "TLS 1.3",
+        version = "TLSv1.3",
         cipher_suites = { 0x1301, 0x1302, 0x1303, 0x1304 },
         extensions = { { type = 0 }, { type = 43 }, { type = 51 } },
         sn = "example.com",
@@ -102,7 +102,7 @@ t.test("ja4: TLS1.3 基础格式", function()
     local j = ja4.calc(hello)
     t.notnil(j)
     t.ok(j:match("^t13%d+%w%w_%w+_%w+$"), "格式: " .. tostring(j))
-    t.ok(j:sub(1, 3) == "t13", "TLS 1.3")
+    t.ok(j:sub(1, 3) == "t13", "TLSv1.3")
     -- d = SNI(1) + ALPN(2) = 3
     t.ok(j:sub(4, 4) == "3", "SNI+ALPN: " .. tostring(j))
     -- c/e：4 个 cipher → 4；3 个 ext → 3
@@ -111,7 +111,7 @@ end)
 
 t.test("ja4: TLS1.2 无 SNI/ALPN", function()
     local hello = {
-        version = "TLS 1.2",
+        version = "TLSv1.2",
         cipher_suites = { 0xc02f, 0xcca8 },
         extensions = { { type = 0 } },
     }
@@ -120,13 +120,18 @@ t.test("ja4: TLS1.2 无 SNI/ALPN", function()
 end)
 
 t.test("ja4: 相同握手指纹稳定", function()
-    local a = ja4.calc({ version = "TLS 1.3", cipher_suites = { 0x1301 }, extensions = { { type = 0 } }, sn = "x" })
-    local b = ja4.calc({ version = "TLS 1.3", cipher_suites = { 0x1301 }, extensions = { { type = 0 } }, sn = "x" })
+    local a = ja4.calc({ version = "TLSv1.3", cipher_suites = { 0x1301 }, extensions = { { type = 0 } }, sn = "x" })
+    local b = ja4.calc({ version = "TLSv1.3", cipher_suites = { 0x1301 }, extensions = { { type = 0 } }, sn = "x" })
     t.eq(a, b)
 end)
 
 t.test("ja4: nil 输入返回 nil", function()
     t.isnil(ja4.calc(nil))
+end)
+
+t.test("ja4: 无版本扩展默认按 TLS1.2", function()
+    local j = ja4.calc({ cipher_suites = { 0x1301 }, extensions = { { type = 0 } } })
+    t.ok(j:sub(1, 3) == "t12", "默认 TLS1.2: " .. tostring(j))
 end)
 
 t.test("fp: effective 优先 ja4", function()

@@ -172,6 +172,13 @@ end
 
 local ctx = new_ctx(cfg)
 
+-- 读取本连接的 JA4 TLS 指纹（ssl_client_hello 阶段写入共享内存；
+-- 同一连接所有请求共享；非 TLS 连接/未挂载钩子时为 nil，回退 HTTP 指纹）
+local _ja4d = ngx.shared[config.dict.rules]
+if _ja4d then
+    ctx.ja4 = _ja4d:get("ja4:conn:" .. tostring(ngx.var.connection))
+end
+
 -- watchdog：检测耗时超阈值（默认 10ms，config.detection.watchdog_ms 可调）时
 -- 强制放行——灾难性回溯/极端慢规则的最后防线，保证单请求延迟有硬上限。
 local function watchdog_exceeded()
