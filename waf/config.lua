@@ -46,6 +46,17 @@ _M.detection = {
     -- 检测 watchdog（毫秒）：access 阶段检测总耗时超过该阈值时强制放行，
     -- 灾难性回溯/极端慢规则的最后防线（0 表示关闭）
     watchdog_ms = 10,
+    -- 响应安全头加固（header_filter 阶段生效，需挂载 header_filter.lua）：
+    --   add: 添加/覆盖响应头（如 HSTS/CSP/X-Frame-Options）
+    --   remove: 移除泄露头（如 Server / X-Powered-By）
+    response_headers = {
+        add = {
+            ["X-Content-Type-Options"] = "nosniff",
+            ["X-Frame-Options"]       = "SAMEORIGIN",
+            ["Referrer-Policy"]       = "strict-origin-when-cross-origin",
+        },
+        remove = { "X-Powered-By" },
+    },
     -- 攻击证据脱敏（隐私合规）：请求头/请求体入库前打码。
     --   fields: 敏感键名（JSON/form 形式 "key=value" 或 "key":"value"，值整体打码）
     --   regex:  额外正则打码（命中部分替换为 ***），如手机号/身份证

@@ -7,6 +7,9 @@
 -- 说明：响应阶段的变量集合（RESPONSE_HEADERS / RESPONSE_BODY 等）尚未实现，
 -- 当前仅执行 header_filter 阶段规则作为骨架；规则命中信息继续写入 ctx.matched，
 -- 由 log 阶段统一落盘。
+--
+-- 另外执行响应安全头加固（config.detection.response_headers：
+-- 添加/覆盖 HSTS/CSP 等安全头，移除 Server/X-Powered-By 等泄露头）。
 
 local engine = require "rule_engine.engine"
 
@@ -18,6 +21,28 @@ if not ctx then
         matched = {},
     }
     ngx.ctx.waf_ctx = ctx
+end
+
+-- 响应安全头加固（每响应执行一次，配置可热更新）
+local cfg = engine.get_active_config()
+if cfg and cfg.detection then
+    local rh = cfg.detection.response_headers
+    if type(rh) == "table" then
+        if type(rh.remove) == "table" then
+            for _, h in ipairs(rh.remove) do
+                if type(h) == "string" and h ~= "" then
+                    ngx.header[h] = nil
+                end
+            end
+        end
+        if type(rh.add) == "table" then
+            for k, v in pairs(rh.add) do
+                if type(k) == "string" and k ~= "" and type(v) == "string" then
+                    ngx.header[k] = v
+                end
+            end
+        end
+    end
 end
 
 local phase_rules = engine.get_phase_rules("header_filter")
