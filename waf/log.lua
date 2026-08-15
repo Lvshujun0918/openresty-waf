@@ -211,7 +211,7 @@ if ctx and ctx.bot_result then
         uri          = ctx.request and ctx.request.uri or "",
         ua           = ngx.var.http_user_agent or "",
         fingerprint  = ctx.fingerprint or "",
-        ja4          = ctx.ja4 or "",
+        ja4          = (ctx.ja4 and ctx.ja4 ~= "" and ctx.ja4) or ctx.tls_fp or "",
         profile      = bot.profile or "",
         engine       = bot.engine and true or false,
         fake         = bot.fake and true or false,

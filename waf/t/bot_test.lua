@@ -147,3 +147,26 @@ t.test("fp: effective 优先 ja4", function()
     t.ok(hfp ~= nil and #hfp > 0)
     t.eq(src2, "http")
 end)
+
+t.test("fp: effective TLS 请求用握手指纹", function()
+    ngx_reset()
+    ngx.var.http_user_agent = "curl/8.5.0"
+    ngx.var.ssl_protocol = "TLSv1.3"
+    ngx.var.ssl_ciphers = "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384"
+    ngx.var.ssl_curves = "prime256v1:secp384r1"
+    local ctx = {}
+    local tfp, src = fp.effective(ctx)
+    t.eq(src, "tls")
+    t.ok(tfp ~= nil and #tfp > 0, "tls 指纹非空")
+    t.eq(tfp, ctx.tls_fp, "ctx 缓存")
+end)
+
+t.test("fp: 非 TLS 请求回退 http", function()
+    ngx_reset()
+    ngx.var.http_user_agent = "curl/8.5.0"
+    ngx.var.ssl_protocol = ""
+    local ctx = {}
+    local hfp, src = fp.effective(ctx)
+    t.eq(src, "http")
+    t.ok(hfp ~= nil and #hfp > 0)
+end)

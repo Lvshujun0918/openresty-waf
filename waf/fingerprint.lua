@@ -39,15 +39,40 @@ function _M.get(ctx)
     return fp
 end
 
--- 当前请求的比对用指纹：
---   TLS 连接优先使用 JA4（ssl_client_hello 阶段计算，抗伪造）；
---   非 TLS 连接（或未挂载钩子）回退 HTTP 组合指纹。
--- 返回 fp, source（"ja4" | "http"）
+-- 当前请求的比对用指纹（优先级 ja4 > tls > http）：
+--   ja4：真实 JA4（需 ssl_client_hello 钩子 + 支持该回调的 OpenResty）
+--   tls：TLS 握手指纹（nginx 内建 $ssl_* 变量版，任何 OpenResty 可用，
+--        md5(ssl_protocol|ssl_ciphers|ssl_curves)——cipher 列表由客户端 TLS 栈决定，
+--        伪造困难，作为 JA4 不可用时的标准替代）
+--   http：HTTP 组合指纹（非 TLS 连接兜底）
+-- 返回 fp, source（"ja4" | "tls" | "http"）
 function _M.effective(ctx)
     if ctx and ctx.ja4 and ctx.ja4 ~= "" then
         return ctx.ja4, "ja4"
     end
+    local tfp = _M.tls(ctx)
+    if tfp then
+        return tfp, "tls"
+    end
     return _M.get(ctx), "http"
+end
+
+-- TLS 握手指纹（nginx 变量版）：md5(ssl_protocol|ssl_ciphers|ssl_curves)。
+-- 仅 TLS 请求可用（$ssl_protocol 非空）；非 TLS 返回 nil。
+-- 与真实 JA4 一样反映客户端 TLS 栈（curl/requests/浏览器的 cipher 列表差异大且难伪造）。
+function _M.tls(ctx)
+    if ctx and ctx.tls_fp then
+        return ctx.tls_fp
+    end
+    local proto = ngx.var.ssl_protocol
+    if not proto or proto == "" then
+        return nil
+    end
+    local fp = ngx.md5(proto .. "|" .. (ngx.var.ssl_ciphers or "") .. "|" .. (ngx.var.ssl_curves or ""))
+    if ctx then
+        ctx.tls_fp = fp
+    end
+    return fp
 end
 
 -- 指纹是否命中恶意库（active_config.blacklist.fingerprints）
