@@ -4,15 +4,17 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
-	Server    Server
-	DB        DB
-	JWT       JWT
-	Rule      Rule
-	WAF       WAF
+	Server   Server
+	DB       DB
+	JWT      JWT
+	Rule     Rule
+	WAF      WAF
 	WAFConfig WAFConfig
+	Security Security
 }
 
 type Server struct {
@@ -27,6 +29,11 @@ type DB struct {
 type JWT struct {
 	Secret string
 	Expire int // 过期时间（小时）
+}
+
+// Security 面板自身安全加固
+type Security struct {
+	AllowedIPs []string // 面板访问 IP 白名单（IP/CIDR，空 = 不限制；ADMIN_ALLOWED_IPS 逗号分隔）
 }
 
 // WAF WAF 组件分发相关
@@ -74,7 +81,25 @@ func Load() *Config {
 			DataKey:    getEnv("WAF_CONFIG_DATA_KEY", "waf:config:data"),
 			VersionKey: getEnv("WAF_CONFIG_VERSION_KEY", "waf:config:version"),
 		},
+		Security: Security{
+			AllowedIPs: splitCSV(getEnv("ADMIN_ALLOWED_IPS", "")),
+		},
 	}
+}
+
+// splitCSV 逗号分隔环境变量 → 去空白字符串数组
+func splitCSV(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func getEnv(key, def string) string {

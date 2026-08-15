@@ -76,12 +76,25 @@ func (h *SetupHandler) Guide(c *gin.Context) {
 	// 强制覆盖命令：加 -f 使脚本重新生成 config_local.lua（修改 Redis 后快速同步下游引擎）
 	installCmdForce := installCmd + " -f"
 	c.JSON(http.StatusOK, gin.H{
-		"redis":                  redisCfg,
-		"install_command":        installCmd,
-		"install_command_force":  installCmdForce,
-		"download_url":           adminURL + "/api/setup/waf.tar.gz",
-		"nginx_config":           nginxSnippet,
+		// redis 配置脱敏返回：密码不回显（安装命令中已含实际密码，仅登录用户可见）
+		"redis": map[string]interface{}{
+			"addr":     redisCfg.Addr,
+			"db":       redisCfg.DB,
+			"password": maskSecret(redisCfg.Password),
+		},
+		"install_command":       installCmd,
+		"install_command_force": installCmdForce,
+		"download_url":          adminURL + "/api/setup/waf.tar.gz",
+		"nginx_config":          nginxSnippet,
 	})
+}
+
+// maskSecret 密码类字段脱敏：非空时显示为掩码（无明文回显）
+func maskSecret(s string) string {
+	if s == "" {
+		return ""
+	}
+	return "******"
 }
 
 // shQuote 单引号包裹并转义，保证密码含特殊字符时在 bash 中安全传递

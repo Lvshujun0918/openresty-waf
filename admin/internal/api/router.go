@@ -17,6 +17,8 @@ import (
 
 func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.Engine {
 	r := gin.Default()
+	r.Use(SecurityHeaders())
+	r.Use(AllowedIP(cfg))
 
 	authHandler := NewAuthHandler(db, cfg)
 	authSvc := service.NewAuthService(db, cfg)
@@ -51,6 +53,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 		api.GET("/setup/install.sh", setupHandler.InstallScript)
 
 		authed := api.Group("", AuthMiddleware(authSvc))
+		authed.Use(CSRFMiddleware())
 		authed.Use(AuditMiddleware(auditSvc))
 		{
 			authed.GET("/auth/me", authHandler.Me)

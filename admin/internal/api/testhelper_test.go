@@ -64,13 +64,21 @@ func newTestRouter(t *testing.T, db *gorm.DB, mgr *service.RedisManager) *gin.En
 	return NewRouter(config.Load(), db, mgr)
 }
 
-// doLogin 登录并返回 Bearer token
+// doLogin 登录并返回 Bearer token（同时缓存登录下发的 CSRF cookie，
+// 供 authedReq 自动携带——CSRF 双提交校验的测试适配）
+var testCSRF = ""
+
 func doLogin(t *testing.T, r *gin.Engine) string {
 	t.Helper()
 	w := doReq(r, authedReq(http.MethodPost, "/api/auth/login", "",
 		map[string]string{"username": testAdminUser, "password": testAdminPass}))
 	if w.Code != http.StatusOK {
 		t.Fatalf("login failed: %d %s", w.Code, w.Body.String())
+	}
+	for _, ck := range w.Result().Cookies() {
+		if ck.Name == csrfCookieName {
+			testCSRF = ck.Value
+		}
 	}
 	var resp struct {
 		Token string `json:"token"`
@@ -82,7 +90,8 @@ func doLogin(t *testing.T, r *gin.Engine) string {
 	return resp.Token
 }
 
-// authedReq 构造请求；body 为 nil 时为空 body，token 为空则不携带 Authorization
+// authedReq 构造请求；body 为 nil 时为空 body，token 为空则不携带 Authorization。
+// 自动附带 CSRF cookie + X-CSRF-Token 头（双提交校验）。
 func authedReq(method, path, token string, body interface{}) *http.Request {
 	var rdr *bytes.Reader
 	if body != nil {
@@ -95,6 +104,10 @@ func authedReq(method, path, token string, body interface{}) *http.Request {
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	if testCSRF != "" {
+		req.AddCookie(&http.Cookie{Name: csrfCookieName, Value: testCSRF})
+		req.Header.Set("X-CSRF-Token", testCSRF)
 	}
 	return req
 }

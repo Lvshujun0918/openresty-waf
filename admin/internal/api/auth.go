@@ -37,6 +37,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
+	// 登录成功：下发 CSRF Cookie（双提交校验，前端写请求需携带 X-CSRF-Token）
+	SetCSRFCookie(c)
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
