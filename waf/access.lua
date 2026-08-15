@@ -7,6 +7,7 @@
 local engine    = require "rule_engine.engine"
 local storage   = require "storage"
 local operators = require "rule_engine.operators"
+local auto_ban  = require "detectors.auto_ban"
 
 -- 每请求唯一 ID：worker pid + 毫秒时间戳 + 连接序号 + 请求内自增
 local req_seq = 0
@@ -87,18 +88,33 @@ local function block(cfg, wctx)
     ngx.exit(status)
 end
 
+-- 名单条目解析："地址" 或 "地址|unix时间戳"（临时封禁，到期自动跳过）
+local function list_entry(entry)
+    local addr, ts = tostring(entry):match("^([^|]+)|(%d+)$")
+    if not addr then
+        return tostring(entry), nil
+    end
+    return addr, tonumber(ts)
+end
+
 -- IP 黑白名单快速检查（白名单优先）
 -- 返回 "whitelisted" / "blocked" / nil
 local function ip_check(ctx, cfg)
     local wl = cfg.whitelist and cfg.whitelist.ips or {}
-    for _, ip in ipairs(wl) do
-        if operators.eval("CIDR", ctx.client_ip, ip) then
+    for _, entry in ipairs(wl) do
+        local addr, ts = list_entry(entry)
+        if (not ts or ngx.time() < ts) and operators.eval("CIDR", ctx.client_ip, addr) then
             return "whitelisted"
         end
     end
+    -- 高频攻击自动封禁（白名单不受影响）
+    if auto_ban.is_banned(cfg, ctx.client_ip) then
+        return "blocked"
+    end
     local bl = cfg.blacklist and cfg.blacklist.ips or {}
-    for _, ip in ipairs(bl) do
-        if operators.eval("CIDR", ctx.client_ip, ip) then
+    for _, entry in ipairs(bl) do
+        local addr, ts = list_entry(entry)
+        if (not ts or ngx.time() < ts) and operators.eval("CIDR", ctx.client_ip, addr) then
             return "blocked"
         end
     end
