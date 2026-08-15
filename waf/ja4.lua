@@ -92,7 +92,8 @@ local function build_hello(ch)
 
     local ok2, vers = pcall(ch.get_supported_versions)
     if ok2 and type(vers) == "table" and #vers > 0 then
-        hello.version = vers[1]  -- 返回列表首项为最高版本
+        -- lua-resty-core 返回低→高（TLSv1 在前），取末项为最高版本
+        hello.version = vers[#vers]
     end
 
     local ok3, alpn = pcall(ch.get_client_hello_ext, ALPN_EXT)
@@ -140,21 +141,20 @@ function _M.run()
         ngx.log(ngx.ERR, "[waf] JA4 计算失败: ", tostring(ja4))
         return
     end
-    local ok3, err3 = pcall(function()
+    -- 双通道写入，兼容不同 OpenResty 环境：
+    --   ngx.ctx：官方镜像/新版中 ssl_client_hello 阶段 ctx 与请求阶段共享（首选）
+    --   shared dict：旧环境兜底（按 worker pid 分键，同 worker 内握手与请求顺序执行）
+    local ok3 = pcall(function()
+        ngx.ctx.ja4 = ja4
+    end)
+    local ok4 = pcall(function()
         local d = ngx.shared["waf_rule"]
         if d then
-            -- ssl_client_hello 阶段无请求上下文，ngx.var.connection 不可用；
-            -- ngx.connection() 返回当前连接对象（含 id，与请求阶段一致）
-            local conn_id = "u"
-            local c = ngx.connection()
-            if c and c.id then
-                conn_id = tostring(c.id)
-            end
-            d:set("ja4:conn:" .. conn_id, ja4, 30)
+            d:set("ja4:conn:w" .. tostring(ngx.worker.pid()), ja4, 30)
         end
     end)
-    if not ok3 then
-        ngx.log(ngx.ERR, "[waf] JA4 写入共享内存失败: ", tostring(err3))
+    if not ok3 and not ok4 then
+        ngx.log(ngx.ERR, "[waf] JA4 写入 ctx 与共享内存均失败")
     end
 end
 
