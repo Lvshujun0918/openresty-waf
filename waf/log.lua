@@ -137,6 +137,15 @@ end
 local ctx = ngx.ctx.waf_ctx
 local cfg = require("rule_engine.engine").get_active_config()
 
+-- ===== 实时统计计数（秒级共享内存窗口，init_worker 定时器聚合上报） =====
+if config.stats and config.stats.enabled ~= false then
+    local sec = os.time()
+    storage.incr_shared(config.dict.counter, "st:" .. sec, 1, 0, 2)
+    if ctx and ctx.matched and #ctx.matched > 0 then
+        storage.incr_shared(config.dict.counter, "stb:" .. sec, 1, 0, 2)
+    end
+end
+
 -- 本请求待上报的 Redis 负载（traffic + 攻击事件合并为一次 timer 推送，
 -- 攻击风暴下减少 timer 数量与 Redis 连接往返）
 local pending = {}

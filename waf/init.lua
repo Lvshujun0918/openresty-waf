@@ -224,6 +224,49 @@ local function refresh_trigger_rules()
     end
 end
 
+-- ============================================================================
+-- 引擎健康心跳：周期写 Redis（含版本号），后台判断在线状态与规则加载进度
+-- ============================================================================
+local function heartbeat(premature)
+    if premature then return end
+    local payload = storage.encode({
+        ts               = ngx.time(),
+        pid              = ngx.worker.pid(),
+        engine           = config.version or "",
+        ruleset_version  = storage.get_shared(config.dict.rules, VERSION_KEY) or "",
+        config_version   = storage.get_shared(config.dict.rules, CFG_VERSION_KEY) or "",
+        trigger_version  = storage.get_shared(config.dict.rules, TRIGGER_VERSION_KEY) or "",
+    })
+    local key = (config.heartbeat.key_prefix or "waf:heartbeat:") .. ngx.worker.pid()
+    local ok, err = storage.redis_set(key, payload, config.heartbeat.ttl or 30)
+    if not ok then
+        log(ngx.WARN, "心跳上报失败: " .. tostring(err))
+    end
+end
+
+-- ============================================================================
+-- 实时统计聚合：把共享内存中的秒级窗口计数取走并追加到 Redis 列表
+-- （多 worker 同时 flush 同一窗口时用 incr(-n) 原子取走，容忍微小误差）
+-- ============================================================================
+local function flush_stats(premature)
+    if premature then return end
+    local sec = os.time() - 1  -- 上一秒窗口（当前秒仍在写入中）
+    local tkey, bkey = "st:" .. sec, "stb:" .. sec
+    local total = storage.get_shared(config.dict.counter, tkey) or 0
+    if not total or total <= 0 then return end
+    storage.incr_shared(config.dict.counter, tkey, -total, 0, 2)
+    local attack = storage.get_shared(config.dict.counter, bkey) or 0
+    if attack and attack > 0 then
+        storage.incr_shared(config.dict.counter, bkey, -attack, 0, 2)
+    end
+    local payload = storage.encode({ ts = sec, total = total, attack = attack or 0 })
+    local ok, err = storage.redis_rpush_trim(
+        config.stats.live_key or "waf:stats:live", payload, config.stats.retention or 3600)
+    if not ok then
+        log(ngx.WARN, "实时统计上报失败: " .. tostring(err))
+    end
+end
+
 -- worker 定时器主回调：规则 + 运行配置 + 触发规则热更新
 local function refresh_from_redis(premature)
     if premature then return end
@@ -258,8 +301,14 @@ function _M.init()
     log(ngx.INFO, "WAF 初始化完成，内置规则集: " .. tostring(builtin.version))
 end
 
--- init_worker 阶段：启动规则热更新轮询
+-- init_worker 阶段：启动规则热更新轮询 + 心跳 + 实时统计聚合
 function _M.init_worker()
+    if config.heartbeat and config.heartbeat.enabled ~= false then
+        ngx.timer.every(config.heartbeat.interval or 10, heartbeat)
+    end
+    if config.stats and config.stats.enabled ~= false then
+        ngx.timer.every(config.stats.flush_interval or 1, flush_stats)
+    end
     if not config.rule_refresh.enabled then
         return
     end

@@ -151,6 +151,19 @@ function _M.redis_lpush(key, value)
     return ok2
 end
 
+-- RPUSH + 可选 LTRIM（实时统计列表：追加后裁剪到 maxlen 防无限增长）
+function _M.redis_rpush_trim(key, value, maxlen)
+    local red, rc = connect_redis()
+    if not red then return nil, rc end
+    local ok2, err2 = red:rpush(key, value)
+    if ok2 and maxlen and maxlen > 0 then
+        red:ltrim(key, -maxlen, -1)
+    end
+    release(red, rc)
+    if not ok2 then return nil, err2 end
+    return ok2
+end
+
 -- INCR + 首次设置过期（用于跨 worker 共享的计数）
 function _M.redis_incr(key, exptime)
     local red, rc = connect_redis()
