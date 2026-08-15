@@ -58,7 +58,7 @@ const logs = ref<Api.Waf.BotLog[]>([]);
 const logTotal = ref(0);
 const logPage = ref(1);
 const logPageSize = ref(20);
-const logFilter = ref({ profile: '', client_ip: '', fake: '', malicious: '' });
+const logFilter = ref({ profile: '', client_ip: '', fake: '', malicious: '', unknown_ja4: '' });
 
 // —— 画像库 ——
 const profiles = ref<Api.Waf.BotProfile[]>([]);
@@ -127,7 +127,8 @@ async function loadLogs() {
     profile: logFilter.value.profile,
     client_ip: logFilter.value.client_ip,
     fake: logFilter.value.fake,
-    malicious: logFilter.value.malicious
+    malicious: logFilter.value.malicious,
+    unknown_ja4: logFilter.value.unknown_ja4
   });
   logs.value = res.data?.items ?? [];
   logTotal.value = res.data?.total ?? 0;
@@ -341,6 +342,30 @@ const logColumns = [
         row.malicious_fp ? h(NTag, { size: 'small', type: 'error', bordered: false }, { default: () => '恶意指纹' }) : null
       ])
   },
+  {
+    title: '客户端',
+    key: 'client_name',
+    width: 150,
+    render: (row: Api.Waf.BotLog) => {
+      if (!row.ja4) return h('span', { class: 'text-xs text-[rgb(125,125,125)]' }, '-');
+      if (row.client_name) {
+        const catMeta: Record<string, { label: string; type: 'error' | 'info' | 'warning' }> = {
+          malware: { label: '恶意', type: 'error' },
+          browser: { label: '浏览器', type: 'info' },
+          tool: { label: '工具', type: 'warning' }
+        };
+        const cat = row.client_category || 'other';
+        return h('div', { class: 'flex flex-wrap items-center gap-1' }, [
+          h(NTag, { size: 'small', bordered: false, type: catMeta[cat]?.type || 'default' }, { default: () => catMeta[cat]?.label || cat }),
+          h('span', { class: 'text-xs' }, row.client_name),
+          row.ja4_match === 'ac'
+            ? h(NTag, { size: 'tiny', bordered: false, type: 'warning' }, { default: () => '疑似轮换' })
+            : null
+        ]);
+      }
+      return h(NTag, { size: 'small', bordered: false, type: 'default' }, { default: () => '未知' });
+    }
+  },
   { title: 'UA', key: 'ua', ellipsis: { tooltip: true }, render: (row: Api.Waf.BotLog) => h('span', { class: 'text-xs' }, row.ua) },
   {
     title: '指纹',
@@ -504,6 +529,7 @@ const botHeaderColumns = [
             <NInput v-model:value="logFilter.client_ip" placeholder="来源 IP" clearable style="width: 150px" @keyup.enter="logPage = 1; loadLogs()" />
             <NSelect v-model:value="logFilter.fake" placeholder="虚假爬虫" clearable style="width: 120px" :options="[{ label: '虚假', value: '1' }]" @update:value="logPage = 1; loadLogs()" />
             <NSelect v-model:value="logFilter.malicious" placeholder="恶意来源" clearable style="width: 120px" :options="[{ label: '恶意IP/指纹', value: '1' }]" @update:value="logPage = 1; loadLogs()" />
+            <NSelect v-model:value="logFilter.unknown_ja4" placeholder="未知 JA4" clearable style="width: 110px" :options="[{ label: '未知指纹', value: '1' }]" @update:value="logPage = 1; loadLogs()" />
             <NButton size="small" type="primary" @click="logPage = 1; loadLogs()">查询</NButton>
           </div>
           <NDataTable

@@ -60,4 +60,8 @@ type BotLog struct {
 	Body         string    `gorm:"type:text" json:"body"`            // 请求体（最多 8KB）
 	Status       int       `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
+	// 响应附加：JA4 客户端识别（查询时填充，不入库）
+	ClientName   string `gorm:"-" json:"client_name,omitempty"`
+	ClientCat    string `gorm:"-" json:"client_category,omitempty"`
+	Ja4Match     string `gorm:"-" json:"ja4_match,omitempty"` // exact | ac（疑似轮换扫描器）
 }

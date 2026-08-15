@@ -333,6 +333,10 @@ declare namespace Api {
       headers?: string;
       /** 请求体（最多 8KB） */
       body?: string;
+      /** JA4 客户端识别（查询附加） */
+      client_name?: string;
+      client_category?: string;
+      ja4_match?: string;
       profile: string;
       engine: boolean;
       fake: boolean;

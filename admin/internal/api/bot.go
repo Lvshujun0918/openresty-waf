@@ -127,7 +127,7 @@ func (h *BotHandler) ListLogs(c *gin.Context) {
 		pageSize = 20
 	}
 	list, total, err := h.svc.List(
-		c.Query("profile"), c.Query("client_ip"), c.Query("fake"), c.Query("malicious"), page, pageSize)
+		c.Query("profile"), c.Query("client_ip"), c.Query("fake"), c.Query("malicious"), c.Query("unknown_ja4"), page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -264,8 +264,8 @@ func (s *BotService) Consume(limit int) (int, error) {
 	return len(logs), nil
 }
 
-// List 分页查询爬虫记录，支持 profile / fake / malicious / client_ip 过滤
-func (s *BotService) List(profile, clientIP, fake, malicious string, page, pageSize int) ([]model.BotLog, int64, error) {
+// List 分页查询爬虫记录，支持 profile / fake / malicious / client_ip / unknown_ja4 过滤
+func (s *BotService) List(profile, clientIP, fake, malicious, unknownJa4 string, page, pageSize int) ([]model.BotLog, int64, error) {
 	q := s.db.Model(&model.BotLog{})
 	if profile != "" {
 		q = q.Where("profile = ?", profile)
@@ -279,6 +279,9 @@ func (s *BotService) List(profile, clientIP, fake, malicious string, page, pageS
 	if malicious == "1" {
 		q = q.Where("malicious_ip = ? OR malicious_fp <> ?", true, "")
 	}
+	if unknownJa4 == "1" {
+		q = q.Where("ja4 <> '' AND NOT EXISTS (SELECT 1 FROM ja4_profiles p WHERE p.enabled = ? AND p.ja4 = bot_logs.ja4)", true)
+	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -291,7 +294,46 @@ func (s *BotService) List(profile, clientIP, fake, malicious string, page, pageS
 		Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&list).Error; err != nil {
 		return nil, 0, err
 	}
+	// 附加 JA4 客户端识别（精确 → ja4_ac 前缀）
+	s.attachJa4Recognition(list)
 	return list, total, nil
+}
+
+// attachJa4Recognition 批量附加客户端识别（内存索引，避免逐条查询）
+func (s *BotService) attachJa4Recognition(list []model.BotLog) {
+	var profiles []model.Ja4Profile
+	if err := s.db.Where("enabled = ?", true).Find(&profiles).Error; err != nil || len(profiles) == 0 {
+		return
+	}
+	byJa4 := map[string]model.Ja4Profile{}
+	byAc := map[string]model.Ja4Profile{}
+	for _, p := range profiles {
+		if p.Ja4 != "" {
+			byJa4[p.Ja4] = p
+		}
+		if p.AcPrefix != "" {
+			if _, ok := byAc[p.AcPrefix]; !ok {
+				byAc[p.AcPrefix] = p
+			}
+		}
+	}
+	for i := range list {
+		ja4 := list[i].Ja4
+		if ja4 == "" {
+			continue
+		}
+		if p, ok := byJa4[ja4]; ok {
+			list[i].ClientName = p.Name
+			list[i].ClientCat = p.Category
+			list[i].Ja4Match = "exact"
+		} else if ac := AcPrefix(ja4); ac != "" {
+			if p, ok2 := byAc[ac]; ok2 {
+				list[i].ClientName = p.Name
+				list[i].ClientCat = p.Category
+				list[i].Ja4Match = "ac"
+			}
+		}
+	}
 }
 
 // Get 按 ID 获取爬虫记录完整信息（含请求头/请求体证据）
