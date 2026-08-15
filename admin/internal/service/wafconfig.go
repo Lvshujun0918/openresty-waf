@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
+	"sort"
+	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -99,7 +104,126 @@ func (s *WafConfigService) Versions() (map[string]string, error) {
 	return out, nil
 }
 
-// defaultWafConfig 出厂默认配置（与 waf/config.lua 默认值一致，
+// BanEntry 临时/永久封禁条目
+type BanEntry struct {
+	IP        string `json:"ip"`
+	ExpiresAt *int64 `json:"expires_at"` // nil = 永久封禁
+	Permanent bool   `json:"permanent"`
+}
+
+// parseBanEntry 解析黑名单条目："地址" 或 "地址|unix时间戳"
+func parseBanEntry(entry string) (string, int64) {
+	if idx := strings.IndexByte(entry, '|'); idx >= 0 {
+		ip := entry[:idx]
+		var ts int64
+		if _, err := fmt.Sscanf(entry[idx+1:], "%d", &ts); err == nil && ts > 0 {
+			return ip, ts
+		}
+		return ip, 0
+	}
+	return entry, 0
+}
+
+// BanIP 封禁 IP：hours<=0 永久封禁，否则封禁 hours 小时；
+// 写入配置 blacklist.ips（条目格式 ip|unix_ts，引擎侧过期自动跳过）并下发。
+func (s *WafConfigService) BanIP(ip string, hours int) error {
+	if net.ParseIP(strings.TrimSpace(ip)) == nil {
+		return errors.New("非法 IP 地址")
+	}
+	cfg, err := s.Get()
+	if err != nil {
+		return err
+	}
+	blacklist, _ := cfg["blacklist"].(map[string]interface{})
+	if blacklist == nil {
+		blacklist = map[string]interface{}{"ips": []string{}, "urls": []string{}}
+		cfg["blacklist"] = blacklist
+	}
+	ips := toStringSlice(blacklist["ips"])
+	out := make([]string, 0, len(ips)+1)
+	for _, e := range ips {
+		part, _ := parseBanEntry(e)
+		if part != ip {
+			out = append(out, e)
+		}
+	}
+	entry := ip
+	if hours > 0 {
+		entry = fmt.Sprintf("%s|%d", ip, time.Now().Add(time.Duration(hours)*time.Hour).Unix())
+	}
+	out = append(out, entry)
+	blacklist["ips"] = out
+	return s.Save(cfg)
+}
+
+// ListBans 当前生效的封禁条目（已过期的临时条目不展示，引擎侧亦自动跳过）
+func (s *WafConfigService) ListBans() ([]BanEntry, error) {
+	cfg, err := s.Get()
+	if err != nil {
+		return nil, err
+	}
+	blacklist, _ := cfg["blacklist"].(map[string]interface{})
+	out := []BanEntry{}
+	if blacklist == nil {
+		return out, nil
+	}
+	now := time.Now().Unix()
+	for _, e := range toStringSlice(blacklist["ips"]) {
+		ip, ts := parseBanEntry(e)
+		if ip == "" || net.ParseIP(ip) == nil {
+			continue
+		}
+		if ts > 0 && ts <= now {
+			continue // 已过期
+		}
+		b := BanEntry{IP: ip}
+		if ts > 0 {
+			t := ts
+			b.ExpiresAt = &t
+		} else {
+			b.Permanent = true
+		}
+		out = append(out, b)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].IP < out[j].IP })
+	return out, nil
+}
+
+// UnbanIP 解除指定 IP 的封禁（含过期条目）
+func (s *WafConfigService) UnbanIP(ip string) error {
+	cfg, err := s.Get()
+	if err != nil {
+		return err
+	}
+	blacklist, _ := cfg["blacklist"].(map[string]interface{})
+	if blacklist == nil {
+		return nil
+	}
+	ips := toStringSlice(blacklist["ips"])
+	out := make([]string, 0, len(ips))
+	for _, e := range ips {
+		part, _ := parseBanEntry(e)
+		if part != ip {
+			out = append(out, e)
+		}
+	}
+	blacklist["ips"] = out
+	return s.Save(cfg)
+}
+
+func toStringSlice(v interface{}) []string {
+	slice, ok := v.([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(slice))
+	for _, item := range slice {
+		if str, ok := item.(string); ok {
+			out = append(out, str)
+		}
+	}
+	return out
+}
 // 不含 redis 连接——该信息由部署引导 config_local.lua 提供）
 func defaultWafConfig() map[string]interface{} {
 	return map[string]interface{}{
@@ -174,6 +298,10 @@ h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
 		},
 		"traffic_log": map[string]interface{}{
 			"enabled": false, "retention_days": 7, "redis_key": "waf:traffic:list",
+		},
+		"auto_ban": map[string]interface{}{
+			"enabled": true, "threshold": 10, "window": 60, "duration": 600,
+			"ban_key_prefix": "waf:ab:ban:", "counter_prefix": "waf:ab:cnt:",
 		},
 	}
 }
