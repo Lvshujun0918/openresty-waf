@@ -173,7 +173,7 @@ end
 local ctx = new_ctx(cfg)
 
 -- 读取本连接的 JA4 TLS 指纹（ssl_client_hello 阶段写入共享内存；
--- 同一连接所有请求共享；非 TLS 连接/未挂载钩子时为 nil，回退 HTTP 指纹）
+-- 同一连接所有请求共享；非 TLS 连接/未挂载钩子时为 nil，回退 TLS/HTTP 指纹）
 local _ja4d = ngx.shared[config.dict.rules]
 if _ja4d then
     ctx.ja4 = _ja4d:get("ja4:conn:" .. tostring(ngx.var.connection))

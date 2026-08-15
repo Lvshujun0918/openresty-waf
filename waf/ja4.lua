@@ -32,13 +32,27 @@ local function hex1(n)
     return string.format("%x", n)
 end
 
-local function sha256_hex12(s)
-    if not s or s == "" then return "0" end
-    local bin = ngx.sha256_bin(s)
-    if not bin then return "0" end
-    return (bin:gsub(".", function(ch)
-        return string.format("%02x", ch:byte())
-    end)):sub(1, 12)
+-- 摘要实现：优先 ngx.sha256_bin（部分 OpenResty 二进制未提供），
+-- 回退 lua-resty-string 的纯 Lua resty.sha256
+local sha256_hex12
+do
+    local has_builtin = type(ngx.sha256_bin) == "function"
+    local resty_ok, resty_sha256 = pcall(require, "resty.sha256")
+    sha256_hex12 = function(s)
+        if not s or s == "" then return "0" end
+        local bin
+        if has_builtin then
+            bin = ngx.sha256_bin(s)
+        elseif resty_ok then
+            local h = resty_sha256:new()
+            h:update(s)
+            bin = h:final()
+        end
+        if not bin then return "0" end
+        return (bin:gsub(".", function(ch)
+            return string.format("%02x", ch:byte())
+        end)):sub(1, 12)
+    end
 end
 
 -- ClientHello 解析结果 → JA4（纯函数，可单测）。
@@ -108,11 +122,17 @@ end
 -- fail-open：任何解析/计算/写入错误都不影响 TLS 握手（仅记录错误并放行）。
 function _M.run()
     local ok, clienthello = pcall(require, "ngx.ssl.clienthello")
-    if not ok or not clienthello then
-        return  -- 环境不支持（应不会发生：OpenResty 1.19.3+ 内置）
+    if not ok then
+        ngx.log(ngx.ERR, "[waf] JA4: ngx.ssl.clienthello 加载失败: ", tostring(clienthello))
+        return
+    end
+    if not clienthello or type(clienthello) ~= "table" then
+        ngx.log(ngx.ERR, "[waf] JA4: ngx.ssl.clienthello 不可用")
+        return
     end
     local okb, hello = pcall(build_hello, clienthello)
     if not okb or not hello then
+        ngx.log(ngx.ERR, "[waf] JA4: ClientHello 解析失败: ", tostring(hello))
         return
     end
     local ok2, ja4 = pcall(_M.calc, hello)
@@ -120,14 +140,21 @@ function _M.run()
         ngx.log(ngx.ERR, "[waf] JA4 计算失败: ", tostring(ja4))
         return
     end
-    local ok3 = pcall(function()
+    local ok3, err3 = pcall(function()
         local d = ngx.shared["waf_rule"]
         if d then
-            d:set("ja4:conn:" .. tostring(ngx.var.connection), ja4, 30)
+            -- ssl_client_hello 阶段无请求上下文，ngx.var.connection 不可用；
+            -- ngx.connection() 返回当前连接对象（含 id，与请求阶段一致）
+            local conn_id = "u"
+            local c = ngx.connection()
+            if c and c.id then
+                conn_id = tostring(c.id)
+            end
+            d:set("ja4:conn:" .. conn_id, ja4, 30)
         end
     end)
     if not ok3 then
-        ngx.log(ngx.ERR, "[waf] JA4 写入共享内存失败")
+        ngx.log(ngx.ERR, "[waf] JA4 写入共享内存失败: ", tostring(err3))
     end
 end
 
