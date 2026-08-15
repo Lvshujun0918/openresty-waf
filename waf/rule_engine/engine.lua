@@ -34,6 +34,8 @@ local function match_rule(rule, waf_ctx)
 end
 
 -- 记录单条规则命中（日志由 log 阶段统一落盘）
+-- 首次命中时触发请求证据惰性捕获（access.lua 注入的 capture_evidence 回调），
+-- 保证 BLOCK 动作 ngx.exit 前证据已就绪，且正常流量零证据采集开销
 local function record_hit(waf_ctx, rule)
     waf_ctx.matched[#waf_ctx.matched + 1] = {
         id       = rule.id,
@@ -41,6 +43,10 @@ local function record_hit(waf_ctx, rule)
         msg      = rule.actions and rule.actions.msg,
         severity = rule.severity,
     }
+    if not waf_ctx._evidence_captured and waf_ctx.capture_evidence then
+        waf_ctx._evidence_captured = true
+        pcall(waf_ctx.capture_evidence, waf_ctx)
+    end
 end
 
 -- 应用单条规则动作：SCORE 累计异常分 / 其余收集后仲裁；

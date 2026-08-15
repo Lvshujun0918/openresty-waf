@@ -26,8 +26,12 @@ end
 local EVIDENCE_MAX_HEADERS = 16
 local EVIDENCE_MAX_BODY    = 8192  -- 请求体最大保留 8KB
 
--- 命中攻击时捕获请求头与请求体（access 阶段执行，供 log 阶段事件详情使用）
+-- 命中攻击时捕获请求头与请求体（access 阶段执行，供 log 阶段事件详情使用）。
+-- 惰性调用：仅规则/触发命中时执行一次（_evidence_captured 幂等标记），
+-- 正常流量不做 header 收集与 body 读取。
 local function capture_evidence(ctx)
+    if ctx._evidence_captured then return end
+    ctx._evidence_captured = true
     local evidence = {}
     -- 请求头：按名称排序，取前 N 个
     local all = ngx.req.get_headers()
@@ -308,9 +312,9 @@ local function protection_flow()
                 ngx.var.uri, cfg.detection and cfg.detection.skip_static)
         end
         if not exempt and not skip_static then
-            -- 先捕获请求头/请求体：engine.run 内部 BLOCK 动作会直接 ngx.exit(403)，
-            -- 因此必须在检测前捕获证据，否则永远执行不到。
-            pcall(capture_evidence, ctx)
+            -- 注入惰性证据捕获：engine.run 内部 BLOCK 动作会直接 ngx.exit(403)，
+            -- 因此捕获只能在规则命中时由引擎回调触发（record_hit），否则永远执行不到。
+            ctx.capture_evidence = capture_evidence
             -- fail-open：规则引擎任何运行错误都不影响业务，记录错误后放行。
             -- ngx.exit 以 Lua 错误形式抛出：配合 _exited 标记区分「正常拦截」与「异常」。
             local ok2, result = pcall(engine.run, ruleset, "access", ctx)
