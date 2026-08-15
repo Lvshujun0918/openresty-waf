@@ -197,5 +197,12 @@ declare namespace Api {
       rule_count: number;
       created_at: string;
     }
+
+    /** 封禁条目 */
+    interface BanEntry {
+      ip: string;
+      expires_at: number | null;
+      permanent: boolean;
+    }
   }
 }

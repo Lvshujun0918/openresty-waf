@@ -18,8 +18,10 @@ import {
 import {
   createRule,
   deleteRule,
+  exportRules,
   fetchPublishHistory,
   fetchRules,
+  importRules,
   publishRules,
   rollbackRules,
   setRuleEnabled,
@@ -207,6 +209,46 @@ async function doRollback(row: Api.Waf.PublishHistory) {
     await load();
   } finally {
     rollingBackId.value = null;
+  }
+}
+
+// —— 规则导入 / 导出 ——
+async function doExport() {
+  const res = await exportRules();
+  const data = res.data;
+  if (!Array.isArray(data)) return;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'waf-rules.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  window.$message?.success(`已导出 ${data.length} 条规则`);
+}
+
+const importInputRef = ref<HTMLInputElement | null>(null);
+
+function triggerImport() {
+  importInputRef.value?.click();
+}
+
+async function onImportFile(ev: Event) {
+  const input = ev.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const arr = Array.isArray(parsed) ? parsed : (parsed as { rules?: unknown[] }).rules;
+    if (!Array.isArray(arr)) throw new Error('格式错误');
+    const res = await importRules(arr);
+    window.$message?.success(`导入完成：新增 ${res.data?.imported ?? 0} 条，跳过 ${res.data?.skipped ?? 0} 条（重复/非法规则）`);
+    await load();
+  } catch {
+    window.$message?.error('导入失败：请检查 JSON 格式');
+  } finally {
+    input.value = '';
   }
 }
 
@@ -479,9 +521,12 @@ onMounted(load);
         <p class="text-sm text-[rgb(125,125,125)]">共 {{ filterRules.length }} 条 · 发布后引擎 5 秒内热更新生效</p>
       </div>
       <NSpace>
+        <NButton secondary @click="doExport">导出</NButton>
+        <NButton secondary @click="triggerImport">导入</NButton>
         <NButton secondary @click="historyOpen = true; loadHistory()">发布历史</NButton>
         <NButton secondary type="warning" @click="doPublish">发布到引擎</NButton>
         <NButton type="primary" @click="openCreate">新建规则</NButton>
+        <input ref="importInputRef" type="file" accept=".json,application/json" class="hidden" @change="onImportFile" />
       </NSpace>
     </div>
 

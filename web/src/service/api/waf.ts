@@ -88,6 +88,31 @@ export function rollbackRules(id: number) {
   return request<{ status: string }>({ url: `/rules/rollback/${id}`, method: 'post' });
 }
 
+/** 导出全部规则（返回 JSON 数组，前端生成文件下载） */
+export function exportRules() {
+  return request<Api.Waf.Rule[]>({ url: '/rules/export' });
+}
+
+/** 导入规则（JSON 数组） */
+export function importRules(rules: unknown[]) {
+  return request<{ imported: number; skipped: number }>({ url: '/rules/import', method: 'post', data: { rules } });
+}
+
+/** 当前生效封禁列表 */
+export function fetchBans() {
+  return request<Api.Waf.BanEntry[]>({ url: '/bans' });
+}
+
+/** 解除封禁 */
+export function unbanIP(ip: string) {
+  return request<{ status: string }>({ url: '/bans', method: 'delete', params: { ip } });
+}
+
+/** 一键封禁事件来源 IP（hours<=0 永久） */
+export function banEvent(id: number, hours: number) {
+  return request<{ status: string; ip: string }>({ url: `/events/${id}/ban`, method: 'post', data: { hours } });
+}
+
 /** 规则测试 */
 export function testRule(data: Api.Waf.RuleTestReq) {
   return request<{ matched: boolean; note?: string }>({ url: '/rules/test', method: 'post', data });
