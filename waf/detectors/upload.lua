@@ -15,7 +15,7 @@ local function get_boundary(content_type)
 end
 
 -- 解析 multipart body → 文件部分列表 { filename, content_type, head }
--- head 保留文件内容前 64 字节（供后续文件头魔数检测扩展）。
+-- head 保留文件内容前 128 字节（文件头魔数/脚本标签检测，覆盖长 MIME 头）。
 -- 部分之间由 \r\n--boundary 分隔；结束分隔行为 --boundary--。
 function _M.parse_multipart(body, boundary)
     local parts = {}
@@ -42,7 +42,7 @@ function _M.parse_multipart(body, boundary)
             parts[#parts + 1] = {
                 filename = filename,
                 content_type = content_type or nil,
-                head = data:sub(1, 64),
+                head = data:sub(1, 128),
             }
         end
         start = next_delim and body:find(delim, next_delim + 2, true) or nil
