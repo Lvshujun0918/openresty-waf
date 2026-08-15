@@ -13,9 +13,13 @@ end)
 
 t.test("get_client_ip: XFF 最左优先", function()
     ngx_reset()
+    local config = require "config"
+    local orig = config.trusted_proxies
+    config.trusted_proxies = { "10.0.0.0/8" }
     ngx.var.remote_addr = "10.0.0.1"
     ngx.var.http_x_forwarded_for = "8.8.8.8, 1.1.1.1"
     t.eq(storage.get_client_ip(), "8.8.8.8")
+    config.trusted_proxies = orig
 end)
 
 t.test("get_client_ip: XFF 为 unknown 回退", function()
