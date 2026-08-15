@@ -54,7 +54,13 @@ func AllowedIP(cfg *config.Config) gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		ip := net.ParseIP(c.ClientIP())
+		// 用 RemoteAddr（直连地址）而非 c.ClientIP()：后者信任 X-Forwarded-For，
+		// 面板前有反代时攻击者可伪造 XFF 绕过白名单
+		host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+		if err != nil {
+			host = c.Request.RemoteAddr
+		}
+		ip := net.ParseIP(host)
 		if ip == nil {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "访问被拒绝"})
 			return
