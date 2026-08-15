@@ -26,23 +26,24 @@ func NewEventService(db *gorm.DB, mgr *RedisManager, cfg *config.Config) *EventS
 	return &EventService{db: db, mgr: mgr, cfg: cfg, ctx: context.Background()}
 }
 
-// Consume 从 Redis 队列消费事件并写入 DB，返回本次消费条数。
-// 使用 RPop 逐条消费，坏数据跳过，单个失败不中断。
+// Consume 从 Redis 队列批量消费事件并写入 DB，返回本次消费条数。
+// 批量 RPop + 批量插入（CreateInBatches），攻击风暴下避免逐条往返与逐条写库；
+// 坏数据跳过，单个失败不中断。
 func (s *EventService) Consume(limit int) (int, error) {
 	rdb := s.mgr.GetClient()
 	if rdb == nil {
 		return 0, errors.New("Redis 未配置，请先在引导页完成 Redis 配置")
 	}
 	key := s.cfg.Rule.EventKey
-	count := 0
-	for i := 0; i < limit; i++ {
-		raw, err := rdb.RPop(s.ctx, key).Result()
-		if err == redis.Nil {
-			break // 队列已空
-		}
-		if err != nil {
-			return count, err
-		}
+	raws, err := rdb.RPopCount(s.ctx, key, limit).Result()
+	if err == redis.Nil {
+		return 0, nil // 队列已空
+	}
+	if err != nil {
+		return 0, err
+	}
+	events := make([]model.Event, 0, len(raws))
+	for _, raw := range raws {
 		var ev model.Event
 		if err := json.Unmarshal([]byte(raw), &ev); err != nil {
 			continue // 跳过无法解析的数据
@@ -50,12 +51,14 @@ func (s *EventService) Consume(limit int) (int, error) {
 		if ev.Time.IsZero() {
 			ev.Time = time.Now()
 		}
-		if err := s.db.Create(&ev).Error; err != nil {
-			return count, err
-		}
-		count++
+		events = append(events, ev)
 	}
-	return count, nil
+	if len(events) > 0 {
+		if err := s.db.CreateInBatches(events, 100).Error; err != nil {
+			return 0, err
+		}
+	}
+	return len(events), nil
 }
 
 // List 分页查询攻击事件，支持 group / client_ip / rule_id / host / action 过滤

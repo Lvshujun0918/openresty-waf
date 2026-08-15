@@ -28,21 +28,21 @@ func NewChallengeService(db *gorm.DB, mgr *RedisManager, cfg *config.Config) *Ch
 	return &ChallengeService{db: db, mgr: mgr, cfg: cfg, ctx: context.Background()}
 }
 
-// Consume 从 Redis 队列消费人机验证事件并写入 DB，返回本次消费条数
+// Consume 从 Redis 队列批量消费人机验证事件并写入 DB，返回本次消费条数
 func (s *ChallengeService) Consume(limit int) (int, error) {
 	rdb := s.mgr.GetClient()
 	if rdb == nil {
 		return 0, errors.New("Redis 未配置")
 	}
-	count := 0
-	for i := 0; i < limit; i++ {
-		raw, err := rdb.RPop(s.ctx, ChallengeKey).Result()
-		if err == redis.Nil {
-			break
-		}
-		if err != nil {
-			return count, err
-		}
+	raws, err := rdb.RPopCount(s.ctx, ChallengeKey, limit).Result()
+	if err == redis.Nil {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	logs := make([]model.ChallengeLog, 0, len(raws))
+	for _, raw := range raws {
 		var rec model.ChallengeLog
 		if err := json.Unmarshal([]byte(raw), &rec); err != nil {
 			continue // 跳过坏数据
@@ -50,12 +50,14 @@ func (s *ChallengeService) Consume(limit int) (int, error) {
 		if rec.Time.IsZero() {
 			rec.Time = time.Now()
 		}
-		if err := s.db.Create(&rec).Error; err != nil {
-			return count, err
-		}
-		count++
+		logs = append(logs, rec)
 	}
-	return count, nil
+	if len(logs) > 0 {
+		if err := s.db.CreateInBatches(logs, 100).Error; err != nil {
+			return 0, err
+		}
+	}
+	return len(logs), nil
 }
 
 // List 分页查询人机验证事件，支持 client_ip / action 过滤

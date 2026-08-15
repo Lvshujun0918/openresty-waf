@@ -26,22 +26,22 @@ func NewTrafficService(db *gorm.DB, mgr *RedisManager, cfg *config.Config) *Traf
 	return &TrafficService{db: db, mgr: mgr, cfg: cfg, ctx: context.Background()}
 }
 
-// Consume 从 Redis 队列消费流量记录并写入 DB，返回本次消费条数
+// Consume 从 Redis 队列批量消费流量记录并写入 DB，返回本次消费条数
 func (s *TrafficService) Consume(limit int) (int, error) {
 	rdb := s.mgr.GetClient()
 	if rdb == nil {
 		return 0, errors.New("Redis 未配置，请先在引导页完成 Redis 配置")
 	}
 	key := "waf:traffic:list"
-	count := 0
-	for i := 0; i < limit; i++ {
-		raw, err := rdb.RPop(s.ctx, key).Result()
-		if err == redis.Nil {
-			break
-		}
-		if err != nil {
-			return count, err
-		}
+	raws, err := rdb.RPopCount(s.ctx, key, limit).Result()
+	if err == redis.Nil {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	logs := make([]model.TrafficLog, 0, len(raws))
+	for _, raw := range raws {
 		var rec model.TrafficLog
 		if err := json.Unmarshal([]byte(raw), &rec); err != nil {
 			continue // 跳过坏数据
@@ -49,12 +49,14 @@ func (s *TrafficService) Consume(limit int) (int, error) {
 		if rec.Time.IsZero() {
 			rec.Time = time.Now()
 		}
-		if err := s.db.Create(&rec).Error; err != nil {
-			return count, err
-		}
-		count++
+		logs = append(logs, rec)
 	}
-	return count, nil
+	if len(logs) > 0 {
+		if err := s.db.CreateInBatches(logs, 100).Error; err != nil {
+			return 0, err
+		}
+	}
+	return len(logs), nil
 }
 
 // List 分页查询流量记录，支持 host / client_ip / attack 过滤
