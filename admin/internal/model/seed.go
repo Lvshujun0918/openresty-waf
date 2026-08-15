@@ -10,7 +10,7 @@ package model
 //     编码混淆 27013、DLP 26010-26014、爬虫/客户端指纹 28001-28004
 // v8: 修复 921170 误报（原 pattern=. 匹配所有参数键）：改为链式规则，
 //     仅 GET/HEAD 且请求体存在时记录
-const SeedVersion = "8"
+const SeedVersion = "9"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{

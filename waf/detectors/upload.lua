@@ -110,7 +110,18 @@ function _M.check(waf_ctx, up)
     return _M.scan_body(body, boundary, up)
 end
 
--- 单个文件部分检测（后缀黑名单 + Content-Type 黑名单）
+-- 脚本/可执行文件内容特征（文件头 64 字节内匹配，Webshell 检测）。
+-- 宽松匹配 PHP/ASP/JSP 标签与 shebang；XML 声明不误伤。
+local CONTENT_FEATURES = {
+    { pattern = "<%?php",     desc = "PHP 脚本标签" },
+    { pattern = "<%?%s*=",    desc = "PHP 短标签" },
+    { pattern = "<%[%s*[@=]", desc = "ASP/JSP 脚本标签" },
+    { pattern = "<%[jsp:%s*:", desc = "JSP 标签" },
+    { pattern = "#!%s*/",     desc = "Shebang 脚本" },
+    { pattern = "^MZ",        desc = "PE 可执行文件" },
+}
+
+-- 单个文件部分检测（后缀黑名单 + Content-Type 黑名单 + 内容特征）
 local function scan_part(part, up)
     -- 1. 文件名后缀黑名单（对伪装 Content-Type 的上传有效）
     local ext = part.filename:match("%.([^%.]+)$")
@@ -121,6 +132,15 @@ local function scan_part(part, up)
     if in_list(up.deny_mime, part.content_type) then
         return "文件上传：危险类型 " .. tostring(part.content_type)
             .. "（" .. part.filename .. "）"
+    end
+    -- 3. 内容特征扫描（Webshell/可执行文件魔数，绕过后缀与类型伪装）
+    if up.content_scan ~= false and part.head and #part.head > 0 then
+        for _, feat in ipairs(CONTENT_FEATURES) do
+            local ok, m = pcall(ngx.re.find, part.head, feat.pattern, "joi")
+            if ok and m then
+                return "文件上传：内容含" .. feat.desc .. "（" .. part.filename .. "）"
+            end
+        end
     end
     return nil
 end

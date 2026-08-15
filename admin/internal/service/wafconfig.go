@@ -313,6 +313,7 @@ h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
 			"enabled":   true,
 			"deny_ext":  []string{"php", "php3", "php5", "phtml", "jsp", "jspx", "asp", "aspx", "asa", "cer", "cgi", "pl", "sh", "py", "exe"},
 			"deny_mime": []string{"application/x-php", "application/x-httpd-php", "application/x-msdownload"},
+			"content_scan": true,
 			// 请求体落临时文件时扫描文件前缀字节数（防超大上传绕过）
 			"spooled_scan_bytes": 524288,
 		},
