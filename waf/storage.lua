@@ -23,10 +23,15 @@ function _M.get_shared(dict_name, key)
     return d:get(key)
 end
 
--- 写共享内存（exptime=0 表示不过期）
+-- 写共享内存（exptime=0 表示不过期）。
+-- value 为 nil 时执行删除语义（真实 lua-nginx-module 下 dict:set 传 nil 会抛错，
+-- 删除需走 dict:delete；如 CC 解封路径）
 function _M.set_shared(dict_name, key, value, exptime)
     local d = get_dict(dict_name)
     if not d then return nil, "shared dict not found: " .. tostring(dict_name) end
+    if value == nil then
+        return d:delete(key)
+    end
     return d:set(key, value, exptime or 0)
 end
 
