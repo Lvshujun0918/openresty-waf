@@ -96,8 +96,11 @@ function _M.check(waf_ctx, cfg, rate, ban_duration, dims)
     ban_duration = ban_duration or cfg.cc.ban_duration or 300
 
     local count, seconds = parse_rate(rate)
-    -- 计数维度：IP + Host + 路径（不含 query string）+ 可选维度
-    local counter_key = (cfg.cc.counter_prefix or "waf:cc:cnt:") .. ip .. ":" .. host .. ":" .. path
+    -- 计数维度：IP + Host + 路径（不含 query string）+ 可选维度。
+    -- host:path 做 md5 哈希：攻击者可用超长/多变 path 制造大量唯一键，
+    -- 直接拼接原始字符串会撑爆 waf_counter 共享内存导致 CC 失效
+    local counter_key = (cfg.cc.counter_prefix or "waf:cc:cnt:") .. ip .. ":" ..
+        ngx.md5(host .. ":" .. path)
     for _, d in ipairs(dims or {}) do
         if d == "ua" then
             -- UA 哈希（防超长 key）：同 IP 换 UA 绕过时各 UA 独立计数
