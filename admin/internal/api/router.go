@@ -33,6 +33,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	banHandler := NewBanHandler(db, mgr, cfg)
 	healthHandler := NewHealthHandler(mgr, cfg)
 	alertHandler := NewAlertHandler(db, mgr, cfg)
+	auditHandler := NewAuditHandler(db)
+	auditSvc := service.NewAuditService(db)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -49,6 +51,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 		api.GET("/setup/install.sh", setupHandler.InstallScript)
 
 		authed := api.Group("", AuthMiddleware(authSvc))
+		authed.Use(AuditMiddleware(auditSvc))
 		{
 			authed.GET("/auth/me", authHandler.Me)
 			authed.POST("/auth/totp/setup", authHandler.TotpSetup)
@@ -130,6 +133,9 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.DELETE("/trigger-rules/:id", triggerRuleHandler.Delete)
 			authed.PATCH("/trigger-rules/:id/enabled", triggerRuleHandler.SetEnabled)
 			authed.POST("/trigger-rules/publish", triggerRuleHandler.Publish)
+
+			// 操作审计日志
+			authed.GET("/audit-logs", auditHandler.ListAudits)
 
 			// WAF 运行配置
 			authed.GET("/config", configHandler.Get)
