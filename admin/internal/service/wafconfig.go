@@ -81,8 +81,8 @@ func (s *WafConfigService) Save(cfg map[string]interface{}) error {
 }
 
 // Versions 版本健康信息：rule_version / config_version 来自 Redis
-// （后台下发的当前版本号）；engine_version 来自最近事件上报的引擎版本
-// （无事件时为空，代表引擎尚未上报）。
+// （后台下发的当前版本号）；engine_version 优先取引擎心跳（实时，不依赖事件），
+// 无心跳时回退最近事件上报的引擎版本。
 func (s *WafConfigService) Versions() (map[string]string, error) {
 	out := map[string]string{
 		"engine_version": "",
@@ -97,10 +97,22 @@ func (s *WafConfigService) Versions() (map[string]string, error) {
 		if v, err := rdb.Get(s.ctx, s.cfg.WAFConfig.VersionKey).Result(); err == nil && v != "" {
 			out["config_version"] = v
 		}
+		// 引擎版本：优先从心跳读取（任一在线引擎）
+		engines, err := NewHealthService(s.mgr, s.cfg).ListEngines()
+		if err == nil {
+			for _, e := range engines {
+				if e.EngineVersion != "" {
+					out["engine_version"] = e.EngineVersion
+					break
+				}
+			}
+		}
 	}
-	var ev model.Event
-	if err := s.db.Where("engine_version <> ''").Order("id desc").First(&ev).Error; err == nil {
-		out["engine_version"] = ev.EngineVersion
+	if out["engine_version"] == "" {
+		var ev model.Event
+		if err := s.db.Where("engine_version <> ''").Order("id desc").First(&ev).Error; err == nil {
+			out["engine_version"] = ev.EngineVersion
+		}
 	}
 	return out, nil
 }
