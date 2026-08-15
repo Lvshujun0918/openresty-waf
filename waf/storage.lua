@@ -100,19 +100,23 @@ local function connect_redis()
         end
     end
 
-    return red
+    return red, rc
 end
 
-local function release(red)
-    red:set_keepalive(config.redis.keepalive_timeout, config.redis.pool_size)
+-- 归还连接到池：参数必须与建立连接时使用的生效配置一致
+-- （连接可能来自后台下发的 active_config，静态 config.redis 的
+-- keepalive_timeout/pool_size 可能与实际不符）
+local function release(red, rc)
+    rc = rc or config.redis
+    red:set_keepalive(rc.keepalive_timeout or 60, rc.pool_size or 100)
 end
 
 -- GET
 function _M.redis_get(key)
-    local red, err = connect_redis()
-    if not red then return nil, err end
+    local red, rc = connect_redis()
+    if not red then return nil, rc end
     local val, err2 = red:get(key)
-    release(red)
+    release(red, rc)
     if err2 then return nil, err2 end
     -- lua-resty-redis 对不存在的键返回 ngx.null（userdata），统一归一为 nil。
     -- 否则调用方把 ngx.null 误判为"有值"，会继续读取并因 JSON 解析失败误报"规则集非法"。
@@ -124,38 +128,38 @@ end
 
 -- SET / SETEX
 function _M.redis_set(key, value, exptime)
-    local red, err = connect_redis()
-    if not red then return nil, err end
+    local red, rc = connect_redis()
+    if not red then return nil, rc end
     local ok2, err2
     if exptime and exptime > 0 then
         ok2, err2 = red:setex(key, exptime, value)
     else
         ok2, err2 = red:set(key, value)
     end
-    release(red)
+    release(red, rc)
     if not ok2 then return nil, err2 end
     return ok2
 end
 
 -- LPUSH（攻击事件缓冲）
 function _M.redis_lpush(key, value)
-    local red, err = connect_redis()
-    if not red then return nil, err end
+    local red, rc = connect_redis()
+    if not red then return nil, rc end
     local ok2, err2 = red:lpush(key, value)
-    release(red)
+    release(red, rc)
     if not ok2 then return nil, err2 end
     return ok2
 end
 
 -- INCR + 首次设置过期（用于跨 worker 共享的计数）
 function _M.redis_incr(key, exptime)
-    local red, err = connect_redis()
-    if not red then return nil, err end
+    local red, rc = connect_redis()
+    if not red then return nil, rc end
     local n, err2 = red:incr(key)
     if n == 1 and exptime and exptime > 0 then
         red:expire(key, exptime)
     end
-    release(red)
+    release(red, rc)
     if err2 then return nil, err2 end
     return n
 end
