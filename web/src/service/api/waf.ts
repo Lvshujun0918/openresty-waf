@@ -401,6 +401,11 @@ export function fetchBotLogs(params: Record<string, string | number>) {
   return request<Api.Waf.PageResult<Api.Waf.BotLog>>({ url: '/bots/logs', params });
 }
 
+/** 爬虫记录详情（含请求头/请求体证据） */
+export function fetchBotLogDetail(id: number) {
+  return request<Api.Waf.BotLog>({ url: `/bots/logs/${id}` });
+}
+
 /** 消费爬虫记录队列 */
 export function consumeBotLogs() {
   return request<{ status: string; consumed: number }>({ url: '/bots/consume', method: 'post' });

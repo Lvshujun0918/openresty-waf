@@ -407,6 +407,10 @@ onMounted(load);
               {{ isBlocked(detail) ? '拦截' : '记录' }}
             </NTag>
           </div>
+          <div v-if="detail.ja4">
+            <div class="text-xs text-[rgb(125,125,125)]">JA4 指纹</div>
+            <div class="font-mono text-xs" :title="detail.ja4">{{ detail.ja4 }}</div>
+          </div>
           <div class="col-span-2 md:col-span-3">
             <div class="text-xs text-[rgb(125,125,125)]">请求</div>
             <div class="break-all font-mono text-xs">{{ detail.method }} {{ detail.host }}{{ detail.uri }}</div>

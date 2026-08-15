@@ -24,6 +24,7 @@ import type { ECOption } from '@/hooks/common/echarts';
 import {
   blacklistBotLog,
   consumeBotLogs,
+  fetchBotLogDetail,
   createBotFingerprint,
   createBotProfile,
   deleteBotFingerprint,
@@ -292,26 +293,29 @@ const logColumns = [
   {
     title: '操作',
     key: 'action',
-    width: 110,
+    width: 160,
     render: (row: Api.Waf.BotLog) =>
-      h(
-        NPopconfirm,
-        {
-          onPositiveClick: async () => {
-            await blacklistBotLog(row.id);
-            message.success('指纹已加入恶意指纹库并下发，同指纹请求将被拦截');
+      h(NSpace, { size: 4 }, [
+        h(NButton, { size: 'small', quaternary: true, type: 'primary', onClick: () => openDetail(row.id) }, { default: () => '详情' }),
+        h(
+          NPopconfirm,
+          {
+            onPositiveClick: async () => {
+              await blacklistBotLog(row.id);
+              message.success('指纹已加入恶意指纹库并下发，同指纹请求将被拦截');
+            }
+          },
+          {
+            trigger: () =>
+              h(
+                NButton,
+                { size: 'small', quaternary: true, type: 'error', disabled: !row.ja4 && !row.fingerprint },
+                { default: () => '指纹拉黑' }
+              ),
+            default: () => '将该请求的 TLS 指纹加入恶意指纹库？同指纹客户端将被拦截'
           }
-        },
-        {
-          trigger: () =>
-            h(
-              NButton,
-              { size: 'small', quaternary: true, type: 'error', disabled: !row.ja4 && !row.fingerprint },
-              { default: () => '指纹拉黑' }
-            ),
-          default: () => '将该请求的 TLS 指纹加入恶意指纹库？同指纹客户端将被拦截'
-        }
-      )
+        )
+      ])
   }
 ];
 
@@ -321,6 +325,39 @@ async function consume() {
   loadLogs();
   loadStats();
 }
+
+// —— 详情弹窗（与攻击事件详情一致：基本信息 + 请求头 + 请求体 + JA4） ——
+const detailOpen = ref(false);
+const detailLoading = ref(false);
+const detail = ref<Api.Waf.BotLog | null>(null);
+const detailHeaders = ref<{ name: string; value: string }[]>([]);
+
+async function openDetail(id: number) {
+  detailOpen.value = true;
+  detailLoading.value = true;
+  detail.value = null;
+  detailHeaders.value = [];
+  try {
+    const res = await fetchBotLogDetail(id);
+    detail.value = res.data ?? null;
+    try {
+      const parsed = JSON.parse(detail.value?.headers || '[]');
+      detailHeaders.value = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      detailHeaders.value = [];
+    }
+  } finally {
+    detailLoading.value = false;
+  }
+}
+function closeDetail() {
+  detailOpen.value = false;
+  detail.value = null;
+}
+const botHeaderColumns = [
+  { title: '名称', key: 'name', width: 180, render: (row: { name: string }) => h('span', { class: 'font-mono text-xs' }, row.name) },
+  { title: '值', key: 'value', render: (row: { value: string }) => h('span', { class: 'break-all font-mono text-xs text-[rgb(125,125,125)]' }, row.value) }
+];
 </script>
 
 <template>
@@ -479,6 +516,84 @@ async function consume() {
           <NButton type="primary" @click="saveFingerprint">保存并下发</NButton>
         </div>
       </template>
+    </NModal>
+
+    <!-- 爬虫记录详情 -->
+    <NModal
+      v-model:show="detailOpen"
+      preset="card"
+      title="爬虫记录详情"
+      class="w-[min(96vw,760px)]"
+      :bordered="false"
+      :style="{ borderRadius: '12px' }"
+      @close="closeDetail"
+    >
+      <div v-if="detailLoading" class="py-10 text-center text-sm text-[rgb(125,125,125)]">加载中…</div>
+      <div v-else-if="detail" class="space-y-5">
+        <p class="font-mono text-[11px] text-[rgb(125,125,125)]">req_id: {{ detail.req_id || '-' }}</p>
+
+        <!-- 基本信息 -->
+        <div class="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm md:grid-cols-3">
+          <div>
+            <div class="text-xs text-[rgb(125,125,125)]">时间</div>
+            <div>{{ fmtTime(detail.time) }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-[rgb(125,125,125)]">来源 IP</div>
+            <div class="font-mono">{{ detail.client_ip }}</div>
+          </div>
+          <div v-if="detail.country">
+            <div class="text-xs text-[rgb(125,125,125)]">归属地</div>
+            <div>{{ [detail.country, detail.province, detail.city].filter(Boolean).join(' ') }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-[rgb(125,125,125)]">识别结果</div>
+            <div class="flex flex-wrap gap-1">
+              <NTag size="small" bordered :type="detail.fake ? 'error' : detail.engine ? 'success' : 'default'">
+                {{ detail.profile || '-' }}{{ detail.fake ? '（虚假）' : detail.engine ? '（真实）' : '' }}
+              </NTag>
+              <NTag v-if="detail.malicious_ip" size="small" type="error" bordered>恶意IP</NTag>
+              <NTag v-if="detail.malicious_fp" size="small" type="error" bordered>恶意指纹</NTag>
+            </div>
+          </div>
+          <div>
+            <div class="text-xs text-[rgb(125,125,125)]">方法</div>
+            <div>{{ detail.method || '-' }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-[rgb(125,125,125)]">域名</div>
+            <div>{{ detail.host || '-' }}</div>
+          </div>
+          <div v-if="detail.ja4">
+            <div class="text-xs text-[rgb(125,125,125)]">JA4 指纹</div>
+            <div class="font-mono text-xs" :title="detail.ja4">{{ detail.ja4 }}</div>
+          </div>
+          <div v-if="detail.fingerprint">
+            <div class="text-xs text-[rgb(125,125,125)]">HTTP 指纹</div>
+            <div class="font-mono text-xs" :title="detail.fingerprint">{{ detail.fingerprint }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-[rgb(125,125,125)]">UA</div>
+            <div class="break-all text-xs">{{ detail.ua || '-' }}</div>
+          </div>
+          <div class="col-span-2 md:col-span-3">
+            <div class="text-xs text-[rgb(125,125,125)]">请求</div>
+            <div class="break-all font-mono text-xs">{{ detail.method }} {{ detail.host }}{{ detail.uri }}</div>
+          </div>
+        </div>
+
+        <!-- 请求头 -->
+        <div v-if="detailHeaders.length">
+          <h4 class="mb-2 text-sm font-semibold">请求头（{{ detailHeaders.length }}）</h4>
+          <NDataTable :columns="botHeaderColumns" :data="detailHeaders" :bordered="true" size="small" />
+        </div>
+
+        <!-- 请求体 -->
+        <div v-if="detail.body">
+          <h4 class="mb-2 text-sm font-semibold">请求体（前 8KB）</h4>
+          <pre class="max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-[rgb(229,229,229)] bg-[rgb(245,245,245)] p-3 font-mono text-xs">{{ detail.body }}</pre>
+        </div>
+      </div>
     </NModal>
   </div>
 </template>

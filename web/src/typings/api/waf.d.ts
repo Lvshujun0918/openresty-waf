@@ -36,6 +36,8 @@ declare namespace Api {
       msg: string;
       severity: number;
       status: number;
+      /** JA4 TLS 指纹 */
+      ja4?: string;
       /** 人工标记误报（命中率统计排除） */
       false_positive?: boolean;
       created_at?: string;
@@ -114,6 +116,8 @@ declare namespace Api {
       uri: string;
       /** 触发的触发规则名称 */
       rule_name?: string;
+      /** JA4 TLS 指纹 */
+      ja4?: string;
       /** 请求头 JSON（name/value 数组） */
       headers?: string;
       /** 请求体（最多 8KB） */
@@ -135,6 +139,8 @@ declare namespace Api {
       uri: string;
       /** 触发的触发规则名称 */
       rule_name?: string;
+      /** JA4 TLS 指纹 */
+      ja4?: string;
       /** 请求头 JSON（name/value 数组） */
       headers?: string;
       /** 请求体（最多 8KB） */
@@ -311,6 +317,10 @@ declare namespace Api {
       ja4?: string;
       /** 命中指纹来源（ja4 | http） */
       fp_source?: string;
+      /** 请求头 JSON（name/value 数组） */
+      headers?: string;
+      /** 请求体（最多 8KB） */
+      body?: string;
       profile: string;
       engine: boolean;
       fake: boolean;
