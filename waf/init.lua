@@ -229,10 +229,11 @@ end
 -- ============================================================================
 local function heartbeat(premature)
     if premature then return end
+    -- 字段名与后台 EngineStatus JSON tag 对齐（last_seen/engine_version/...）
     local payload = storage.encode({
-        ts               = ngx.time(),
+        last_seen        = ngx.time(),
         pid              = ngx.worker.pid(),
-        engine           = config.version or "",
+        engine_version   = config.version or "",
         ruleset_version  = storage.get_shared(config.dict.rules, VERSION_KEY) or "",
         config_version   = storage.get_shared(config.dict.rules, CFG_VERSION_KEY) or "",
         trigger_version  = storage.get_shared(config.dict.rules, TRIGGER_VERSION_KEY) or "",
