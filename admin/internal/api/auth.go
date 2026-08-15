@@ -22,6 +22,7 @@ func NewAuthHandler(db *gorm.DB, cfg *config.Config) *AuthHandler {
 type loginReq struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
+	TotpCode string `json:"totp_code"` // 可选：启用 TOTP 的账号必填
 }
 
 // Login POST /api/auth/login
@@ -31,7 +32,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
-	token, err := h.svc.Login(req.Username, req.Password)
+	token, err := h.svc.LoginWithTOTP(req.Username, req.Password, req.TotpCode)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -43,7 +44,74 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) Me(c *gin.Context) {
 	username, _ := c.Get("username")
 	userID, _ := c.Get("user_id")
-	c.JSON(http.StatusOK, gin.H{"id": userID, "username": username})
+	totpEnabled := false
+	if id, ok := userID.(uint); ok {
+		enabled, err := h.svc.TOTPStatus(id)
+		if err == nil {
+			totpEnabled = enabled
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id": userID, "username": username, "totp_enabled": totpEnabled,
+	})
+}
+
+// TotpSetup POST /api/auth/totp/setup  生成新密钥（未确认前不生效）
+func (h *AuthHandler) TotpSetup(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	id, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
+		return
+	}
+	secret, url, err := h.svc.SetupTOTP(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"secret": secret, "otpauth_url": url})
+}
+
+// TotpConfirm POST /api/auth/totp/confirm  body: {"code": "123456"}  校验后启用
+func (h *AuthHandler) TotpConfirm(c *gin.Context) {
+	var req struct {
+		Code string `json:"code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+	userID, _ := c.Get("user_id")
+	id, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
+		return
+	}
+	if err := h.svc.ConfirmTOTP(id, req.Code); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// TotpDisable DELETE /api/auth/totp  query: ?code=123456  校验后关闭
+func (h *AuthHandler) TotpDisable(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+	userID, _ := c.Get("user_id")
+	id, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
+		return
+	}
+	if err := h.svc.DisableTOTP(id, code); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 // AuthMiddleware JWT 鉴权中间件

@@ -30,6 +30,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	challengeHandler := NewChallengeHandler(db, mgr, cfg)
 	ccLogHandler := NewCcLogHandler(db, mgr, cfg)
 	triggerRuleHandler := NewTriggerRuleHandler(db, mgr, cfg)
+	banHandler := NewBanHandler(db, mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -48,6 +49,9 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 		authed := api.Group("", AuthMiddleware(authSvc))
 		{
 			authed.GET("/auth/me", authHandler.Me)
+			authed.POST("/auth/totp/setup", authHandler.TotpSetup)
+			authed.POST("/auth/totp/confirm", authHandler.TotpConfirm)
+			authed.DELETE("/auth/totp", authHandler.TotpDisable)
 
 			// 引导配置（登录后）
 			authed.POST("/setup/redis", setupHandler.SaveRedis)
@@ -62,6 +66,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.POST("/rules/test", ruleHandler.Test)
 			authed.GET("/rules/publish-history", ruleHandler.PublishHistory)
 			authed.POST("/rules/rollback/:id", ruleHandler.Rollback)
+			authed.GET("/rules/export", ruleHandler.Export)
+			authed.POST("/rules/import", ruleHandler.Import)
 
 			// IP 列表订阅（远程威胁情报 IP 列表）
 			authed.GET("/ip-list-subs", ipListHandler.List)
@@ -82,6 +88,11 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.GET("/events", eventHandler.List)
 			authed.GET("/events/:id", eventHandler.Detail)
 			authed.POST("/events/consume", eventHandler.Consume)
+			authed.POST("/events/:id/ban", eventHandler.Ban)
+
+			// 封禁管理（临时/永久封禁 IP）
+			authed.GET("/bans", banHandler.List)
+			authed.DELETE("/bans", banHandler.Unban)
 
 			// 仪表盘聚合统计
 			authed.GET("/dashboard/stats", dashboardHandler.Stats)
