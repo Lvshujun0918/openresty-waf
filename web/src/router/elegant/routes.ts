@@ -174,5 +174,27 @@ export const generatedRoutes: GeneratedRoute[] = [
       icon: 'mdi:filter-variant',
       order: 6
     }
+  },
+  {
+    name: 'bans',
+    path: '/bans',
+    component: 'layout.base$view.bans',
+    meta: {
+      title: 'bans',
+      i18nKey: 'route.bans',
+      icon: 'mdi:do-not-disturb',
+      order: 8
+    }
+  },
+  {
+    name: 'security',
+    path: '/security',
+    component: 'layout.base$view.security',
+    meta: {
+      title: 'security',
+      i18nKey: 'route.security',
+      icon: 'mdi:shield-account-outline',
+      order: 9
+    }
   }
 ];

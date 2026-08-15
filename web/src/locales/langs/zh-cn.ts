@@ -233,6 +233,8 @@ const local: App.I18n.Schema = {
     'trigger-rules': '触发规则',
     'trigger-records': '触发记录',
     'ip-lists': '黑白名单',
+    bans: '封禁管理',
+    security: '账号安全',
     config: '系统配置',
     guide: '接入指引'
   },
@@ -243,6 +245,7 @@ const local: App.I18n.Schema = {
         userNamePlaceholder: '请输入用户名',
         phonePlaceholder: '请输入手机号',
         codePlaceholder: '请输入验证码',
+        totpPlaceholder: '动态验证码（如已启用，选填）',
         passwordPlaceholder: '请输入密码',
         confirmPasswordPlaceholder: '请再次输入密码',
         codeLogin: '验证码登录',

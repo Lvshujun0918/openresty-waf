@@ -237,6 +237,8 @@ const local: App.I18n.Schema = {
     'trigger-rules': 'Trigger Rules',
     'trigger-records': 'Trigger Records',
     'ip-lists': 'IP Lists',
+    bans: 'IP Bans',
+    security: 'Account Security',
     config: 'Settings',
     guide: 'Guide'
   },
@@ -247,6 +249,7 @@ const local: App.I18n.Schema = {
         userNamePlaceholder: 'Please enter user name',
         phonePlaceholder: 'Please enter phone number',
         codePlaceholder: 'Please enter verification code',
+        totpPlaceholder: 'TOTP code (if enabled, optional)',
         passwordPlaceholder: 'Please enter password',
         confirmPasswordPlaceholder: 'Please enter password again',
         codeLogin: 'Verification code login',
