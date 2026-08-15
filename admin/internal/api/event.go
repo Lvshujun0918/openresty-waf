@@ -1,8 +1,10 @@
 package api
 
 import (
+	"encoding/csv"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -136,4 +138,31 @@ func (h *EventHandler) Exempt(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "rule_id": ruleID})
+}
+
+// Export GET /api/events/export?group=&client_ip=&rule_id=&host=&action=&limit=
+// 导出匹配事件为 CSV（合规留档；需带当前列表过滤条件）
+func (h *EventHandler) Export(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10000"))
+	events, err := h.svc.ExportAll(
+		c.Query("group"), c.Query("client_ip"), c.Query("rule_id"), c.Query("host"), c.Query("action"), limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", `attachment; filename="waf-events-`+time.Now().Format("20060102-150405")+`.csv"`)
+	w := csv.NewWriter(c.Writer)
+	_ = w.Write([]string{"ID", "时间", "来源IP", "国家", "省份", "城市", "方法", "主机", "URI", "命中规则", "规则ID列表", "类型", "级别", "状态码", "误报"})
+	for _, ev := range events {
+		_ = w.Write([]string{
+			strconv.FormatUint(uint64(ev.ID), 10),
+			ev.Time.Format("2006-01-02 15:04:05"),
+			ev.ClientIP, ev.Country, ev.Province, ev.City,
+			ev.Method, ev.Host, ev.URI, ev.RuleID, ev.RuleIDs,
+			ev.Group, strconv.Itoa(ev.Severity), strconv.Itoa(ev.Status),
+			map[bool]string{true: "是", false: ""}[ev.FalsePositive],
+		})
+	}
+	w.Flush()
 }

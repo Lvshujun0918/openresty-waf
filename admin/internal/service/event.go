@@ -66,6 +66,24 @@ func (s *EventService) Consume(limit int) (int, error) {
 // List 分页查询攻击事件，支持 group / client_ip / rule_id / host / action 过滤
 // action: "block"=status>=400（拦截），"record"=status<400（仅记录）
 func (s *EventService) List(group, clientIP, ruleID, host, action string, page, pageSize int) ([]model.Event, int64, error) {
+	q := s.buildListQuery(group, clientIP, ruleID, host, action)
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	// 列表不返回大字段（命中规则详情/请求头/请求体），详情接口单独获取
+	var events []model.Event
+	if err := q.Select("id", "time", "req_id", "client_ip", "country", "province", "city",
+		"method", "host", "uri", "rule_id", "rule_ids", "`group`", "message",
+		"severity", "status", "created_at", "false_positive").
+		Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&events).Error; err != nil {
+		return nil, 0, err
+	}
+	return events, total, nil
+}
+
+// buildListQuery 列表查询条件（List / Export 共用）
+func (s *EventService) buildListQuery(group, clientIP, ruleID, host, action string) *gorm.DB {
 	q := s.db.Model(&model.Event{})
 	if group != "" {
 		q = q.Where("`group` = ?", group)
@@ -84,19 +102,20 @@ func (s *EventService) List(group, clientIP, ruleID, host, action string, page, 
 	} else if action == "record" {
 		q = q.Where("status < ?", 400)
 	}
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
-		return nil, 0, err
+	return q
+}
+
+// ExportAll 导出全部匹配记录（不分页，限制上限防拉爆；返回记录切片供 CSV 序列化）
+func (s *EventService) ExportAll(group, clientIP, ruleID, host, action string, limit int) ([]model.Event, error) {
+	if limit <= 0 || limit > 10000 {
+		limit = 10000
 	}
-	// 列表不返回大字段（命中规则详情/请求头/请求体），详情接口单独获取
 	var events []model.Event
-	if err := q.Select("id", "time", "req_id", "client_ip", "country", "province", "city",
-		"method", "host", "uri", "rule_id", "rule_ids", "`group`", "message",
-		"severity", "status", "created_at").
-		Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&events).Error; err != nil {
-		return nil, 0, err
+	if err := s.buildListQuery(group, clientIP, ruleID, host, action).
+		Order("id desc").Limit(limit).Find(&events).Error; err != nil {
+		return nil, err
 	}
-	return events, total, nil
+	return events, nil
 }
 
 // Get 按 ID 获取事件完整信息（含命中规则详情 / 请求头 / 请求体）

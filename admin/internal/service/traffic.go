@@ -61,6 +61,20 @@ func (s *TrafficService) Consume(limit int) (int, error) {
 
 // List 分页查询流量记录，支持 host / client_ip / attack 过滤
 func (s *TrafficService) List(host, clientIP, attack string, page, pageSize int) ([]model.TrafficLog, int64, error) {
+	q := s.buildListQuery(host, clientIP, attack)
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var logs []model.TrafficLog
+	if err := q.Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&logs).Error; err != nil {
+		return nil, 0, err
+	}
+	return logs, total, nil
+}
+
+// buildListQuery 列表查询条件（List / Export 共用）
+func (s *TrafficService) buildListQuery(host, clientIP, attack string) *gorm.DB {
 	q := s.db.Model(&model.TrafficLog{})
 	if host != "" {
 		q = q.Where("host LIKE ?", "%"+host+"%")
@@ -73,15 +87,20 @@ func (s *TrafficService) List(host, clientIP, attack string, page, pageSize int)
 	} else if attack == "0" {
 		q = q.Where("attack = ?", false)
 	}
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
-		return nil, 0, err
+	return q
+}
+
+// ExportAll 导出全部匹配记录（上限防拉爆）
+func (s *TrafficService) ExportAll(host, clientIP, attack string, limit int) ([]model.TrafficLog, error) {
+	if limit <= 0 || limit > 10000 {
+		limit = 10000
 	}
 	var logs []model.TrafficLog
-	if err := q.Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&logs).Error; err != nil {
-		return nil, 0, err
+	if err := s.buildListQuery(host, clientIP, attack).
+		Order("id desc").Limit(limit).Find(&logs).Error; err != nil {
+		return nil, err
 	}
-	return logs, total, nil
+	return logs, nil
 }
 
 // Cleanup 清理 retentionDays 天前的流量记录，返回删除条数
