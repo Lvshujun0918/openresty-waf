@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, h, onMounted, ref } from 'vue';
-import { NCard, NDataTable, NGrid, NGi, NStatistic, NTag } from 'naive-ui';
+import { NCard, NDataTable, NGrid, NGi, NTag } from 'naive-ui';
 import { useEcharts } from '@/hooks/common/echarts';
 import type { ECOption } from '@/hooks/common/echarts';
-import { fetchDashboardStats, fetchEvents, fetchRules, fetchTrafficTrend } from '@/service/api';
+import { fetchDashboardStats, fetchEngines, fetchEvents, fetchRules, fetchTopRegions, fetchTrafficTrend } from '@/service/api';
 
 const mode = ref('active');
 const ruleCount = ref(0);
@@ -12,6 +12,9 @@ const recentEvents = ref<Api.Waf.EventItem[]>([]);
 const stats = ref<Api.Waf.DashboardStats | null>(null);
 const reqTrend = ref<{ date: string; total: number }[]>([]);
 const loading = ref(true);
+const engineOnline = ref(0);
+const engineTotal = ref(0);
+const topRegions = ref<{ region: string; count: number }[]>([]);
 
 const groupMeta: Record<string, { label: string; color: string }> = {
   sqli: { label: 'SQL 注入', color: '#ef4444' },
@@ -165,8 +168,24 @@ const countryOption = (): ECOption => ({
 });
 const { domRef: countryRef, updateOptions: updateCountry } = useEcharts(countryOption);
 
+// —— 攻击来源 Top 地区（省份） ——
+const regionOption = (): ECOption => ({
+  tooltip: { trigger: 'axis' },
+  grid: { left: 24, right: 16, top: 8, bottom: 24 },
+  xAxis: { type: 'value', minInterval: 1 },
+  yAxis: { type: 'category', data: topRegions.value.map(r => r.region).reverse() },
+  series: [
+    {
+      type: 'bar',
+      data: topRegions.value.map(r => r.count).reverse(),
+      itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] },
+      barWidth: 14
+    }
+  ]
+});
+const { domRef: regionRef, updateOptions: updateRegion } = useEcharts(regionOption);
+
 // —— 近期事件表格 ——
-const maxTopIP = computed(() => Math.max(1, ...(stats.value?.top_ips ?? []).map(x => x.count)));
 const eventColumns = [
   { title: '时间', key: 'time', width: 150, render: (row: Api.Waf.EventItem) => fmtTime(row.time) },
   {
@@ -191,11 +210,13 @@ const eventColumns = [
 async function load() {
   loading.value = true;
   try {
-    const [st, tr, ev, rules] = await Promise.all([
+    const [st, tr, ev, rules, en, rg] = await Promise.all([
       fetchDashboardStats(14),
       fetchTrafficTrend(14).catch(() => ({ data: { items: [] as { date: string; total: number }[] } })),
       fetchEvents({ page: 1, page_size: 6 }).catch(() => ({ data: { items: [] as Api.Waf.EventItem[] } })),
-      fetchRules().catch(() => ({ data: [] as Api.Waf.Rule[] }))
+      fetchRules().catch(() => ({ data: [] as Api.Waf.Rule[] })),
+      fetchEngines().catch(() => ({ data: { engines: [] as Api.Waf.EngineStatus[] } })),
+      fetchTopRegions('province', 8).catch(() => ({ data: { items: [] as { region: string; count: number }[] } }))
     ]);
     stats.value = st.data;
     reqTrend.value = tr.data?.items ?? [];
@@ -203,11 +224,16 @@ async function load() {
     const rulesList = rules.data ?? [];
     ruleCount.value = rulesList.length;
     enabledCount.value = rulesList.filter(r => r.enabled).length;
+    const engines = en.data?.engines ?? [];
+    engineTotal.value = engines.length;
+    engineOnline.value = engines.filter(e => e.online).length;
+    topRegions.value = rg.data?.items ?? [];
     // 数据更新后需传入最新 option 工厂重新计算（默认 callback 用初始空数据）
     await Promise.all([
       updateTrend(() => trendOption()),
       updateDonut(() => donutOption()),
-      updateCountry(() => countryOption())
+      updateCountry(() => countryOption()),
+      updateRegion(() => regionOption())
     ]);
   } finally {
     loading.value = false;
@@ -231,6 +257,9 @@ onMounted(load);
           </div>
         </div>
         <div class="flex items-center gap-3">
+          <NTag :type="engineTotal > 0 && engineOnline === engineTotal ? 'success' : engineOnline > 0 ? 'warning' : 'error'" size="small" round>
+            引擎 {{ engineOnline }}/{{ engineTotal }} 在线
+          </NTag>
           <div class="text-sm">规则 {{ ruleCount }} 条 / 启用 {{ enabledCount }} 条</div>
         </div>
       </div>
@@ -286,30 +315,11 @@ onMounted(load);
         </NCard>
       </NGi>
       <NGi span="24 s:24 m:10">
-        <NCard :bordered="false" class="card-wrapper h-full" title="攻击来源 Top 10">
+        <NCard :bordered="false" class="card-wrapper h-full" title="攻击来源 Top 省份">
           <template #header-extra>
-            <span class="text-xs text-[rgb(125,125,125)]">含归属地</span>
+            <span class="text-xs text-[rgb(125,125,125)]">按省份聚合</span>
           </template>
-          <div class="space-y-2">
-            <div v-for="(ip, i) in (stats?.top_ips ?? [])" :key="ip.client_ip" class="flex items-center gap-3">
-              <span class="w-4 text-right text-xs text-[rgb(125,125,125)]">{{ i + 1 }}</span>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center justify-between">
-                  <span class="font-mono text-xs">{{ ip.client_ip }}</span>
-                  <span class="text-xs font-medium">{{ ip.count }}</span>
-                </div>
-                <div class="mt-0.5 flex items-center gap-2">
-                  <span v-if="ip.country" class="shrink-0 text-[11px] text-[rgb(125,125,125)]">
-                    {{ geoText(ip.country, ip.province, ip.city) }}
-                  </span>
-                  <div class="h-1 flex-1 overflow-hidden rounded-full bg-[rgb(235,235,235)]">
-                    <div class="h-full rounded-full bg-gradient-to-r from-[#ef4444] to-[#f97316]" :style="{ width: `${(ip.count / maxTopIP) * 100}%` }" />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <n-empty v-if="!stats?.top_ips?.length" description="暂无攻击来源数据" class="py-6" />
-          </div>
+          <div ref="regionRef" class="h-64 w-full" />
         </NCard>
       </NGi>
     </NGrid>
