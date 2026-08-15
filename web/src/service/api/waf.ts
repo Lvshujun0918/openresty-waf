@@ -451,6 +451,11 @@ export function deleteJa4Profile(id: number) {
   return request<{ ok: boolean }>({ url: `/ja4/profiles/${id}`, method: 'delete' });
 }
 
+/** 导出恶意 JA4 情报（CSV 订阅格式） */
+export function exportJa4Malware() {
+  return request<string>({ url: '/ja4/export', responseType: 'blob' } as never);
+}
+
 /** 爬虫趋势 */
 export function fetchBotTrend(days = 7) {
   return request<{ items: { date: string; total: number; fake: number }[] }>({ url: '/bots/trend', params: { days } });

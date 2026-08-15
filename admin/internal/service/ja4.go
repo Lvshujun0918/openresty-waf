@@ -164,6 +164,21 @@ func (s *Ja4Service) Delete(id uint) error {
 	return s.db.Delete(&model.Ja4Profile{}, id).Error
 }
 
+// ExportMalwareCSV 导出恶意 JA4（订阅格式：名称,ja4,category），供多机共享情报源
+func (s *Ja4Service) ExportMalwareCSV() (string, error) {
+	var list []model.Ja4Profile
+	if err := s.db.Where("category = ? AND enabled = ?", "malware", true).
+		Order("name asc").Find(&list).Error; err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	b.WriteString("# FoxIO JA4 恶意指纹导出\n# 名称,ja4,category\n")
+	for _, p := range list {
+		b.WriteString(p.Name + "," + p.Ja4 + ",malware\n")
+	}
+	return b.String(), nil
+}
+
 // Lookup 查询识别：精确匹配 → JA4_ac 前缀匹配（抗 cipher 轮换）
 func (s *Ja4Service) Lookup(ja4 string) (*model.Ja4Profile, string, error) {
 	if ja4 == "" {

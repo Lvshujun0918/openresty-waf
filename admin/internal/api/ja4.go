@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -65,6 +66,18 @@ func (h *Ja4Handler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// Export GET /api/ja4/export 导出恶意 JA4 情报（CSV 订阅格式）
+func (h *Ja4Handler) Export(c *gin.Context) {
+	csv, err := h.svc.ExportMalwareCSV()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", `attachment; filename="ja4-malware-`+time.Now().Format("20060102")+`.csv"`)
+	c.String(http.StatusOK, csv)
 }
 
 // Lookup GET /api/ja4/lookup?ja4= 查询识别（精确 → ja4_ac 前缀）

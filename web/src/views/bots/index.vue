@@ -27,6 +27,7 @@ import {
   blacklistBotLog,
   consumeBotLogs,
   createJa4Profile,
+  exportJa4Malware,
   deleteJa4Profile,
   fetchBotLogDetail,
   fetchJa4Profiles,
@@ -215,6 +216,16 @@ async function saveJa4Profile() {
 function editJa4Profile(row?: Api.Waf.Ja4Profile) {
   editingJa4.value = row ? { ...row } : { category: 'tool', enabled: true };
   showJa4Modal.value = true;
+}
+
+async function doExportJa4() {
+  const res = await exportJa4Malware();
+  const url = URL.createObjectURL(res.data as unknown as Blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ja4-malware-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 const ja4CatMeta: Record<string, { label: string; type: 'error' | 'info' | 'warning' | 'default' }> = {
@@ -559,6 +570,7 @@ const botHeaderColumns = [
       <NTabPane name="ja4" tab="JA4 客户端库">
         <NCard :bordered="false" class="card-wrapper">
           <template #header-extra>
+            <NButton secondary size="small" class="mr-2" @click="doExportJa4">导出恶意情报</NButton>
             <NButton type="primary" size="small" @click="editJa4Profile()">新增</NButton>
           </template>
           <p class="mb-3 text-xs text-[rgb(125,125,125)]">

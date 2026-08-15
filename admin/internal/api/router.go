@@ -155,6 +155,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.PUT("/ja4/profiles/:id", ja4Handler.Update)
 			authed.DELETE("/ja4/profiles/:id", ja4Handler.Delete)
 			authed.GET("/ja4/lookup", ja4Handler.Lookup)
+			authed.GET("/ja4/export", ja4Handler.Export)
 			authed.POST("/bots/consume", botHandler.ConsumeLogs)
 			authed.POST("/bots/logs/:id/blacklist", botHandler.BlacklistLog)
 			authed.GET("/bots/stats", botHandler.Stats)
