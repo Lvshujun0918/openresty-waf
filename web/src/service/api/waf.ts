@@ -280,7 +280,7 @@ export function exportTrafficCsv(params: Record<string, string | number>) {
 
 /** 规则命中统计排行 */
 export function fetchRuleStats(group = '', limit = 20) {
-  return request<{ items: { rule_id: string; hits: number; blocks: number; fps: number }[] }>({
+  return request<{ items: { rule_id: string; hits: number; blocks: number; fps: number; fp_rate?: number }[] }>({
     url: '/rules/stats',
     params: { group, limit }
   });
