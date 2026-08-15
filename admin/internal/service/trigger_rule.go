@@ -48,13 +48,37 @@ func (s *TriggerRuleService) List(kind, keyword string) ([]model.TriggerRule, er
 	return rules, nil
 }
 
+// validateTriggerConditions 校验触发规则条件 JSON：
+// regex 运算符的 pattern 拒绝明显灾难性回溯（与规则引擎 ReDoS 护栏一致）
+func validateTriggerConditions(conds string) error {
+	if conds == "" {
+		return nil
+	}
+	var list []model.TriggerCondition
+	if err := json.Unmarshal([]byte(conds), &list); err != nil {
+		return nil // JSON 格式错误交给入库层处理，这里只做正则安全检查
+	}
+	for _, c := range list {
+		if c.Operator == "regex" && hasCatastrophicBacktracking(c.Value) {
+			return fmt.Errorf("字段 %q 的正则疑似灾难性回溯（组内量词与组后量词嵌套，如 (a+)+），请简化", c.Field)
+		}
+	}
+	return nil
+}
+
 // Create 新建触发规则
 func (s *TriggerRuleService) Create(r *model.TriggerRule) error {
+	if err := validateTriggerConditions(r.Conditions); err != nil {
+		return err
+	}
 	return s.db.Create(r).Error
 }
 
 // Update 更新触发规则
 func (s *TriggerRuleService) Update(id uint, r *model.TriggerRule) error {
+	if err := validateTriggerConditions(r.Conditions); err != nil {
+		return err
+	}
 	return s.db.Model(&model.TriggerRule{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"name": r.Name, "kind": r.Kind, "match_logic": r.MatchLogic,
 		"enabled": r.Enabled, "sort_order": r.SortOrder, "conditions": r.Conditions,

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"time"
 
 	"gorm.io/gorm"
@@ -265,7 +266,18 @@ var validOperators = map[string]bool{
 // 同时防止异常巨型 pattern 拖慢引擎编译与执行。
 const maxPatternLen = 32768
 
-// validateRule 规则静态校验：运算符白名单 + pattern 长度护栏
+// catastrophicRe 明显灾难性回溯特征：组内以量词结尾且组后紧跟量词，
+// 如 (a+)+ / (a*)* / (ab*)+ / (a{2,3})*。这类模式在 PCRE 下对恶意输入
+// 可能指数级回溯，烧满 worker CPU（引擎侧无 match_limit 兜底）。
+// 仅做启发式拦截（Go regexp 扫描），不保证覆盖全部 ReDoS 变体，
+// 不含嵌套量词的常规正则（如 (foo|bar)+、[\s'\"]*union...）不受影响。
+var catastrophicRe = regexp.MustCompile(`\([^()]*[*+?{][^()]*\)\s*[*+?{]`)
+
+func hasCatastrophicBacktracking(pattern string) bool {
+	return catastrophicRe.MatchString(pattern)
+}
+
+// validateRule 规则静态校验：运算符白名单 + pattern 长度护栏 + ReDoS 启发式
 func (s *RuleService) validateRule(r *model.Rule) error {
 	if r.RuleID == "" || r.Operator == "" || r.Pattern == "" {
 		return errors.New("rule_id / operator / pattern 不能为空")
@@ -275,6 +287,9 @@ func (s *RuleService) validateRule(r *model.Rule) error {
 	}
 	if len(r.Pattern) > maxPatternLen {
 		return errors.New("pattern 过长（上限 32KB），请拆分规则或精简正则")
+	}
+	if r.Operator == "REGEX" && hasCatastrophicBacktracking(r.Pattern) {
+		return errors.New("pattern 疑似灾难性回溯（组内量词与组后量词嵌套，如 (a+)+），请简化正则")
 	}
 	return nil
 }
@@ -297,6 +312,9 @@ func (s *RuleService) Update(id uint, r *model.Rule) error {
 	}
 	if len(r.Pattern) > maxPatternLen {
 		return errors.New("pattern 过长（上限 32KB），请拆分规则或精简正则")
+	}
+	if r.Pattern != "" && r.Operator == "REGEX" && hasCatastrophicBacktracking(r.Pattern) {
+		return errors.New("pattern 疑似灾难性回溯（组内量词与组后量词嵌套，如 (a+)+），请简化正则")
 	}
 	return s.db.Model(&existing).Updates(r).Error
 }
