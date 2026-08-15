@@ -31,6 +31,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	ccLogHandler := NewCcLogHandler(db, mgr, cfg)
 	triggerRuleHandler := NewTriggerRuleHandler(db, mgr, cfg)
 	banHandler := NewBanHandler(db, mgr, cfg)
+	healthHandler := NewHealthHandler(mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -96,6 +97,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 
 			// 仪表盘聚合统计
 			authed.GET("/dashboard/stats", dashboardHandler.Stats)
+
+			// 引擎健康状态与实时监控
+			authed.GET("/health/engines", healthHandler.Engines)
+			authed.GET("/monitor/realtime", healthHandler.Realtime)
 
 			// 人机验证事件
 			authed.GET("/challenges", challengeHandler.List)
