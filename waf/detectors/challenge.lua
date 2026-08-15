@@ -112,14 +112,20 @@ local function set_pass_cookie(cfg, ip)
         "; Path=/; HttpOnly; Max-Age=" .. cfg.cookie_ttl
 end
 
+-- 嵌入 JS 字符串前的安全化：剔除单引号/尖括号/&/控制字符，
+-- 防止 redirect 参数以 </script> 闭合标签注入任意 JS（XSS）
+local function js_safe(s)
+    return (s or ""):gsub("'", "\\'"):gsub("<", ""):gsub(">", "")
+        :gsub("&", ""):gsub("[%c]", "")
+end
+
 -- 基础 JS 挑战页：前端 JS 计算工作量证明，通过后 POST 验证路径，
 -- 服务端校验成功才下发放行 cookie——无 JS 能力的 bot 跟随重定向也拿不到 cookie
 local function basic_page(ch, ip, redirect, token, bits)
     local verify = ch.verify_path or "/__waf_challenge_verify__"
     local js = "location.reload();"
     if redirect and redirect ~= "" then
-        local safe = redirect:gsub("'", "\\'"):gsub("\n", ""):gsub("\r", "")
-        js = "location.href='" .. safe .. "';"
+        js = "location.href='" .. js_safe(redirect) .. "';"
     end
     return [[<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>安全验证</title>
@@ -151,8 +157,7 @@ local function advanced_page(cfg, redirect)
     local sdk = cfg.captcha.sdk or "https://static.geetest.com/v4/gt4.js"
     local js = "location.reload();"
     if redirect and redirect ~= "" then
-        local safe = redirect:gsub("'", "\\'"):gsub("\n", ""):gsub("\r", "")
-        js = "location.href='" .. safe .. "';"
+        js = "location.href='" .. js_safe(redirect) .. "';"
     end
     return [[<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>安全验证</title>
