@@ -77,6 +77,7 @@ local function build_event(ctx)
         msg       = primary and primary.msg,
         severity  = primary and primary.severity,
         status    = ngx.status,
+        ja4       = (ctx.ja4 and ctx.ja4 ~= "" and ctx.ja4) or ctx.tls_fp or "",
         country   = geo and geo.country or "",
         province  = geo and geo.province or "",
         city      = geo and geo.city or "",
@@ -218,6 +219,8 @@ if ctx and ctx.bot_result then
         malicious_ip = malicious_ip and true or false,
         malicious_fp = ctx.fp_malicious or "",
         fp_source    = ctx.fp_source or "",
+        headers      = cjson.encode((ctx.evidence and ctx.evidence.headers) or {}),
+        body         = (ctx.evidence and ctx.evidence.body) or "",
         status       = ngx.status,
     }
     pending[#pending + 1] = { key = config.bot.report_key or "waf:bot:list",

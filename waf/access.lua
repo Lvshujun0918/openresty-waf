@@ -336,6 +336,8 @@ local function protection_flow()
         end)
         if okb7 and botres then
             ctx.bot_result = botres
+            -- 爬虫记录详情需要请求头/请求体证据（与攻击事件一致）
+            pcall(capture_evidence, ctx)
         elseif not okb7 then
             ngx.log(ngx.ERR, "[waf] 爬虫识别异常: ", tostring(botres))
         end
