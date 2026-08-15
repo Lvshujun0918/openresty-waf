@@ -165,3 +165,15 @@ if backend == "redis" then
 else
     write_file(cfg, cjson.encode(event))
 end
+
+-- ===== 高频攻击自动封禁计数（仅拦截模式；达到阈值自动临时封禁该 IP） =====
+if cfg.mode == "active" and ctx and ctx.client_ip then
+    local ok2, banned = pcall(function()
+        return require("detectors.auto_ban").record_hit(cfg, ctx.client_ip)
+    end)
+    if ok2 and banned then
+        ngx.log(ngx.WARN, "[waf] 高频攻击自动封禁: ", ctx.client_ip)
+    elseif not ok2 then
+        ngx.log(ngx.ERR, "[waf] 自动封禁计数异常: ", tostring(banned))
+    end
+end

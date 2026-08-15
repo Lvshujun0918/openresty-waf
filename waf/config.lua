@@ -175,6 +175,16 @@ _M.blacklist = {
 -- 列表为空时保持兼容行为（无条件信任 XFF），适合确认部署在可信反代之后。
 _M.trusted_proxies = { }
 
+-- 高频攻击自动封禁：同 IP 短窗口内多次攻击命中后自动临时封禁（雷池同款能力）
+_M.auto_ban = {
+    enabled        = true,
+    threshold      = 10,     -- 窗口内攻击次数阈值
+    window         = 60,     -- 统计窗口（秒）
+    duration       = 600,    -- 封禁时长（秒）
+    ban_key_prefix = "waf:ab:ban:",
+    counter_prefix = "waf:ab:cnt:",
+}
+
 -- 文件上传黑名单
 _M.upload = {
     enabled  = true,   -- 上传检测开关（关闭后仅放行，不检测文件后缀/类型）
