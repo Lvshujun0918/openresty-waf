@@ -83,17 +83,42 @@ local function build_event(ctx)
     }
 end
 
--- file 后端：按天追加写
+-- file 后端：按天追加写。
+-- 模块级句柄缓存（log 阶段单 worker 串行，句柄可跨请求复用），
+-- 避免攻击风暴下每个事件 open/close 文件的开销；按天/目录变化自动切换。
+local log_handle, log_day, log_dir
+
 local function write_file(cfg, line)
     local dir = cfg.log.dir or "/var/log/waf"
-    local path = dir .. "/waf_" .. os.date("%Y%m%d") .. ".log"
-    local f, err = io.open(path, "a")
-    if not f then
-        ngx.log(ngx.WARN, "[waf] 打开日志文件失败: ", tostring(err))
-        return
+    local day = os.date("%Y%m%d")
+    if log_day ~= day or log_dir ~= dir then
+        if log_handle then
+            pcall(io.close, log_handle)
+            log_handle = nil
+        end
+        local path = dir .. "/waf_" .. day .. ".log"
+        local f, err = io.open(path, "a")
+        if not f then
+            ngx.log(ngx.WARN, "[waf] 打开日志文件失败: ", tostring(err))
+            return
+        end
+        log_handle, log_day, log_dir = f, day, dir
     end
-    f:write(line, "\n")
-    f:close()
+    -- 写失败（如句柄被外部关闭）时关闭句柄重开一次
+    local ok, werr = pcall(log_handle.write, log_handle, line, "\n")
+    if not ok then
+        pcall(io.close, log_handle)
+        log_handle = nil
+        local path = dir .. "/waf_" .. day .. ".log"
+        local f, err = io.open(path, "a")
+        if not f then
+            ngx.log(ngx.WARN, "[waf] 重新打开日志文件失败: ", tostring(err))
+            return
+        end
+        log_handle, log_day, log_dir = f, day, dir
+        pcall(log_handle.write, log_handle, line, "\n")
+    end
+    pcall(log_handle.flush, log_handle)
 end
 
 -- redis 后端：经 ngx.timer 异步推送（log 阶段禁用 TCP cosocket，
