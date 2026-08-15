@@ -354,10 +354,11 @@ func (s *RuleService) Delete(id uint) error {
 
 // RuleHitStat 规则命中统计（事件按主命中 rule_id 聚合）
 type RuleHitStat struct {
-	RuleID string `json:"rule_id"`
-	Hits   int64  `json:"hits"`   // 总命中次数
-	Blocks int64  `json:"blocks"` // 拦截次数（status >= 400）
-	FPs    int64  `json:"fps"`    // 人工标记误报次数
+	RuleID string  `json:"rule_id"`
+	Hits   int64   `json:"hits"`    // 总命中次数
+	Blocks int64   `json:"blocks"`  // 拦截次数（status >= 400）
+	FPs    int64   `json:"fps"`     // 人工标记误报次数
+	FpRate float64 `json:"fp_rate"` // 误报率（百分比，fps/hits）
 }
 
 // HitStats 按事件聚合规则命中排行（Top limit），支持按 group 过滤；
@@ -381,6 +382,12 @@ func (s *RuleService) HitStats(group string, limit int) ([]RuleHitStat, error) {
 	var out []RuleHitStat
 	if err := s.db.Raw(q, args...).Scan(&out).Error; err != nil {
 		return nil, err
+	}
+	// 误报率计算（供高误报规则提醒）
+	for i := range out {
+		if out[i].Hits > 0 {
+			out[i].FpRate = float64(out[i].FPs) / float64(out[i].Hits) * 100
+		}
 	}
 	return out, nil
 }

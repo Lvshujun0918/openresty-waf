@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { fetchRuleStats } from '@/service/api';
 import { computed, h, onMounted, reactive, ref } from 'vue';
 import {
   NButton,
@@ -510,11 +511,25 @@ const columns = [
   }
 ];
 
-onMounted(load);
+const highFpRules = ref<{ rule_id: string; hits: number; fps: number; fp_rate: number }[]>([]);
+
+async function loadRuleStats() {
+  const res = await fetchRuleStats('', 20).catch(() => ({ data: { items: [] as { rule_id: string; hits: number; fps: number; fp_rate: number }[] } }));
+  const items = (res.data?.items ?? []).filter(x => x.fp_rate >= 20 && x.hits >= 3);
+  highFpRules.value = items;
+}
+
+onMounted(() => {
+  load();
+  loadRuleStats();
+});
 </script>
 
 <template>
   <div class="space-y-4">
+    <NAlert v-if="highFpRules.length" type="warning" :bordered="false" class="card-wrapper" title="高误报规则提醒">
+      以下规则误报率 ≥20%（命中 ≥3 次）：{{ highFpRules.map(r => r.rule_id + '（' + r.fp_rate.toFixed(0) + '%）').join('、') }} —— 建议复查规则或对相关路径配置豁免
+    </NAlert>
     <div class="flex items-center justify-between">
       <div>
         <h2 class="text-xl font-semibold">规则管理</h2>
@@ -629,13 +644,13 @@ onMounted(load);
 
         <template v-else>
           <NFormItem label="检测位置">
-            <NInput v-model:value="form.varsRaw" type="textarea" :rows="2" class="font-mono" placeholder='[{"type":"URI_ARGS","specific":"id"}]' />
+            <NInput v-model:value="form.varsRaw" type="textarea" :rows="2" class="font-mono" placeholder="[{&quot;type&quot;:&quot;URI_ARGS&quot;,&quot;specific&quot;:&quot;id&quot;}]" />
           </NFormItem>
           <NFormItem label="预处理">
-            <NInput v-model:value="form.transformsRaw" class="font-mono" placeholder='["url_decode","to_lowercase"]' />
+            <NInput v-model:value="form.transformsRaw" class="font-mono" placeholder="[&quot;url_decode&quot;,&quot;to_lowercase&quot;]" />
           </NFormItem>
           <NFormItem label="动作">
-            <NInput v-model:value="form.actionsRaw" type="textarea" :rows="2" class="font-mono" placeholder='{"disrupt":"BLOCK","status":403,"msg":"..."}' />
+            <NInput v-model:value="form.actionsRaw" type="textarea" :rows="2" class="font-mono" placeholder="{&quot;disrupt&quot;:&quot;BLOCK&quot;,&quot;status&quot;:403,&quot;msg&quot;:&quot;...&quot;}" />
           </NFormItem>
         </template>
 
