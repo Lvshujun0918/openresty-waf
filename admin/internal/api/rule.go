@@ -159,3 +159,32 @@ func (h *RuleHandler) Rollback(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
+
+// Export GET /api/rules/export  导出全部规则（JSON 下载）
+func (h *RuleHandler) Export(c *gin.Context) {
+	rules, err := h.svc.ExportRules()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Header("Content-Type", "application/json; charset=utf-8")
+	c.Header("Content-Disposition", `attachment; filename="waf-rules.json"`)
+	c.JSON(http.StatusOK, rules)
+}
+
+// Import POST /api/rules/import  body: {"rules": [...]}  导入规则
+func (h *RuleHandler) Import(c *gin.Context) {
+	var req struct {
+		Rules []model.Rule `json:"rules"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || len(req.Rules) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误：rules 不能为空"})
+		return
+	}
+	imported, skipped, err := h.svc.ImportRules(req.Rules)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"imported": imported, "skipped": skipped})
+}

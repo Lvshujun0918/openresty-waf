@@ -192,6 +192,51 @@ func (s *RuleService) GetByRuleID(ruleID string) (*model.Rule, error) {
 	return &r, nil
 }
 
+// ExportRules 导出全部规则（清除内部 ID/时间戳/种子标记，可直接导入其他实例）
+func (s *RuleService) ExportRules() ([]model.Rule, error) {
+	var rules []model.Rule
+	if err := s.db.Order("sort_order asc, id asc").Find(&rules).Error; err != nil {
+		return nil, err
+	}
+	for i := range rules {
+		rules[i].ID = 0
+		rules[i].IsSeed = false
+		rules[i].CreatedAt = time.Time{}
+		rules[i].UpdatedAt = time.Time{}
+	}
+	return rules, nil
+}
+
+// ImportRules 导入规则：逐条静态校验，rule_id 已存在的跳过；
+// 返回导入成功与跳过条数。
+func (s *RuleService) ImportRules(rules []model.Rule) (imported, skipped int, err error) {
+	for _, r := range rules {
+		r.ID = 0
+		r.IsSeed = false
+		r.CreatedAt = time.Time{}
+		r.UpdatedAt = time.Time{}
+		if r.RuleID == "" {
+			r.RuleID = fmt.Sprintf("c%d", time.Now().UnixNano())
+		}
+		if err := s.validateRule(&r); err != nil {
+			skipped++
+			continue
+		}
+		var count int64
+		_ = s.db.Model(&model.Rule{}).Where("rule_id = ?", r.RuleID).Count(&count).Error
+		if count > 0 {
+			skipped++ // 已存在：跳过避免覆盖
+			continue
+		}
+		if err := s.db.Create(&r).Error; err != nil {
+			skipped++
+			continue
+		}
+		imported++
+	}
+	return imported, skipped, nil
+}
+
 // List 规则列表（支持 group / keyword 过滤）
 func (s *RuleService) List(group, keyword string) ([]model.Rule, error) {
 	q := s.db

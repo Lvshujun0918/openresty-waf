@@ -218,6 +218,39 @@ func TestRuleService_Publish(t *testing.T) {
 	}
 }
 
+func TestRuleService_ImportExport(t *testing.T) {
+	db := newTestDB(t)
+	s := NewRuleService(db, nil, newTestConfig())
+	// 预置一条与导入冲突的规则
+	if err := db.Create(&model.Rule{RuleID: "dup", Operator: "REGEX", Pattern: "a"}).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	imported, skipped, err := s.ImportRules([]model.Rule{
+		{RuleID: "dup", Operator: "REGEX", Pattern: "a"},          // 重复 → 跳过
+		{RuleID: "new1", Operator: "PM", Pattern: "x"},             // 合法 → 导入
+		{RuleID: "bad", Operator: "BOGUS", Pattern: "x"},           // 非法运算符 → 跳过
+		{RuleID: "", Operator: "REGEX", Pattern: "ok"},             // 空 ID 自动生成 → 导入
+	})
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if imported != 2 || skipped != 2 {
+		t.Fatalf("imported=%d skipped=%d, want 2/2", imported, skipped)
+	}
+	rules, err := s.ExportRules()
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	if len(rules) != 3 {
+		t.Fatalf("exported %d rules, want 3", len(rules))
+	}
+	for _, r := range rules {
+		if r.ID != 0 || r.IsSeed {
+			t.Errorf("exported rule should have ID=0 and IsSeed=false: %+v", r)
+		}
+	}
+}
+
 func TestRuleService_validateRule(t *testing.T) {
 	s := NewRuleService(newTestDB(t), nil, newTestConfig())
 
