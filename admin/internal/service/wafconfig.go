@@ -276,7 +276,7 @@ func defaultWafConfig() map[string]interface{} {
 			},
 		},
 		"cc": map[string]interface{}{
-			"rate": "100/60", "ban_duration": 300,
+			"rate": "100/60", "ban_duration": 300, "backend": "shared",
 			"ban_key_prefix": "waf:cc:ban:", "counter_prefix": "waf:cc:cnt:",
 		},
 		"block": map[string]interface{}{

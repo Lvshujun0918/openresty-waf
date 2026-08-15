@@ -77,3 +77,35 @@ t.test("无配置安全返回", function()
     t.no(auto_ban.record_hit({}, "1.2.3.4"))
     t.no(auto_ban.is_banned({}, "1.2.3.4"))
 end)
+
+t.test("auto_ban: 第3次封禁升级为 IP+UA 条目", function()
+    ngx_reset()
+    ngx.var.http_user_agent = "python-requests/2.31"
+    local cfg = { auto_ban = { enabled = true, threshold = 1, window = 60, duration = 600,
+        ban_key_prefix = "waf:ab:ban:", counter_prefix = "waf:ab:cnt:" } }
+    local ab = auto_ban
+    -- 3 次触发（不 reset shared dict，保证封禁次数累积）
+    for i = 1, 3 do
+        ab.record_hit(cfg, "10.1.1.1")
+    end
+    local val = ngx.shared.waf_counter:get("waf:ab:ban:10.1.1.1")
+    t.notnil(val)
+    local ip, ua, ts = tostring(val):match("^([^|]+)|([^|]+)|(%d+)$")
+    t.notnil(ip, "升级条目格式 ip|ua|ts: " .. tostring(val))
+    t.eq(ip, "10.1.1.1")
+    t.eq(ua, "python-requests/2.31")
+    -- 白名单/免升级：UA 含 | 时保持 IP 级
+end)
+
+t.test("auto_ban: 第1次封禁为 IP 级", function()
+    ngx_reset()
+    ngx.var.http_user_agent = "curl/8.5.0"
+    local cfg = { auto_ban = { enabled = true, threshold = 1, window = 60, duration = 600,
+        ban_key_prefix = "waf:ab:ban:", counter_prefix = "waf:ab:cnt:" } }
+    local ab = auto_ban
+    ab.record_hit(cfg, "10.1.1.2")
+    local val = ngx.shared.waf_counter:get("waf:ab:ban:10.1.1.2")
+    t.notnil(val)
+    local ip, ts = tostring(val):match("^([^|]+)|(%d+)$")
+    t.eq(ip, "10.1.1.2")
+end)

@@ -29,9 +29,12 @@ local function tz_offset()
     return string.format("%s%02d:%02d", sign, math.floor(a / 3600), math.floor((a % 3600) / 60))
 end
 
--- 该 IP 是否在封禁期
+-- 该 IP 是否在封禁期（shared 或 redis 后端）
 local function is_banned(cfg, ip)
     local key = (cfg.cc.ban_key_prefix or "waf:cc:ban:") .. ip
+    if (cfg.cc.backend or "shared") == "redis" then
+        return storage.redis_get(key) ~= nil
+    end
     return storage.get_shared(config.dict.counter, key) ~= nil
 end
 
@@ -115,15 +118,26 @@ function _M.check(waf_ctx, cfg, rate, ban_duration, dims)
         end
     end
 
-    local n = storage.incr_shared(config.dict.counter, counter_key, 1, 0, seconds)
+    -- 计数后端：shared（单机共享内存，默认）| redis（集群跨 worker/节点精确限流）
+    local n
+    if (cfg.cc.backend or "shared") == "redis" then
+        -- Redis INCR + 首次设置过期（防计数键永久残留）
+        n = storage.redis_incr(counter_key, seconds)
+    else
+        n = storage.incr_shared(config.dict.counter, counter_key, 1, 0, seconds)
+    end
     if n and n >= count then
         -- 触发封禁（IP 级）
         local ban_key = (cfg.cc.ban_key_prefix or "waf:cc:ban:") .. ip
-        local ok, serr = storage.set_shared(config.dict.counter, ban_key, ngx.time(), ban_duration)
+        local ok, serr
+        if (cfg.cc.backend or "shared") == "redis" then
+            ok, serr = storage.redis_set(ban_key, ngx.time(), ban_duration)
+        else
+            ok, serr = storage.set_shared(config.dict.counter, ban_key, ngx.time(), ban_duration)
+        end
         if not ok then
-            -- 共享字典写满降级：封禁状态写不进去时仍拦截本次请求，
-            -- 并告警（下一请求会再次尝试写入；计数键仍能正常读，不影响限流本身）
-            ngx.log(ngx.ERR, "[waf] CC 封禁写入共享内存失败（字典可能已满）: ", tostring(serr))
+            -- 写失败降级：封禁状态写不进去时仍拦截本次请求，并告警
+            ngx.log(ngx.ERR, "[waf] CC 封禁写入失败（" .. (cfg.cc.backend or "shared") .. "）: ", tostring(serr))
         end
         return "banned"
     end
@@ -136,7 +150,11 @@ function _M.unban(waf_ctx, cfg)
     local ip = waf_ctx.client_ip
     if not ip or ip == "" then return end
     local key = (cfg.cc.ban_key_prefix or "waf:cc:ban:") .. ip
-    storage.set_shared(config.dict.counter, key, nil)
+    if (cfg.cc.backend or "shared") == "redis" then
+        storage.redis_del(key)
+    else
+        storage.set_shared(config.dict.counter, key, nil)
+    end
 end
 
 return _M

@@ -25,6 +25,26 @@ function _M.is_banned(cfg, ip)
     return storage.get_shared(config.dict.counter, key) ~= nil
 end
 
+-- 封禁时长：按该 IP 历史封禁次数升级（阶梯 1 次→IP；2 次→IP；3 次起→IP+UA）
+-- 防"换 UA 绕过 IP 封禁"：升级后的条目用名单格式 ip|ua|ts（引擎名单子串匹配 UA）。
+-- 封禁次数记录在共享内存（TTL = duration，随封禁一起过期）。
+local function ban_level(cfg, ab, ip, duration)
+    local level_key = (ab.counter_prefix or "waf:ab:cnt:") .. "lv:" .. ip
+    local level = storage.get_shared(config.dict.counter, level_key) or 0
+    level = level + 1
+    storage.set_shared(config.dict.counter, level_key, level, duration)
+
+    local entry = ip
+    if level >= 3 then
+        -- 升级为 IP+UA 封禁（名单条目 ip|ua|ts，UA 子串匹配；UA 为空时保持 IP 级）
+        local ua = ngx.var.http_user_agent or ""
+        if ua ~= "" and not ua:find("|", 1, true) then
+            entry = ip .. "|" .. ua
+        end
+    end
+    return entry .. "|" .. tostring(ngx.time() + duration)
+end
+
 -- 记录一次攻击命中：达到阈值即写入封禁键（时长 duration 秒）。
 -- 返回 true 表示本次触发了封禁（供日志告警）。
 function _M.record_hit(cfg, ip)
@@ -42,7 +62,7 @@ function _M.record_hit(cfg, ip)
     local n = storage.incr_shared(config.dict.counter, ckey, 1, 0, window)
     if n and n >= threshold then
         local bkey = (ab.ban_key_prefix or "waf:ab:ban:") .. ip
-        local ok, err = storage.set_shared(config.dict.counter, bkey, ngx.time(), duration)
+        local ok, err = storage.set_shared(config.dict.counter, bkey, ban_level(cfg, ab, ip, duration), duration)
         if not ok then
             -- 字典写满降级：封禁键写不进去时仅告警，不影响业务
             ngx.log(ngx.ERR, "[waf] 自动封禁写入共享内存失败（字典可能已满）: ", tostring(err))

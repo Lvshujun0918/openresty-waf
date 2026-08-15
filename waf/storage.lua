@@ -151,6 +151,16 @@ function _M.redis_lpush(key, value)
     return ok2
 end
 
+-- DEL（CC 解封等）
+function _M.redis_del(key)
+    local red, rc = connect_redis()
+    if not red then return nil, rc end
+    local ok2, err2 = red:del(key)
+    release(red, rc)
+    if not ok2 then return nil, err2 end
+    return ok2
+end
+
 -- RPUSH + 可选 LTRIM（实时统计列表：追加后裁剪到 maxlen 防无限增长）
 function _M.redis_rpush_trim(key, value, maxlen)
     local red, rc = connect_redis()

@@ -144,6 +144,7 @@ _M.stats = {
 -- CC 防刷
 -- ============================================================================
 _M.cc = {
+    backend       = "shared",  -- shared（单机共享内存）| redis（集群精确限流，每请求一次 Redis INCR）
     rate          = "100/60",  -- 每 60 秒内同一 IP 同 URI 最多 100 次
     ban_duration  = 300,       -- 触发后封禁时长（秒）
     ban_key_prefix= "waf:cc:ban:",
