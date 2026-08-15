@@ -122,12 +122,13 @@ local function write_file(cfg, line)
 end
 
 -- redis 后端：经 ngx.timer 异步推送（log 阶段禁用 TCP cosocket，
--- 定时器回调中可用），不阻塞请求收尾。
-local function push_to_redis(premature, key, payloads)
+-- 定时器回调中可用），不阻塞请求收尾。items 为 { key, payload } 数组，
+-- 一次 timer 内完成多条推送（同一请求的 traffic + 事件可合并）。
+local function push_to_redis(premature, items)
     if premature then return end
     local storage = require "storage"
-    for _, raw in ipairs(payloads) do
-        storage.redis_lpush(key, raw)
+    for _, it in ipairs(items) do
+        storage.redis_lpush(it.key, it.payload)
     end
 end
 
@@ -135,6 +136,10 @@ end
 
 local ctx = ngx.ctx.waf_ctx
 local cfg = require("rule_engine.engine").get_active_config()
+
+-- 本请求待上报的 Redis 负载（traffic + 攻击事件合并为一次 timer 推送，
+-- 攻击风暴下减少 timer 数量与 Redis 连接往返）
+local pending = {}
 
 -- ===== 全量流量记录（可选）：开启后每个请求上报一条（含是否命中攻击） =====
 local traffic = cfg.traffic_log
@@ -162,11 +167,8 @@ if traffic and traffic.enabled then
         province      = geo and geo.province or "",
         city          = geo and geo.city or "",
     }
-    local key = traffic.redis_key or "waf:traffic:list"
-    local ok, err = ngx.timer.at(0, push_to_redis, key, { cjson.encode(rec) })
-    if not ok then
-        ngx.log(ngx.ERR, "[waf] 调度流量记录上报失败: ", tostring(err))
-    end
+    pending[#pending + 1] = { key = traffic.redis_key or "waf:traffic:list",
+                              payload = cjson.encode(rec) }
 end
 
 -- ===== 攻击事件 =====
@@ -182,13 +184,18 @@ local event = build_event(ctx)
 local backend = cfg.log.backend or "file"
 
 if backend == "redis" then
-    local key = cfg.log.redis_key or "waf:event:list"
-    local ok, err = ngx.timer.at(0, push_to_redis, key, { cjson.encode(event) })
+    pending[#pending + 1] = { key = cfg.log.redis_key or "waf:event:list",
+                              payload = cjson.encode(event) }
+else
+    write_file(cfg, cjson.encode(event))
+end
+
+-- 合并推送：traffic + 攻击事件一次 timer 完成，避免逐条连接往返
+if #pending > 0 then
+    local ok, err = ngx.timer.at(0, push_to_redis, pending)
     if not ok then
         ngx.log(ngx.ERR, "[waf] 调度事件上报失败: ", tostring(err))
     end
-else
-    write_file(cfg, cjson.encode(event))
 end
 
 -- ===== 高频攻击自动封禁计数（仅拦截模式；达到阈值自动临时封禁该 IP） =====
