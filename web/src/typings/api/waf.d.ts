@@ -299,6 +299,18 @@ declare namespace Api {
       sort_order: number;
     }
 
+    /** JA4 客户端指纹库条目 */
+    interface Ja4Profile {
+      id: number;
+      ja4: string;
+      ac_prefix?: string;
+      name: string;
+      category: string;
+      description?: string;
+      enabled: boolean;
+      source?: string;
+    }
+
     /** 爬虫访问记录 */
     interface BotLog {
       id: number;

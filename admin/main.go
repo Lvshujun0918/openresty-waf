@@ -169,6 +169,7 @@ func main() {
 	// 爬虫识别记录：定时消费 Redis 队列实时落库（每 3 秒）
 	botSvc := service.NewBotService(db, mgr, cfg)
 	botSvc.SeedProfiles()
+	service.NewJa4Service(db, mgr, cfg).SeedJa4Profiles()
 	go func() {
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()

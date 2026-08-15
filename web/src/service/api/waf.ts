@@ -423,6 +423,34 @@ export function fetchBotTop(dim: string, limit = 20) {
   return request<{ items: { key: string; count: number }[] }>({ url: '/bots/top', params: { dim, limit } });
 }
 
+/** JA4 客户端指纹查询识别（精确 → ja4_ac 前缀） */
+export function fetchJa4Lookup(ja4: string) {
+  return request<{ matched: boolean; match?: string; profile?: { name: string; category: string } }>({
+    url: '/ja4/lookup',
+    params: { ja4 }
+  });
+}
+
+/** JA4 客户端指纹库列表 */
+export function fetchJa4Profiles(category = '') {
+  return request<Api.Waf.Ja4Profile[]>({ url: '/ja4/profiles', params: { category } });
+}
+
+/** 新建 JA4 客户端指纹 */
+export function createJa4Profile(data: Record<string, unknown>) {
+  return request<{ ok: boolean; id: number }>({ url: '/ja4/profiles', method: 'post', data });
+}
+
+/** 更新 JA4 客户端指纹 */
+export function updateJa4Profile(id: number, data: Record<string, unknown>) {
+  return request<{ ok: boolean }>({ url: `/ja4/profiles/${id}`, method: 'put', data });
+}
+
+/** 删除 JA4 客户端指纹 */
+export function deleteJa4Profile(id: number) {
+  return request<{ ok: boolean }>({ url: `/ja4/profiles/${id}`, method: 'delete' });
+}
+
 /** 爬虫趋势 */
 export function fetchBotTrend(days = 7) {
   return request<{ items: { date: string; total: number; fake: number }[] }>({ url: '/bots/trend', params: { days } });

@@ -38,6 +38,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	auditHandler := NewAuditHandler(db)
 	auditSvc := service.NewAuditService(db)
 	botHandler := NewBotHandler(db, mgr, cfg)
+	ja4Handler := NewJa4Handler(db, mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -147,6 +148,13 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			// 爬虫记录与统计
 			authed.GET("/bots/logs", botHandler.ListLogs)
 			authed.GET("/bots/logs/:id", botHandler.GetLog)
+
+			// JA4 客户端指纹库与查询识别
+			authed.GET("/ja4/profiles", ja4Handler.List)
+			authed.POST("/ja4/profiles", ja4Handler.Create)
+			authed.PUT("/ja4/profiles/:id", ja4Handler.Update)
+			authed.DELETE("/ja4/profiles/:id", ja4Handler.Delete)
+			authed.GET("/ja4/lookup", ja4Handler.Lookup)
 			authed.POST("/bots/consume", botHandler.ConsumeLogs)
 			authed.POST("/bots/logs/:id/blacklist", botHandler.BlacklistLog)
 			authed.GET("/bots/stats", botHandler.Stats)

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, onMounted, ref } from 'vue';
 import {
+  useMessage,
   NButton,
   NCard,
   NDataTable,
@@ -20,11 +21,15 @@ import {
   NGi
 } from 'naive-ui';
 import { useEcharts } from '@/hooks/common/echarts';
+import Ja4Identify from '@/components/custom/Ja4Identify.vue';
 import type { ECOption } from '@/hooks/common/echarts';
 import {
   blacklistBotLog,
   consumeBotLogs,
+  createJa4Profile,
+  deleteJa4Profile,
   fetchBotLogDetail,
+  fetchJa4Profiles,
   createBotFingerprint,
   createBotProfile,
   deleteBotFingerprint,
@@ -35,10 +40,10 @@ import {
   fetchBotStats,
   fetchBotTop,
   fetchBotTrend,
+  updateJa4Profile,
   updateBotFingerprint,
   updateBotProfile
 } from '@/service/api';
-import { useMessage } from 'naive-ui';
 
 const message = useMessage();
 
@@ -143,6 +148,7 @@ function load() {
   loadLogs();
   loadProfiles();
   loadFingerprints();
+  loadJa4Profiles();
 }
 onMounted(load);
 
@@ -182,6 +188,69 @@ function editFingerprint(row?: Api.Waf.BotFingerprint) {
   editingFp.value = row ? { ...row } : { match: 'exact', enabled: true };
   showFpModal.value = true;
 }
+
+// —— JA4 客户端库 ——
+const ja4Profiles = ref<Api.Waf.Ja4Profile[]>([]);
+const showJa4Modal = ref(false);
+const editingJa4 = ref<Partial<Api.Waf.Ja4Profile>>({ category: 'tool', enabled: true });
+
+async function loadJa4Profiles() {
+  const res = await fetchJa4Profiles().catch(() => ({ data: [] as Api.Waf.Ja4Profile[] }));
+  ja4Profiles.value = res.data ?? [];
+}
+
+async function saveJa4Profile() {
+  const data = { ...editingJa4.value };
+  if (data.id) {
+    await updateJa4Profile(data.id, data);
+  } else {
+    await createJa4Profile(data);
+  }
+  message.success('已保存');
+  showJa4Modal.value = false;
+  loadJa4Profiles();
+}
+
+function editJa4Profile(row?: Api.Waf.Ja4Profile) {
+  editingJa4.value = row ? { ...row } : { category: 'tool', enabled: true };
+  showJa4Modal.value = true;
+}
+
+const ja4CatMeta: Record<string, { label: string; type: 'error' | 'info' | 'warning' | 'default' }> = {
+  malware: { label: '恶意软件', type: 'error' },
+  browser: { label: '浏览器', type: 'info' },
+  tool: { label: '工具/库', type: 'warning' },
+  other: { label: '其他', type: 'default' }
+};
+
+const ja4Columns = [
+  { title: '客户端', key: 'name', minWidth: 140 },
+  {
+    title: '分类',
+    key: 'category',
+    width: 100,
+    render: (row: Api.Waf.Ja4Profile) =>
+      h(NTag, { size: 'small', bordered: false, type: ja4CatMeta[row.category]?.type || 'default' },
+        { default: () => ja4CatMeta[row.category]?.label || row.category })
+  },
+  { title: 'JA4', key: 'ja4', ellipsis: { tooltip: true }, render: (row: Api.Waf.Ja4Profile) => h('span', { class: 'font-mono text-xs' }, row.ja4) },
+  { title: 'JA4_ac', key: 'ac_prefix', width: 110, render: (row: Api.Waf.Ja4Profile) => h('span', { class: 'font-mono text-[11px] text-[rgb(125,125,125)]' }, row.ac_prefix || '-') },
+  { title: '描述', key: 'description', ellipsis: { tooltip: true } },
+  {
+    title: '操作',
+    key: 'action',
+    width: 120,
+    render: (row: Api.Waf.Ja4Profile) =>
+      h('div', { class: 'flex gap-2' }, [
+        h(NButton, { size: 'small', quaternary: true, onClick: () => editJa4Profile(row) }, { default: () => '编辑' }),
+        h(
+          NPopconfirm,
+          { onPositiveClick: () => deleteJa4Profile(row.id).then(loadJa4Profiles) },
+          { trigger: () => h(NButton, { size: 'small', quaternary: true, type: 'error' }, { default: () => '删除' }), default: () => '确认删除？' }
+        )
+      ])
+  }
+];
 
 // —— 表格列 ——
 const profileColumns = [
@@ -461,6 +530,17 @@ const botHeaderColumns = [
         </NCard>
       </NTabPane>
 
+      <NTabPane name="ja4" tab="JA4 客户端库">
+        <NCard :bordered="false" class="card-wrapper">
+          <template #header-extra>
+            <NButton type="primary" size="small" @click="editJa4Profile()">新增</NButton>
+          </template>
+          <p class="mb-3 text-xs text-[rgb(125,125,125)]">
+            内置 FoxIO 已知客户端指纹（浏览器/工具/恶意软件）：恶意类命中自动加入恶意指纹库拦截；详情页 JA4 将显示识别结果
+          </p>
+          <NDataTable :columns="ja4Columns" :data="ja4Profiles" size="small" :bordered="false" />
+        </NCard>
+      </NTabPane>
       <NTabPane name="fingerprints" tab="恶意指纹库">
         <NCard :bordered="false" class="card-wrapper">
           <template #header-extra>
@@ -518,6 +598,33 @@ const botHeaderColumns = [
       </template>
     </NModal>
 
+    <!-- JA4 客户端库编辑弹窗 -->
+    <NModal v-model:show="showJa4Modal" preset="card" :title="editingJa4.id ? '编辑客户端' : '新增客户端'" style="width: 560px">
+      <NForm label-placement="left" label-width="90">
+        <NFormItem label="名称"><NInput v-model:value="editingJa4.name" placeholder="如 Chromium Browser / Sliver Agent" /></NFormItem>
+        <NFormItem label="JA4"><NInput v-model:value="editingJa4.ja4" placeholder="如 t13d1516h2_8daaf6152771_02713d6af862" /></NFormItem>
+        <NFormItem label="分类">
+          <NSelect
+            v-model:value="editingJa4.category"
+            :options="[
+              { label: '浏览器', value: 'browser' },
+              { label: '工具/库', value: 'tool' },
+              { label: '恶意软件', value: 'malware' },
+              { label: '其他', value: 'other' }
+            ]"
+          />
+        </NFormItem>
+        <NFormItem label="描述"><NInput v-model:value="editingJa4.description" /></NFormItem>
+        <NFormItem label="启用"><NSwitch v-model:value="editingJa4.enabled" /></NFormItem>
+      </NForm>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <NButton @click="showJa4Modal = false">取消</NButton>
+          <NButton type="primary" @click="saveJa4Profile">保存</NButton>
+        </div>
+      </template>
+    </NModal>
+
     <!-- 爬虫记录详情 -->
     <NModal
       v-model:show="detailOpen"
@@ -564,9 +671,12 @@ const botHeaderColumns = [
             <div class="text-xs text-[rgb(125,125,125)]">域名</div>
             <div>{{ detail.host || '-' }}</div>
           </div>
-          <div v-if="detail.ja4">
+          <div v-if="detail.ja4" class="col-span-2 md:col-span-3">
             <div class="text-xs text-[rgb(125,125,125)]">JA4 指纹</div>
-            <div class="font-mono text-xs" :title="detail.ja4">{{ detail.ja4 }}</div>
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-xs" :title="detail.ja4">{{ detail.ja4 }}</span>
+              <Ja4Identify :ja4="detail.ja4" />
+            </div>
           </div>
           <div v-if="detail.fingerprint">
             <div class="text-xs text-[rgb(125,125,125)]">HTTP 指纹</div>

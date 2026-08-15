@@ -16,6 +16,7 @@ import {
   NTabPane
 } from 'naive-ui';
 import { consumeCcLogs, consumeChallenges, fetchCcLogs, fetchChallenges } from '@/service/api';
+import Ja4Identify from '@/components/custom/Ja4Identify.vue';
 
 // —— 通用 ——
 function fmtTime(t: string) {
@@ -256,7 +257,7 @@ onMounted(() => {
               </NSpace>
             </NFormItem>
             <NFormItem style="margin-left: auto">
-              <NButton secondary @click="consumeCc" :loading="ccLoading">消费 Redis 队列</NButton>
+              <NButton secondary :loading="ccLoading" @click="consumeCc">消费 Redis 队列</NButton>
             </NFormItem>
           </NForm>
           <NDataTable :columns="ccColumns" :data="ccList" :loading="ccLoading" :bordered="false" size="small" />
@@ -293,7 +294,7 @@ onMounted(() => {
               </NSpace>
             </NFormItem>
             <NFormItem style="margin-left: auto">
-              <NButton secondary @click="consumeCh" :loading="chLoading">消费 Redis 队列</NButton>
+              <NButton secondary :loading="chLoading" @click="consumeCh">消费 Redis 队列</NButton>
             </NFormItem>
           </NForm>
           <NDataTable :columns="chColumns" :data="chList" :loading="chLoading" :bordered="false" size="small" />
@@ -355,9 +356,12 @@ onMounted(() => {
               {{ (detail as Api.Waf.CcLogItem).status >= 400 ? '封禁拦截' : '记录' }}
             </NTag>
           </div>
-          <div v-if="detail.ja4">
+          <div v-if="detail.ja4" class="col-span-2 md:col-span-3">
             <div class="text-xs text-[rgb(125,125,125)]">JA4 指纹</div>
-            <div class="font-mono text-xs" :title="detail.ja4">{{ detail.ja4 }}</div>
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-xs" :title="detail.ja4">{{ detail.ja4 }}</span>
+              <Ja4Identify :ja4="detail.ja4" />
+            </div>
           </div>
           <div class="col-span-2 md:col-span-3">
             <div class="text-xs text-[rgb(125,125,125)]">请求</div>

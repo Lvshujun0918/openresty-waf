@@ -15,6 +15,7 @@ import {
   NTag
 } from 'naive-ui';
 import { banEvent, consumeEvents, exemptEvent, exportEventsCsv, fetchEventDetail, fetchEvents, markFalsePositive } from '@/service/api';
+import Ja4Identify from '@/components/custom/Ja4Identify.vue';
 
 const groupMeta: Record<string, { label: string; color: string }> = {
   sqli: { label: 'SQL 注入', color: '#ef4444' },
@@ -407,9 +408,12 @@ onMounted(load);
               {{ isBlocked(detail) ? '拦截' : '记录' }}
             </NTag>
           </div>
-          <div v-if="detail.ja4">
+          <div v-if="detail.ja4" class="col-span-2 md:col-span-3">
             <div class="text-xs text-[rgb(125,125,125)]">JA4 指纹</div>
-            <div class="font-mono text-xs" :title="detail.ja4">{{ detail.ja4 }}</div>
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-xs" :title="detail.ja4">{{ detail.ja4 }}</span>
+              <Ja4Identify :ja4="detail.ja4" />
+            </div>
           </div>
           <div class="col-span-2 md:col-span-3">
             <div class="text-xs text-[rgb(125,125,125)]">请求</div>
