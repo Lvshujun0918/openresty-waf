@@ -56,6 +56,7 @@ function _M.record(waf_ctx, cfg, rule_name)
         uri        = waf_ctx and waf_ctx.request and waf_ctx.request.uri or "",
         rule_name  = rule_name or "",
         ja4        = (waf_ctx and waf_ctx.ja4 and waf_ctx.ja4 ~= "" and waf_ctx.ja4) or (waf_ctx and waf_ctx.tls_fp) or "",
+        ja4h       = (waf_ctx and waf_ctx.ja4h) or "",
         headers    = cjson.encode(evidence.headers or {}),
         body       = evidence.body or "",
         status     = ngx.status and ngx.status ~= 0 and ngx.status or 503, -- 记录封禁拦截状态

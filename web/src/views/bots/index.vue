@@ -716,6 +716,10 @@ const botHeaderColumns = [
               <Ja4Identify :ja4="detail.ja4" />
             </div>
           </div>
+          <div v-if="detail.ja4h">
+            <div class="text-xs text-[rgb(125,125,125)]">JA4H 指纹</div>
+            <div class="font-mono text-xs" :title="detail.ja4h">{{ detail.ja4h }}</div>
+          </div>
           <div v-if="detail.fingerprint">
             <div class="text-xs text-[rgb(125,125,125)]">HTTP 指纹</div>
             <div class="font-mono text-xs" :title="detail.fingerprint">{{ detail.fingerprint }}</div>

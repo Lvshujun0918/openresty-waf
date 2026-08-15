@@ -141,6 +141,7 @@ ngx = {
 
     time = function() return os.time() end,
     now  = function() return os.time() end,
+    http_version = function() return ngx.req._http_version or 1.1 end,
 
     -- 正则（PCRE → Lua 模式；顶层 | 交替拆分为多个候选依次尝试）
     re = {
@@ -208,6 +209,7 @@ ngx = {
         _body = nil,
         _body_file = nil,   -- body 落临时文件路径（超过 client_body_buffer_size）
         get_method    = function() return ngx.req._method end,
+        http_version  = function() return ngx.req._http_version or 1.1 end,
         get_uri_args  = function() return ngx.req._args end,
         get_post_args = function() return ngx.req._post end,
         get_headers   = function() return ngx.req._headers end,

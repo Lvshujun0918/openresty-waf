@@ -49,7 +49,8 @@ type BotLog struct {
 	URI          string    `gorm:"type:text" json:"uri"`
 	UA           string    `gorm:"size:512" json:"ua"`
 	Fingerprint  string    `gorm:"size:64;index" json:"fingerprint"` // HTTP 组合指纹（兜底/统计）
-	Ja4          string    `gorm:"size:64;index" json:"ja4"`         // JA4 TLS 指纹（TLS 连接）
+	Ja4          string    `gorm:"size:64;index" json:"ja4"`
+	Ja4H      string    `gorm:"size:64" json:"ja4h"`                 // JA4H HTTP 客户端指纹         // JA4 TLS 指纹（TLS 连接）
 	Profile      string    `gorm:"size:64;index" json:"profile"`     // 命中的爬虫画像
 	Engine       bool      `json:"engine"`                           // 搜索引擎类
 	Fake         bool      `gorm:"index" json:"fake"`                // 虚假爬虫（UA 声称搜索引擎但 IP 不匹配）

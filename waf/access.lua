@@ -343,6 +343,11 @@ local function protection_flow()
         end
     end
 
+    -- 1.75 JA4H HTTP 客户端指纹（工具/浏览器的 HTTP 头特征识别，所有 HTTP 请求可算）
+    if config.bot and config.bot.enabled ~= false then
+        require("ja4h").run(ctx)
+    end
+
     -- 1.8 触发规则拦截（kind=block：host/UA/请求头/IP 等条件命中即拦截，
     --     可用于爬虫/采集器分级处置；detect 模式仅记录事件）
     local okb, ruleb = pcall(function()

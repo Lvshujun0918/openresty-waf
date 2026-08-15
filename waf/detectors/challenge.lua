@@ -304,6 +304,7 @@ function _M.record(waf_ctx, action)
         uri        = ngx.var.request_uri or "",
         rule_name  = waf_ctx and waf_ctx.trigger_rule or "",
         ja4        = (waf_ctx and waf_ctx.ja4 and waf_ctx.ja4 ~= "" and waf_ctx.ja4) or (waf_ctx and waf_ctx.tls_fp) or "",
+        ja4h       = (waf_ctx and waf_ctx.ja4h) or "",
         headers    = cjson.encode(evidence.headers or {}),
         body       = evidence.body or "",
         country    = ok and geo and geo.country or "",

@@ -197,3 +197,44 @@ t.test("fp: 非 TLS 请求回退 http", function()
     t.eq(src, "http")
     t.ok(hfp ~= nil and #hfp > 0)
 end)
+
+-- ===== JA4H HTTP 客户端指纹 =====
+local ja4h = require "ja4h"
+
+t.test("ja4h: GET HTTP/1.1 官方格式", function()
+    ngx_reset()
+    ngx.req._method = "GET"
+    ngx.req._http_version = 1.1
+    ngx.var.http_accept_language = "zh-CN,zh;q=0.9"
+    ngx.req._headers = { ["user-agent"] = "curl/8.5.0", ["accept"] = "*/*" }
+    local j = ja4h.calc()
+    t.notnil(j)
+    -- ge11nn02zh-c_...
+    t.ok(j:match("^ge11nn02zhcn_%w+_000000000000_000000000000$"), "GET 无Cookie: " .. tostring(j))
+end)
+
+t.test("ja4h: POST 带 Cookie/Referer", function()
+    ngx_reset()
+    ngx.req._method = "POST"
+    ngx.req._http_version = 2.0
+    ngx.var.http_cookie = "session=abc123; theme=dark"
+    ngx.var.http_referer = "https://example.com/"
+    ngx.req._headers = { ["content-type"] = "application/json" }
+    local j = ja4h.calc()
+    t.notnil(j)
+    t.ok(j:match("^po20cr01zhcn_%w+_%w+_%w+$"), "POST H2 Cookie: " .. tostring(j))
+end)
+
+t.test("ja4h: 头部排序稳定", function()
+    ngx_reset()
+    ngx.req._method = "GET"
+    ngx.req._http_version = 1.1
+    ngx.req._headers = { ["accept"] = "*/*", ["user-agent"] = "curl" }
+    local a = ja4h.calc()
+    ngx_reset()
+    ngx.req._method = "GET"
+    ngx.req._http_version = 1.1
+    ngx.req._headers = { ["user-agent"] = "curl", ["accept"] = "*/*" }
+    local b = ja4h.calc()
+    t.eq(a, b, "排序后稳定")
+end)

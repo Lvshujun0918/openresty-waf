@@ -38,6 +38,8 @@ declare namespace Api {
       status: number;
       /** JA4 TLS 指纹 */
       ja4?: string;
+      /** JA4H HTTP 客户端指纹 */
+      ja4h?: string;
       /** 人工标记误报（命中率统计排除） */
       false_positive?: boolean;
       created_at?: string;
@@ -118,6 +120,8 @@ declare namespace Api {
       rule_name?: string;
       /** JA4 TLS 指纹 */
       ja4?: string;
+      /** JA4H HTTP 客户端指纹 */
+      ja4h?: string;
       /** 请求头 JSON（name/value 数组） */
       headers?: string;
       /** 请求体（最多 8KB） */
@@ -141,6 +145,8 @@ declare namespace Api {
       rule_name?: string;
       /** JA4 TLS 指纹 */
       ja4?: string;
+      /** JA4H HTTP 客户端指纹 */
+      ja4h?: string;
       /** 请求头 JSON（name/value 数组） */
       headers?: string;
       /** 请求体（最多 8KB） */
@@ -327,6 +333,8 @@ declare namespace Api {
       fingerprint: string;
       /** JA4 TLS 指纹（TLS 连接） */
       ja4?: string;
+      /** JA4H HTTP 客户端指纹 */
+      ja4h?: string;
       /** 命中指纹来源（ja4 | http） */
       fp_source?: string;
       /** 请求头 JSON（name/value 数组） */
