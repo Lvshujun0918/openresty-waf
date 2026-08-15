@@ -33,7 +33,7 @@ func Init(cfg *config.Config) *gorm.DB {
 		&model.Event{}, &model.Setup{}, &model.IpListSubscription{},
 		&model.TrafficLog{}, &model.ChallengeLog{}, &model.TriggerRule{},
 		&model.CcLog{}, &model.PublishHistory{},
-		&model.AlertChannel{}, &model.AlertRule{}); err != nil {
+		&model.AlertChannel{}, &model.AlertRule{}, &model.AuditLog{}); err != nil {
 		log.Fatalf("数据库迁移失败: %v", err)
 	}
 
