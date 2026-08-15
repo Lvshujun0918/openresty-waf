@@ -36,6 +36,8 @@ declare namespace Api {
       msg: string;
       severity: number;
       status: number;
+      /** 人工标记误报（命中率统计排除） */
+      false_positive?: boolean;
       created_at?: string;
     }
 
@@ -201,8 +203,71 @@ declare namespace Api {
     /** 封禁条目 */
     interface BanEntry {
       ip: string;
+      ua?: string;
       expires_at: number | null;
       permanent: boolean;
+    }
+
+    /** 引擎健康状态 */
+    interface EngineStatus {
+      pid: number;
+      engine_version: string;
+      ruleset_version: string;
+      config_version: string;
+      trigger_version: string;
+      last_seen: number;
+      online: boolean;
+      rule_synced: boolean;
+    }
+
+    /** 告警通知通道 */
+    interface AlertChannel {
+      id: number;
+      name: string;
+      type: string;
+      webhook_url: string;
+      smtp_host: string;
+      smtp_port: number;
+      smtp_user: string;
+      smtp_from: string;
+      enabled: boolean;
+    }
+
+    /** 告警规则 */
+    interface AlertRule {
+      id: number;
+      name: string;
+      type: string;
+      window_sec: number;
+      threshold: number;
+      action: string;
+      channel_id: number;
+      cooldown_sec: number;
+      enabled: boolean;
+      last_triggered_at: string | null;
+    }
+
+    /** 操作审计日志 */
+    interface AuditLog {
+      id: number;
+      username: string;
+      action: string;
+      method: string;
+      path: string;
+      detail: string;
+      client_ip: string;
+      success: boolean;
+      created_at: string;
+    }
+
+    /** 登录会话 */
+    interface Session {
+      jti: string;
+      user_id: number;
+      username: string;
+      ip: string;
+      ua: string;
+      created_at: number;
     }
   }
 }

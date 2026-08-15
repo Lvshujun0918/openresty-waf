@@ -228,3 +228,130 @@ export function setTriggerRuleEnabled(id: number, enabled: boolean) {
 export function publishTriggerRules() {
   return request<{ status: string; version: string }>({ url: '/trigger-rules/publish', method: 'post' });
 }
+
+/** 引擎健康状态列表 */
+export function fetchEngines() {
+  return request<{ engines: Api.Waf.EngineStatus[]; count: number }>({ url: '/health/engines' });
+}
+
+/** 实时监控秒级曲线 */
+export function fetchRealtime(minutes = 10) {
+  return request<{ points: { ts: number; total: number; attack: number }[] }>({
+    url: '/monitor/realtime',
+    params: { minutes }
+  });
+}
+
+/** 标记事件误报/取消误报 */
+export function markFalsePositive(id: number, flag: boolean) {
+  return request<{ status: string }>({ url: `/events/${id}/false-positive`, method: 'post', data: { flag } });
+}
+
+/** 事件一键豁免（生成 exempt 触发规则） */
+export function exemptEvent(id: number) {
+  return request<{ status: string; rule_id: number }>({ url: `/events/${id}/exempt`, method: 'post' });
+}
+
+/** 导出事件 CSV */
+export function exportEventsCsv(params: Record<string, string | number>) {
+  return request<Blob>({ url: '/events/export', params, responseType: 'blob' } as never);
+}
+
+/** 导出流量 CSV */
+export function exportTrafficCsv(params: Record<string, string | number>) {
+  return request<Blob>({ url: '/traffic/export', params, responseType: 'blob' } as never);
+}
+
+/** 规则命中统计排行 */
+export function fetchRuleStats(group = '', limit = 20) {
+  return request<{ items: { rule_id: string; hits: number; blocks: number; fps: number }[] }>({
+    url: '/rules/stats',
+    params: { group, limit }
+  });
+}
+
+/** 攻击类型趋势 */
+export function fetchGroupTrend(group: string, days = 14) {
+  return request<{ group: string; items: { date: string; attack: number }[] }>({
+    url: '/dashboard/group-trend',
+    params: { group, days }
+  });
+}
+
+/** 攻击来源地区排行 */
+export function fetchTopRegions(level = 'province', limit = 10) {
+  return request<{ items: { region: string; count: number }[] }>({
+    url: '/dashboard/top-regions',
+    params: { level, limit }
+  });
+}
+
+/** 告警通道列表 */
+export function fetchAlertChannels() {
+  return request<Api.Waf.AlertChannel[]>({ url: '/alerts/channels' });
+}
+
+/** 新建告警通道 */
+export function createAlertChannel(data: Record<string, unknown>) {
+  return request<{ ok: boolean; id: number }>({ url: '/alerts/channels', method: 'post', data });
+}
+
+/** 更新告警通道 */
+export function updateAlertChannel(id: number, data: Record<string, unknown>) {
+  return request<{ ok: boolean }>({ url: `/alerts/channels/${id}`, method: 'put', data });
+}
+
+/** 删除告警通道 */
+export function deleteAlertChannel(id: number) {
+  return request<{ ok: boolean }>({ url: `/alerts/channels/${id}`, method: 'delete' });
+}
+
+/** 测试告警通道 */
+export function testAlertChannel(id: number) {
+  return request<{ ok: boolean }>({ url: `/alerts/channels/${id}/test`, method: 'post' });
+}
+
+/** 告警规则列表 */
+export function fetchAlertRules() {
+  return request<Api.Waf.AlertRule[]>({ url: '/alerts/rules' });
+}
+
+/** 新建告警规则 */
+export function createAlertRule(data: Record<string, unknown>) {
+  return request<{ ok: boolean; id: number }>({ url: '/alerts/rules', method: 'post', data });
+}
+
+/** 更新告警规则 */
+export function updateAlertRule(id: number, data: Record<string, unknown>) {
+  return request<{ ok: boolean }>({ url: `/alerts/rules/${id}`, method: 'put', data });
+}
+
+/** 删除告警规则 */
+export function deleteAlertRule(id: number) {
+  return request<{ ok: boolean }>({ url: `/alerts/rules/${id}`, method: 'delete' });
+}
+
+/** 启用/禁用告警规则 */
+export function setAlertRuleEnabled(id: number, enabled: boolean) {
+  return request<{ ok: boolean }>({ url: `/alerts/rules/${id}/enabled`, method: 'patch', data: { enabled } });
+}
+
+/** 操作审计日志 */
+export function fetchAuditLogs(params: Record<string, string | number>) {
+  return request<Api.Waf.PageResult<Api.Waf.AuditLog>>({ url: '/audit-logs', params });
+}
+
+/** 登录会话列表 */
+export function fetchSessions() {
+  return request<{ sessions: Api.Waf.Session[] }>({ url: '/auth/sessions' });
+}
+
+/** 强制下线会话 */
+export function kickSession(jti: string) {
+  return request<{ ok: boolean }>({ url: `/auth/sessions/${jti}`, method: 'delete' });
+}
+
+/** 新增封禁（支持 IP+UA 维度） */
+export function createBan(data: { ip: string; ua?: string; hours: number }) {
+  return request<{ status: string }>({ url: '/bans', method: 'post', data });
+}

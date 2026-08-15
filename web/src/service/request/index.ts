@@ -22,6 +22,15 @@ export const request = createFlatRequest<any, any, RequestInstanceState>(
       const Authorization = getAuthorization();
       Object.assign(config.headers, { Authorization });
 
+      // CSRF 双提交：从 Cookie 读取 token 并作为请求头携带（后端写请求校验一致性）
+      const csrf = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('waf_csrf='))
+        ?.split('=')[1];
+      if (csrf) {
+        Object.assign(config.headers, { 'X-CSRF-Token': csrf });
+      }
+
       return config;
     },
     isBackendSuccess(response) {
