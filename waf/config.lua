@@ -46,6 +46,15 @@ _M.detection = {
     -- 检测 watchdog（毫秒）：access 阶段检测总耗时超过该阈值时强制放行，
     -- 灾难性回溯/极端慢规则的最后防线（0 表示关闭）
     watchdog_ms = 10,
+    -- 攻击证据脱敏（隐私合规）：请求头/请求体入库前打码。
+    --   fields: 敏感键名（JSON/form 形式 "key=value" 或 "key":"value"，值整体打码）
+    --   regex:  额外正则打码（命中部分替换为 ***），如手机号/身份证
+    evidence_mask = {
+        enabled = true,
+        fields = { "password", "passwd", "pwd", "token", "secret",
+                   "authorization", "access_key", "private_key", "cookie" },
+        regex = { [[1[3-9]\d{9}]], "\\d{17}[\\dXx]" },
+    },
 }
 
 -- ============================================================================

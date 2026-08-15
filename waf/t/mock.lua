@@ -121,6 +121,13 @@ ngx = {
             end
             return nil
         end,
+        gsub = function(s, p, repl, opts)
+            if s == nil then return nil end
+            local lp = pcre_to_lua(p)
+            local ok, res = pcall(string.gsub, tostring(s), lp, repl)
+            if ok then return res end
+            return nil
+        end,
     },
 
     -- URL 解码

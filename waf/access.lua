@@ -32,13 +32,20 @@ local EVIDENCE_MAX_BODY    = 8192  -- 请求体最大保留 8KB
 local function capture_evidence(ctx)
     if ctx._evidence_captured then return end
     ctx._evidence_captured = true
+    -- 敏感信息脱敏配置（config.detection.evidence_mask，后台可配置）
+    local mask = nil
+    local cfg = engine.get_active_config()
+    if cfg and cfg.detection then
+        mask = cfg.detection.evidence_mask
+    end
+    local util = require "rule_engine.util"
     local evidence = {}
-    -- 请求头：按名称排序，取前 N 个
+    -- 请求头：按名称排序，取前 N 个（值打码）
     local all = ngx.req.get_headers()
     local hdrs = {}
     if all then
         for k, v in pairs(all) do
-            hdrs[#hdrs + 1] = { name = tostring(k), value = tostring(v) }
+            hdrs[#hdrs + 1] = { name = tostring(k), value = util.mask_sensitive(tostring(v), mask) }
         end
     end
     table.sort(hdrs, function(a, b) return a.name < b.name end)
@@ -55,7 +62,7 @@ local function capture_evidence(ctx)
         ngx.req.read_body()
         local body = ngx.req.get_body_data()
         if body and #body > 0 then
-            evidence.body = string.sub(body, 1, EVIDENCE_MAX_BODY)
+            evidence.body = util.mask_sensitive(string.sub(body, 1, EVIDENCE_MAX_BODY), mask)
         end
     end
     ctx.evidence = evidence

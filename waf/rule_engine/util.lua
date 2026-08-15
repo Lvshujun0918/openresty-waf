@@ -151,4 +151,43 @@ function _M.match_regex_list(value, patterns)
     return false
 end
 
+-- 敏感信息打码（隐私合规）：对证据文本中的敏感字段值与指定正则命中的
+-- 手机号/身份证等内容替换为 ***，防止敏感信息完整入库。
+-- mask 结构：{ enabled, fields = {"password", ...}, regex = { "pattern", ... } }
+local MASK_KEY = "***"
+
+function _M.mask_sensitive(text, mask)
+    if type(text) ~= "string" or text == "" or not mask then
+        return text
+    end
+    if mask.enabled == false then
+        return text
+    end
+    local out = text
+    -- 1. 敏感键名打码：支持 form（key=value&...）与 JSON（"key":"value"）两种形态
+    local fields = mask.fields
+    if type(fields) == "table" and #fields > 0 then
+        for _, f in ipairs(fields) do
+            if type(f) == "string" and f ~= "" then
+                -- "password":"xxx" / 'password':'xxx' / password=xxx& / password=xxx,xxx
+                out = out:gsub('["\']%s*' .. f .. '%s*["\']%s*:%s*["\'][^"\'%c]+["\']',
+                               '"' .. f .. '":"' .. MASK_KEY .. '"')
+                out = out:gsub('([^%w_])' .. f .. '%s*=%s*[^&%s,;]+',
+                               '%1' .. f .. '=' .. MASK_KEY)
+            end
+        end
+    end
+    -- 2. 正则打码（手机号/身份证等）
+    local regexes = mask.regex
+    if type(regexes) == "table" then
+        for _, p in ipairs(regexes) do
+            if type(p) == "string" and p ~= "" then
+                local ok, res = pcall(ngx.re.gsub, out, p, MASK_KEY, "jo")
+                if ok and res then out = res end
+            end
+        end
+    end
+    return out
+end
+
 return _M

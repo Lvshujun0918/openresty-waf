@@ -130,3 +130,28 @@ t.test("try_parse_xml: 超长输入片段数量受限不抛错", function()
     t.ok(ok, "不抛错")
     if ok then t.ok(vals == nil or #vals <= 1001, "片段数量受限") end
 end)
+
+t.test("mask_sensitive: JSON 键值打码", function()
+    local mask = { enabled = true, fields = { "password", "token" }, regex = {} }
+    local out = util.mask_sensitive([[{"username":"bob","password":"secret123"}]], mask)
+    t.ok(out:find("password\":\"***", 1, true) ~= nil, "password 已打码")
+    t.ok(out:find("secret123", 1, true) == nil, "原文已隐藏")
+end)
+
+t.test("mask_sensitive: form 键值打码", function()
+    local mask = { enabled = true, fields = { "password" }, regex = {} }
+    local out = util.mask_sensitive("user=bob&password=abc123&role=admin", mask)
+    t.ok(out:find("password=***", 1, true) ~= nil)
+    t.ok(out:find("abc123", 1, true) == nil)
+end)
+
+t.test("mask_sensitive: 正则打码手机号", function()
+    local mask = { enabled = true, fields = {}, regex = { [[1[3-9]\d{9}]] } }
+    local out = util.mask_sensitive("联系 13812345678 咨询", mask)
+    t.ok(out:find("13812345678", 1, true) == nil, "手机号已打码")
+end)
+
+t.test("mask_sensitive: disabled 原样返回", function()
+    local mask = { enabled = false, fields = { "password" }, regex = {} }
+    t.eq(util.mask_sensitive("password=abc", mask), "password=abc")
+end)
