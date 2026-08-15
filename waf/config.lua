@@ -165,6 +165,12 @@ _M.challenge = {
         verify_api = "https://gcaptcha4.geetest.com/validate",
         sdk        = "https://static.geetest.com/v4/gt4.js",
     },
+    -- 品牌化（挑战页标题与页脚公司/联系方式，后台可配置；空字段自动隐藏）
+    brand = {
+        title   = "",          -- 页面标题（空用默认「安全验证」）
+        company = "",          -- 公司/站点名（页脚展示）
+        contact = "",          -- 联系方式（页脚展示）
+    },
 }
 
 -- ============================================================================

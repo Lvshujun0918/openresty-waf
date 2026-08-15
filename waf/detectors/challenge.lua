@@ -119,22 +119,35 @@ local function js_safe(s)
         :gsub("&", ""):gsub("[%c]", "")
 end
 
+-- 品牌信息（config.challenge.brand：标题/公司/联系方式，后台可配置，空则隐藏页脚）
+local function brand_html(ch)
+    local b = ch and ch.brand or {}
+    local parts = {}
+    if b.company and b.company ~= "" then parts[#parts + 1] = b.company end
+    if b.contact and b.contact ~= "" then parts[#parts + 1] = b.contact end
+    if #parts == 0 then return "" end
+    return '<div class="brand">' .. table.concat(parts, " · ") .. '</div>'
+end
+
 -- 基础 JS 挑战页：前端 JS 计算工作量证明，通过后 POST 验证路径，
 -- 服务端校验成功才下发放行 cookie——无 JS 能力的 bot 跟随重定向也拿不到 cookie
 local function basic_page(ch, ip, redirect, token, bits)
     local verify = ch.verify_path or "/__waf_challenge_verify__"
+    local title = (ch.brand and ch.brand.title ~= "" and ch.brand.title) or "安全验证"
     local js = "location.reload();"
     if redirect and redirect ~= "" then
         js = "location.href='" .. js_safe(redirect) .. "';"
     end
     return [[<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>安全验证</title>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>]] .. title .. [[</title>
 <style>body{font-family:sans-serif;text-align:center;padding:80px 20px;color:#333}
 .box{max-width:380px;margin:0 auto;border:1px solid #eee;border-radius:12px;padding:40px}
+.brand{margin-top:24px;font-size:12px;color:#999}
 .spinner{width:36px;height:36px;margin:0 auto 16px;border:3px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}</style>
 </head><body><div class="box"><div class="spinner"></div>
-<h2>正在验证您的浏览器…</h2><p>请稍候，正在执行浏览器环境检测。</p></div>
+<h2>]] .. title .. [[</h2><p>请稍候，正在执行浏览器环境检测。</p></div>
+]] .. brand_html(ch) .. [[
 <script>
 var challenge = ']] .. token .. [[', bits = ]] .. tostring(bits) .. [[;
 function fnv1a(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=(h*16777619)>>>0;}return h>>>0;}
@@ -155,14 +168,16 @@ end
 -- 高级验证码（极验 GT4 / Gitee）挑战页：嵌入官方 SDK，验证成功后跳回原请求
 local function advanced_page(cfg, redirect)
     local sdk = cfg.captcha.sdk or "https://static.geetest.com/v4/gt4.js"
+    local title = (cfg.brand and cfg.brand.title ~= "" and cfg.brand.title) or "安全验证"
     local js = "location.reload();"
     if redirect and redirect ~= "" then
         js = "location.href='" .. js_safe(redirect) .. "';"
     end
     return [[<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>安全验证</title>
-<style>body{font-family:sans-serif;text-align:center;padding:60px 20px;color:#333}</style>
-</head><body><h2>请完成安全验证</h2>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>]] .. title .. [[</title>
+<style>body{font-family:sans-serif;text-align:center;padding:60px 20px;color:#333}
+.brand{margin-top:24px;font-size:12px;color:#999}</style>
+</head><body><h2>]] .. title .. [[</h2>
 <div id="captcha"></div>
 <script src="]] .. sdk .. [["></script>
 <script>
@@ -184,7 +199,8 @@ initGeetest4({
         });
     });
 });
-</script></body></html>]]
+</script>]] .. brand_html(cfg) .. [[
+</body></html>]]
 end
 
 -- ============================================================================
