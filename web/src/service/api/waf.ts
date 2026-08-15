@@ -113,6 +113,22 @@ export function banEvent(id: number, hours: number) {
   return request<{ status: string; ip: string }>({ url: `/events/${id}/ban`, method: 'post', data: { hours } });
 }
 
+/** 全规则重放检测（攻击重放：跑全部启用规则返回命中列表） */
+export function replayRequest(req: {
+  method: string;
+  uri: string;
+  body?: string;
+  content_type?: string;
+  headers?: Record<string, string>;
+  cookies?: string;
+}) {
+  return request<{ hits: { rule_id: string; name: string; group: string; msg: string; severity: number }[]; count: number }>({
+    url: '/rules/test-all',
+    method: 'post',
+    data: req
+  });
+}
+
 /** 规则测试 */
 export function testRule(data: Api.Waf.RuleTestReq) {
   return request<{ matched: boolean; note?: string }>({ url: '/rules/test', method: 'post', data });

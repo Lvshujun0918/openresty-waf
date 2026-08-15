@@ -76,6 +76,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.PATCH("/rules/:id/enabled", ruleHandler.SetEnabled)
 			authed.POST("/rules/publish", ruleHandler.Publish)
 			authed.POST("/rules/test", ruleHandler.Test)
+			authed.POST("/rules/test-all", ruleHandler.TestAll)
 			authed.GET("/rules/publish-history", ruleHandler.PublishHistory)
 			authed.POST("/rules/rollback/:id", ruleHandler.Rollback)
 			authed.GET("/rules/export", ruleHandler.Export)

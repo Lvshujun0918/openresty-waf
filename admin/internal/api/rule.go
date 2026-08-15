@@ -189,6 +189,21 @@ func (h *RuleHandler) Import(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"imported": imported, "skipped": skipped})
 }
 
+// TestAll POST /api/rules/test-all 全规则重放（攻击重放：跑全部启用规则返回命中）
+func (h *RuleHandler) TestAll(c *gin.Context) {
+	var req ruletest.TestRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误: " + err.Error()})
+		return
+	}
+	hits, err := h.svc.TestAll(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"hits": hits, "count": len(hits)})
+}
+
 // HitStats GET /api/rules/stats?group=&limit=20 规则命中排行（命中/拦截/误报）
 func (h *RuleHandler) HitStats(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))

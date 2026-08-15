@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"openresty-waf/admin/internal/config"
+	"openresty-waf/admin/internal/ruletest"
 	"openresty-waf/admin/internal/model"
 )
 
@@ -317,6 +318,34 @@ func (s *RuleService) Update(id uint, r *model.Rule) error {
 		return errors.New("pattern 疑似灾难性回溯（组内量词与组后量词嵌套，如 (a+)+），请简化正则")
 	}
 	return s.db.Model(&existing).Updates(r).Error
+}
+
+// ReplayHit 全规则重放命中项
+type ReplayHit struct {
+	RuleID   string `json:"rule_id"`
+	Name     string `json:"name"`
+	Group    string `json:"group"`
+	Msg      string `json:"msg"`
+	Severity int    `json:"severity"`
+}
+
+// TestAll 用请求描述跑全部启用规则，返回命中列表（攻击重放）
+func (s *RuleService) TestAll(req ruletest.TestRequest) ([]ReplayHit, error) {
+	var rules []model.Rule
+	if err := s.db.Where("enabled = ?", true).Find(&rules).Error; err != nil {
+		return nil, err
+	}
+	var hits []ReplayHit
+	for _, r := range rules {
+		res := ruletest.Match(r, req)
+		if res.Matched {
+			hits = append(hits, ReplayHit{
+				RuleID: r.RuleID, Name: r.Name, Group: r.Group,
+				Msg: r.Message, Severity: r.Severity,
+			})
+		}
+	}
+	return hits, nil
 }
 
 func (s *RuleService) Delete(id uint) error {

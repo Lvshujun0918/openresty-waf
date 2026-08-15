@@ -22,6 +22,7 @@ import {
 } from 'naive-ui';
 import { useEcharts } from '@/hooks/common/echarts';
 import Ja4Identify from '@/components/custom/Ja4Identify.vue';
+import { replayRequest } from '@/service/api';
 import type { ECOption } from '@/hooks/common/echarts';
 import {
   blacklistBotLog,
@@ -459,6 +460,42 @@ function closeDetail() {
   detailOpen.value = false;
   detail.value = null;
 }
+
+// —— 重放检测 ——
+const replaying = ref(false);
+const replayHits = ref<{ rule_id: string; name: string; group: string; msg: string; severity: number }[]>([]);
+const replayOpen = ref(false);
+
+function parseHeaderMap(headers: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  try {
+    const list = JSON.parse(headers || '[]') as { name: string; value: string }[];
+    for (const h of list) out[h.name] = h.value;
+  } catch {
+    /* 忽略 */
+  }
+  return out;
+}
+
+async function doReplay() {
+  if (!detail.value) return;
+  replaying.value = true;
+  try {
+    const hmap = parseHeaderMap(detail.value.headers || '');
+    const res = await replayRequest({
+      method: detail.value.method || 'GET',
+      uri: detail.value.uri || '/',
+      body: detail.value.body || '',
+      content_type: hmap['content-type'] || 'application/x-www-form-urlencoded',
+      headers: hmap,
+      cookies: hmap['cookie'] || ''
+    });
+    replayHits.value = res.data?.hits ?? [];
+    replayOpen.value = true;
+  } finally {
+    replaying.value = false;
+  }
+}
 const botHeaderColumns = [
   { title: '名称', key: 'name', width: 180, render: (row: { name: string }) => h('span', { class: 'font-mono text-xs' }, row.name) },
   { title: '值', key: 'value', render: (row: { value: string }) => h('span', { class: 'break-all font-mono text-xs text-[rgb(125,125,125)]' }, row.value) }
@@ -734,6 +771,10 @@ const botHeaderColumns = [
           </div>
         </div>
 
+        <div class="flex justify-end">
+          <NButton size="small" secondary :loading="replaying" @click="doReplay">重放检测</NButton>
+        </div>
+
         <!-- 请求头 -->
         <div v-if="detailHeaders.length">
           <h4 class="mb-2 text-sm font-semibold">请求头（{{ detailHeaders.length }}）</h4>
@@ -746,6 +787,23 @@ const botHeaderColumns = [
           <pre class="max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-[rgb(229,229,229)] bg-[rgb(245,245,245)] p-3 font-mono text-xs">{{ detail.body }}</pre>
         </div>
       </div>
+    </NModal>
+
+    <!-- 重放检测结果 -->
+    <NModal v-model:show="replayOpen" preset="card" title="重放检测结果" class="w-[min(96vw,620px)]" :bordered="false" :style="{ borderRadius: '12px' }">
+      <p v-if="!replayHits.length" class="py-6 text-center text-sm text-[rgb(125,125,125)]">未命中任何启用规则（该请求当前规则集不拦截）</p>
+      <template v-else>
+        <p class="mb-2 text-sm">命中 {{ replayHits.length }} 条规则：</p>
+        <NDataTable
+          :columns="[
+            { title: '规则 ID', key: 'rule_id', width: 100, render: (row: { rule_id: string }) => h('span', { class: 'font-mono text-xs' }, row.rule_id) },
+            { title: '描述', key: 'msg' }
+          ]"
+          :data="replayHits"
+          size="small"
+          :bordered="false"
+        />
+      </template>
     </NModal>
   </div>
 </template>
