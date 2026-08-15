@@ -61,7 +61,8 @@ openresty-waf/
 docker compose up -d --build
 ```
 
-浏览器打开 http://\<host\>:18081（默认账号 `admin / admin123`，可用 `ADMIN_INIT_PASSWORD` 覆盖），
+浏览器打开 http://\<host\>:8232（默认账号 `admin / admin123`，可用 `ADMIN_INIT_PASSWORD` 覆盖；
+端口由 compose 中 `ADMIN_ADDR` 控制），
 首次使用会进入**引导页**：
 
 1. **配置 Redis**：填写你已有 Redis 实例的连接信息（规则热下发 / 攻击事件队列），后台先做连通性测试。
@@ -72,7 +73,7 @@ docker compose up -d --build
 ```
 ┌─────────────┐     引导接入      ┌──────────────────────────────┐
 │ 单容器管理后台 │ ───────────────► │ 本机已部署的 OpenResty          │
-│ (Go+Vue,18081)│   下载组件/脚本    │  + /opt/waf (Lua 组件)        │
+│ (Go+Vue,8232) │   下载组件/脚本    │  + /opt/waf (Lua 组件)        │
 └──────┬──────┘                   │  + nginx.conf 挂载            │
        │ 规则下发/事件消费          │                                │
        ▼                          └──────────────┬───────────────┘
@@ -86,7 +87,7 @@ main 分支 / `v*` 标签 push 后，GitHub Actions 自动构建并推送到
 
 ```bash
 docker pull ghcr.io/<owner>/openresty-waf:latest
-docker run -d --name waf-admin -p 18081:8081 \
+docker run -d --name waf-admin --network host -e ADMIN_ADDR=:8232 \
   -v waf-data:/data \
   -e ADMIN_INIT_PASSWORD=your-password \
   -e ADMIN_JWT_SECRET=your-secret \

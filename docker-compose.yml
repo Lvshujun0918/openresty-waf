@@ -15,14 +15,17 @@ services:
       context: .
       dockerfile: admin/Dockerfile
     restart: unless-stopped
+    # host 网络：容器内 127.0.0.1 即宿主，可直接连宿主 Redis（1Panel 容器发布在 127.0.0.1:6379）
+    network_mode: host
     environment:
-      ADMIN_ADDR: ":8081"
+      ADMIN_ADDR: ":8232"
       ADMIN_DB_TYPE: "sqlite"
       ADMIN_DB_DSN: "/data/waf.db"
       ADMIN_JWT_SECRET: "${ADMIN_JWT_SECRET:-openresty-waf-change-me}"
       ADMIN_INIT_PASSWORD: "${ADMIN_INIT_PASSWORD:-admin123}"
-    ports:
-      - "18081:8081"
+    # host 网络下把 1Panel 容器名解析到宿主回环
+    extra_hosts:
+      - "1Panel-redis-fHju:127.0.0.1"
     volumes:
       - admin-data:/data
 
