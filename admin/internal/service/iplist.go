@@ -77,6 +77,11 @@ func (s *IpListService) Delete(id uint) error {
 			Delete(&model.BotProfile{})
 		removed = res.RowsAffected
 		_ = bot.publishProfiles()
+	} else if sub.Target == "ja4_profile" {
+		res := s.db.Where("source = ? AND sub_id = ?", "subscription", sub.ID).
+			Delete(&model.Ja4Profile{})
+		removed = res.RowsAffected
+		_ = NewJa4Service(s.db, s.mgr, s.cfg).PublishMalware()
 	}
 	_ = s.db.Model(&model.IpListSubscription{}).Where("id = ?", id).
 		Update("last_status", fmt.Sprintf("已删除，清理同步条目 %d 条", removed)).Error
@@ -102,8 +107,8 @@ func validateSub(sub *model.IpListSubscription) error {
 		if sub.Type != "whitelist" && sub.Type != "blacklist" {
 			return errors.New("IP 订阅的类型必须是 whitelist 或 blacklist")
 		}
-	case "fingerprint", "bot_profile":
-		// 指纹/画像订阅无名单方向
+	case "fingerprint", "bot_profile", "ja4_profile":
+		// 指纹/画像/客户端库订阅无名单方向
 		sub.Type = ""
 	default:
 		return errors.New("订阅目标必须是 ip / fingerprint / bot_profile")
@@ -141,6 +146,8 @@ func (s *IpListService) syncSub(sub *model.IpListSubscription) (int, error) {
 		count, syncErr = s.syncFingerprints(sub, raw)
 	case "bot_profile":
 		count, syncErr = s.syncBotProfiles(sub, raw)
+	case "ja4_profile":
+		count, syncErr = s.syncJa4Profiles(sub, raw)
 	default:
 		count, syncErr = s.syncIPEntries(sub, raw)
 	}
@@ -214,6 +221,74 @@ func (s *IpListService) syncIPEntries(sub *model.IpListSubscription, raw string)
 		return 0, err
 	}
 	return len(fetched), nil
+}
+
+// syncJa4Profiles 同步 JA4 客户端指纹库：CSV 每行 "名称,ja4[,category]"，重建该订阅条目。
+func (s *IpListService) syncJa4Profiles(sub *model.IpListSubscription, raw string) (int, error) {
+	ja4svc := NewJa4Service(s.db, s.mgr, s.cfg)
+	items, err := parseJa4ProfileCSV(raw)
+	if err != nil {
+		return 0, err
+	}
+	if len(items) == 0 {
+		return 0, errors.New("未解析到有效 JA4 条目（CSV：名称,ja4[,category]）")
+	}
+	if err := s.db.Where("source = ? AND sub_id = ?", "subscription", sub.ID).
+		Delete(&model.Ja4Profile{}).Error; err != nil {
+		return 0, err
+	}
+	now := time.Now()
+	for _, it := range items {
+		p := model.Ja4Profile{
+			Ja4: it.Ja4, AcPrefix: AcPrefix(it.Ja4), Name: it.Name,
+			Category: it.Category, Description: "订阅: " + sub.Name,
+			Enabled: true, Source: "subscription", SubID: sub.ID,
+			CreatedAt: now, UpdatedAt: now,
+		}
+		if err := s.db.Create(&p).Error; err != nil {
+			return 0, err
+		}
+	}
+	_ = ja4svc.PublishMalware()
+	return len(items), nil
+}
+
+// ja4ProfileItem CSV 解析条目
+type ja4ProfileItem struct {
+	Name     string
+	Ja4      string
+	Category string
+}
+
+// parseJa4ProfileCSV 解析 "名称,ja4[,category]" 每行（跳过 # 注释与空行，支持逗号/引号）
+func parseJa4ProfileCSV(body string) ([]ja4ProfileItem, error) {
+	var out []ja4ProfileItem
+	seen := map[string]bool{}
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.Split(line, ",")
+		if len(parts) < 2 {
+			continue
+		}
+		name := strings.Trim(strings.TrimSpace(parts[0]), `"`)
+		ja4 := strings.Trim(strings.TrimSpace(parts[1]), `"`)
+		if name == "" || ja4 == "" || seen[ja4] {
+			continue
+		}
+		cat := "other"
+		if len(parts) >= 3 {
+			switch strings.TrimSpace(parts[2]) {
+			case "malware", "browser", "tool":
+				cat = strings.TrimSpace(parts[2])
+			}
+		}
+		seen[ja4] = true
+		out = append(out, ja4ProfileItem{Name: name, Ja4: ja4, Category: cat})
+	}
+	return out, nil
 }
 
 // parseIPLines 按行解析 IP/CIDR（跳过注释与空行，支持逗号分隔）。

@@ -95,20 +95,27 @@ func (s *Ja4Service) SeedJa4Profiles() {
 		if err := s.db.Create(&p).Error; err != nil {
 			continue
 		}
-		// 恶意条目联动恶意指纹库（引擎精确拦截）
-		if sd.Cat == "malware" {
-			var exist int64
-			s.db.Model(&model.BotFingerprint{}).Where("value = ? AND match = ?", sd.Ja4, "exact").Count(&exist)
-			if exist == 0 {
-				_ = s.db.Create(&model.BotFingerprint{
-					Name: "JA4-" + sd.Name, Value: sd.Ja4, Match: "exact",
-					Description: "内置恶意 JA4（" + sd.Cat + "）", Enabled: true,
-					CreatedAt: now, UpdatedAt: now,
-				}).Error
-			}
-		}
 	}
-	_ = NewBotService(s.db, s.mgr, s.cfg).publishFingerprints()
+	_ = s.PublishMalware()
+}
+
+// PublishMalware 把启用中的 malware 类 Ja4Profile 同步到恶意指纹库（JA4- 前缀）并下发引擎。
+// 引擎对同 TLS 栈请求精确 403 拦截；订阅/删除时同样调用保持同步。
+func (s *Ja4Service) PublishMalware() error {
+	_ = s.db.Where("name LIKE ?", "JA4-%").Delete(&model.BotFingerprint{}).Error
+	var list []model.Ja4Profile
+	if err := s.db.Where("category = ? AND enabled = ?", "malware", true).Find(&list).Error; err != nil {
+		return err
+	}
+	now := time.Now()
+	for _, p := range list {
+		_ = s.db.Create(&model.BotFingerprint{
+			Name: "JA4-" + p.Name, Value: p.Ja4, Match: "exact",
+			Description: "JA4 客户端库恶意指纹", Enabled: true,
+			CreatedAt: now, UpdatedAt: now,
+		}).Error
+	}
+	return NewBotService(s.db, s.mgr, s.cfg).publishFingerprints()
 }
 
 // List 客户端库列表（category 过滤）

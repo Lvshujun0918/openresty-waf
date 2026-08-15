@@ -21,7 +21,7 @@ import {
 import { createIpListSub, deleteIpListSub, fetchIpListSubs, setIpListSubEnabled, syncIpListSub, updateIpListSub } from '@/service/api';
 
 // 订阅目标 tab
-type Target = 'ip' | 'fingerprint' | 'bot_profile';
+type Target = 'ip' | 'fingerprint' | 'bot_profile' | 'ja4_profile';
 const activeTarget = ref<Target>('ip');
 
 const subs = ref<Api.Waf.IpListSub[]>([]);
@@ -42,6 +42,11 @@ const targetMeta: Record<Target, { label: string; hint: string; placeholder: str
     label: '爬虫画像库',
     hint: '订阅远程爬虫画像（JSON 数组），同步后进入爬虫画像库并下发引擎识别',
     placeholder: 'JSON 数组 [{"name":"Googlebot","ua":"Googlebot","ips":["66.249.64.0/19"],"engine":true}]'
+  },
+  ja4_profile: {
+    label: 'JA4 客户端库',
+    hint: '订阅远程 JA4 客户端指纹（CSV：每行 名称,ja4[,分类]），同步后进入 JA4 客户端库；malware 类自动联动恶意指纹库拦截',
+    placeholder: 'CSV 每行 名称,ja4[,malware|browser|tool]，如 Sliver Agent,t13d190900_9dc949149365_97f8aa674fd9,malware'
   }
 };
 
@@ -201,7 +206,8 @@ onMounted(load);
             :options="[
               { label: '恶意/信任 IP 库', value: 'ip' },
               { label: '恶意指纹库', value: 'fingerprint' },
-              { label: '爬虫画像库', value: 'bot_profile' }
+              { label: '爬虫画像库', value: 'bot_profile' },
+              { label: 'JA4 客户端库', value: 'ja4_profile' }
             ]"
             @update:value="v => (form.target = v as string)"
           />

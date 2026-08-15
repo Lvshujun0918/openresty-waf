@@ -13,7 +13,8 @@ type Ja4Profile struct {
 	Category    string    `gorm:"size:16;index" json:"category"` // browser | tool | malware | other
 	Description string    `gorm:"size:255" json:"description"`
 	Enabled     bool      `json:"enabled"`
-	Source      string    `gorm:"size:16" json:"source"` // seed | manual
+	Source      string    `gorm:"size:16;index" json:"source"` // seed | manual | subscription
+	SubID       uint      `gorm:"index" json:"sub_id"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
