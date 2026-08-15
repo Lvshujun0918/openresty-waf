@@ -88,50 +88,77 @@ t.test("fp: 请求级缓存", function()
     t.eq(a, b, "ctx 缓存后头部变化不影响已计算指纹")
 end)
 
--- ===== JA4 指纹 =====
+-- ===== JA4 指纹（对齐官方 FoxIO 算法） =====
 local ja4 = require "ja4"
 
-t.test("ja4: TLS1.3 基础格式", function()
+t.test("ja4: TLS1.3 官方格式", function()
     local hello = {
         version = "TLSv1.3",
-        cipher_suites = { 0x1301, 0x1302, 0x1303, 0x1304 },
-        extensions = { { type = 0 }, { type = 43 }, { type = 51 } },
         sn = "example.com",
         alpn = "h2",
+        cipher_suites = { 0x1301, 0x1302, 0x1303, 0x1304, 0xc02f, 0xcca8 },
+        extensions = { 0, 16, 43, 51, 13 },
+        sig_algs = { 0x0403, 0x0503 },
     }
     local j = ja4.calc(hello)
     t.notnil(j)
-    t.ok(j:match("^t13%d+%w%w_%w+_%w+$"), "格式: " .. tostring(j))
-    t.ok(j:sub(1, 3) == "t13", "TLSv1.3")
-    -- d = SNI(1) + ALPN(2) = 3
-    t.ok(j:sub(4, 4) == "3", "SNI+ALPN: " .. tostring(j))
-    -- c/e：4 个 cipher → 4；3 个 ext → 3
-    t.ok(j:match("^t13343_"), "cipher=4 ext=3: " .. tostring(j))
+    -- t13 + d + 06 + 05 + h2
+    t.ok(j:sub(1, 3) == "t13", "TLS1.3: " .. tostring(j))
+    t.ok(j:sub(4, 4) == "d", "SNI: " .. tostring(j))
+    t.ok(j:sub(5, 6) == "06", "cipher_len: " .. tostring(j))
+    t.ok(j:sub(7, 8) == "05", "ext_len(含SNI/ALPN): " .. tostring(j))
+    t.ok(j:sub(9, 10) == "h2", "alpn: " .. tostring(j))
+    t.ok(j:match("^t13d0605h2_%w+_%w+$"), "完整格式: " .. tostring(j))
 end)
 
-t.test("ja4: TLS1.2 无 SNI/ALPN", function()
+t.test("ja4: 无 SNI/ALPN 无签名算法", function()
     local hello = {
         version = "TLSv1.2",
         cipher_suites = { 0xc02f, 0xcca8 },
-        extensions = { { type = 0 } },
+        extensions = { 0 },
     }
     local j = ja4.calc(hello)
-    t.ok(j:sub(1, 7) == "t12021_", "TLS1.2 d0 c2 e1: " .. tostring(j))
+    t.notnil(j)
+    t.ok(j:sub(1, 4) == "t12i", "TLS1.2 无SNI: " .. tostring(j))
+    t.ok(j:sub(5, 6) == "02", "cipher_len 02: " .. tostring(j))
+    t.ok(j:sub(7, 8) == "01", "ext_len 01: " .. tostring(j))
+    t.ok(j:sub(9, 10) == "00", "alpn 00: " .. tostring(j))
+    t.ok(j:match("^t12i020100_%w+_%w+$"), "格式: " .. tostring(j))
+end)
+
+t.test("ja4: cipher 排序影响哈希", function()
+    local a = ja4.calc({ version = "TLSv1.3", cipher_suites = { 0x1301, 0x1302 }, extensions = { 0 } })
+    local b = ja4.calc({ version = "TLSv1.3", cipher_suites = { 0x1302, 0x1301 }, extensions = { 0 } })
+    t.eq(a, b, "排序后相同")
 end)
 
 t.test("ja4: 相同握手指纹稳定", function()
-    local a = ja4.calc({ version = "TLSv1.3", cipher_suites = { 0x1301 }, extensions = { { type = 0 } }, sn = "x" })
-    local b = ja4.calc({ version = "TLSv1.3", cipher_suites = { 0x1301 }, extensions = { { type = 0 } }, sn = "x" })
+    local a = ja4.calc({ version = "TLSv1.3", cipher_suites = { 0x1301 }, extensions = { 0 } })
+    local b = ja4.calc({ version = "TLSv1.3", cipher_suites = { 0x1301 }, extensions = { 0 } })
     t.eq(a, b)
+end)
+
+t.test("ja4: 空列表返回 12 个 0 哈希段", function()
+    local j = ja4.calc({ version = "TLSv1.3", cipher_suites = {}, extensions = { 0 } })
+    t.notnil(j)
+    t.ok(j:match("^t13i000100_000000000000_000000000000$"), "空列表: " .. tostring(j))
 end)
 
 t.test("ja4: nil 输入返回 nil", function()
     t.isnil(ja4.calc(nil))
 end)
 
-t.test("ja4: 无版本扩展默认按 TLS1.2", function()
-    local j = ja4.calc({ cipher_suites = { 0x1301 }, extensions = { { type = 0 } } })
-    t.ok(j:sub(1, 3) == "t12", "默认 TLS1.2: " .. tostring(j))
+t.test("ja4: 签名算法附加段", function()
+    local hello = {
+        version = "TLSv1.3",
+        cipher_suites = { 0x1301 },
+        extensions = { 0, 13 },
+        sig_algs = { 0x0403, 0x0804 },
+    }
+    local j = ja4.calc(hello)
+    t.notnil(j)
+    -- 扩展去 SNI/ALPN 后剩 [13]（sigalg 在扩展列表里也算一个扩展）
+    t.ok(j:match("^t13i010200_%w+_%w+$"), "含 sig_algs: " .. tostring(j))
 end)
 
 t.test("fp: effective 优先 ja4", function()
