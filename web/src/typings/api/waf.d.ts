@@ -177,11 +177,16 @@ declare namespace Api {
 
     /** 规则测试 */
     interface RuleTestReq {
-      ruleId: string;
-      uri: string;
-      method: string;
-      body: string;
-      content_type: string;
+      rule_id: string;
+      request: {
+        method: string;
+        uri: string;
+        body: string;
+        content_type: string;
+        headers?: Record<string, string>;
+        cookies?: string;
+        client_ip?: string;
+      };
     }
 
     /** 规则发布历史（支持一键回滚） */
