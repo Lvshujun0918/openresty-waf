@@ -10,29 +10,53 @@ local _M = {}
 local operators = require "rule_engine.operators"
 
 -- 模块级缓存：触发规则集按共享内存版本号（trigger_rules_version）缓存解码结果，
--- 避免每个请求对触发规则 JSON 重复 cjson.decode（access 阶段最多查询 3 次）。
-local trigger_cache = { version = false, value = nil }
+-- 并惰性构建「按 kind 分组」的启用规则列表（by_kind）。
+-- 避免每个请求对触发规则 JSON 重复 cjson.decode（access 阶段最多查询 4 次），
+-- 也避免 match_first/match_any 每次调用全量遍历过滤建新表。
+local trigger_cache = { version = false, value = nil, by_kind = {} }
 
--- 条件字段取值
+-- 条件字段取值（带请求级缓存：一次读取多次复用，避免每规则重复 ngx.var 访问）
 local function get_value(field, ctx, cond)
+    local vc = ctx and ctx._trigger_vars or nil
     if field == "host" then
+        if vc and vc.host ~= nil then return vc.host end
         -- 规范化 host：去掉端口（HTTP/2 下 ngx.var.host 可能带 :port）
-        return (ngx.var.host or ""):gsub(":%d+$", "")
+        local v = (ngx.var.host or ""):gsub(":%d+$", "")
+        if vc then vc.host = v end
+        return v
     elseif field == "path" then
-        return ngx.var.uri or ""
+        if vc and vc.path ~= nil then return vc.path end
+        local v = ngx.var.uri or ""
+        if vc then vc.path = v end
+        return v
     elseif field == "ua" then
-        return ngx.var.http_user_agent or ""
+        if vc and vc.ua ~= nil then return vc.ua end
+        local v = ngx.var.http_user_agent or ""
+        if vc then vc.ua = v end
+        return v
     elseif field == "ip" then
         return ctx and ctx.client_ip or ""
     elseif field == "method" then
-        return ngx.req.get_method() or ""
+        if vc and vc.method ~= nil then return vc.method end
+        local v = ngx.req.get_method() or ""
+        if vc then vc.method = v end
+        return v
     elseif field == "args" then
-        return ngx.var.args or ""
+        if vc and vc.args ~= nil then return vc.args end
+        local v = ngx.var.args or ""
+        if vc then vc.args = v end
+        return v
     elseif field == "header" then
         local name = tostring(cond.header or "")
         if name == "" then return "" end
         local var = "http_" .. name:lower():gsub("-", "_")
-        return ngx.var[var] or ""
+        if vc and vc.headers and vc.headers[var] ~= nil then return vc.headers[var] end
+        local v = ngx.var[var] or ""
+        if vc then
+            vc.headers = vc.headers or {}
+            vc.headers[var] = v
+        end
+        return v
     end
     return ""
 end
@@ -85,7 +109,7 @@ function _M.match(rule, ctx)
     return true
 end
 
--- 获取当前生效的触发规则（按 kind 过滤）
+-- 获取当前生效的触发规则（按 kind 过滤，结果按版本 + kind 缓存复用）
 function _M.get_rules(kind)
     local storage = require "storage"
     local config = require "config"
@@ -94,15 +118,20 @@ function _M.get_rules(kind)
         local body = storage.get_shared(config.dict.rules, "active_trigger_rules")
         trigger_cache.version = version
         trigger_cache.value = storage.decode(body)
+        trigger_cache.by_kind = {}
     end
     local rs = trigger_cache.value
     if type(rs) ~= "table" or type(rs.rules) ~= "table" then return nil end
+    kind = kind or ""
+    local cached = trigger_cache.by_kind[kind]
+    if cached then return cached end
     local rules = {}
     for _, r in ipairs(rs.rules) do
-        if r.enabled ~= false and (not kind or r.kind == kind) then
+        if r.enabled ~= false and (kind == "" or r.kind == kind) then
             rules[#rules + 1] = r
         end
     end
+    trigger_cache.by_kind[kind] = rules
     return rules
 end
 
