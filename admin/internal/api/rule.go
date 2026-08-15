@@ -188,3 +188,14 @@ func (h *RuleHandler) Import(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"imported": imported, "skipped": skipped})
 }
+
+// HitStats GET /api/rules/stats?group=&limit=20 规则命中排行（命中/拦截/误报）
+func (h *RuleHandler) HitStats(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	stats, err := h.svc.HitStats(c.Query("group"), limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": stats})
+}

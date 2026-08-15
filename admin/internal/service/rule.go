@@ -323,6 +323,39 @@ func (s *RuleService) Delete(id uint) error {
 	return s.db.Delete(&model.Rule{}, id).Error
 }
 
+// RuleHitStat 规则命中统计（事件按主命中 rule_id 聚合）
+type RuleHitStat struct {
+	RuleID string `json:"rule_id"`
+	Hits   int64  `json:"hits"`   // 总命中次数
+	Blocks int64  `json:"blocks"` // 拦截次数（status >= 400）
+	FPs    int64  `json:"fps"`    // 人工标记误报次数
+}
+
+// HitStats 按事件聚合规则命中排行（Top limit），支持按 group 过滤；
+// 支持「误报率」分析以指导规则治理（僵尸规则/高误报规则）
+func (s *RuleService) HitStats(group string, limit int) ([]RuleHitStat, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	q := `SELECT rule_id,
+		COUNT(*) AS hits,
+		COALESCE(SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END), 0) AS blocks,
+		COALESCE(SUM(CASE WHEN false_positive THEN 1 ELSE 0 END), 0) AS fps
+		FROM events`
+	var args []interface{}
+	if group != "" {
+		q += ` WHERE ` + "`group`" + ` = ?`
+		args = append(args, group)
+	}
+	q += ` GROUP BY rule_id ORDER BY hits DESC LIMIT ?`
+	args = append(args, limit)
+	var out []RuleHitStat
+	if err := s.db.Raw(q, args...).Scan(&out).Error; err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (s *RuleService) SetEnabled(id uint, enabled bool) error {
 	res := s.db.Model(&model.Rule{}).Where("id = ?", id).Update("enabled", enabled)
 	if res.RowsAffected == 0 {
