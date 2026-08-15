@@ -32,15 +32,15 @@ t.test("get_client_ip: XFF 空白回退", function()
     t.eq(storage.get_client_ip(), "10.0.0.1")
 end)
 
--- 可信代理：列表为空时保持兼容行为（无条件信任 XFF）
-t.test("get_client_ip: 可信代理列表为空时信任 XFF", function()
+-- 可信代理：列表为空时不信任 XFF（安全默认，防止伪造 XFF 绕过 IP 维度防护）
+t.test("get_client_ip: 可信代理列表为空时不信任 XFF", function()
     ngx_reset()
     local config = require "config"
     local orig = config.trusted_proxies
     config.trusted_proxies = {}
     ngx.var.remote_addr = "10.0.0.1"
     ngx.var.http_x_forwarded_for = "8.8.8.8"
-    t.eq(storage.get_client_ip(), "8.8.8.8")
+    t.eq(storage.get_client_ip(), "10.0.0.1")
     config.trusted_proxies = orig
 end)
 

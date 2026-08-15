@@ -157,14 +157,17 @@ end
 
 -- ============================================================================
 -- 客户端真实 IP（优先 X-Forwarded-For 最左值）
--- 仅当直连地址命中 config.trusted_proxies 时才信任 XFF；列表为空保持兼容行为。
+-- 仅当直连地址命中 config.trusted_proxies 时才信任 XFF；
+-- 列表为空视为未配置可信代理（安全默认），不信任任何 XFF。
 -- ============================================================================
 
--- 直连地址是否在可信代理列表中（空列表 → 信任，保持旧行为）
+-- 直连地址是否在可信代理列表中（空列表 → 不信任，安全默认：
+-- 公网直连场景下攻击者可伪造 X-Forwarded-For，一旦信任即可绕过
+-- IP 名单 / CC 计数 / 自动封禁 / 人机验证等所有 IP 维度防护）
 local function is_trusted_proxy(ip)
     local list = config.trusted_proxies
     if not list or #list == 0 then
-        return true
+        return false
     end
     local operators = require "rule_engine.operators"
     for _, entry in ipairs(list) do
