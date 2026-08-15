@@ -166,6 +166,22 @@ func main() {
 		}
 	}()
 
+	// 爬虫识别记录：定时消费 Redis 队列实时落库（每 3 秒）
+	botSvc := service.NewBotService(db, mgr, cfg)
+	botSvc.SeedProfiles()
+	go func() {
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if mgr.GetClient() == nil {
+				continue
+			}
+			if _, err := botSvc.Consume(100); err != nil {
+				log.Printf("消费爬虫记录失败: %v", err)
+			}
+		}
+	}()
+
 	// 告警规则定时检查（每 10 秒）：事件风暴 / 引擎离线 → 通知通道 + 可选自动回滚
 	alertSvc := service.NewAlertService(db, mgr, cfg)
 	go func() {

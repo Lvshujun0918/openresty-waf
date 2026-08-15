@@ -37,6 +37,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	alertHandler := NewAlertHandler(db, mgr, cfg)
 	auditHandler := NewAuditHandler(db)
 	auditSvc := service.NewAuditService(db)
+	botHandler := NewBotHandler(db, mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -130,6 +131,25 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.PUT("/alerts/rules/:id", alertHandler.UpdateRule)
 			authed.DELETE("/alerts/rules/:id", alertHandler.DeleteRule)
 			authed.PATCH("/alerts/rules/:id/enabled", alertHandler.SetRuleEnabled)
+
+			// 恶意指纹库（命中即拦截）
+			authed.GET("/bots/fingerprints", botHandler.ListFingerprints)
+			authed.POST("/bots/fingerprints", botHandler.CreateFingerprint)
+			authed.PUT("/bots/fingerprints/:id", botHandler.UpdateFingerprint)
+			authed.DELETE("/bots/fingerprints/:id", botHandler.DeleteFingerprint)
+
+			// 爬虫画像库（UA + IP 段验证）
+			authed.GET("/bots/profiles", botHandler.ListProfiles)
+			authed.POST("/bots/profiles", botHandler.CreateProfile)
+			authed.PUT("/bots/profiles/:id", botHandler.UpdateProfile)
+			authed.DELETE("/bots/profiles/:id", botHandler.DeleteProfile)
+
+			// 爬虫记录与统计
+			authed.GET("/bots/logs", botHandler.ListLogs)
+			authed.POST("/bots/consume", botHandler.ConsumeLogs)
+			authed.GET("/bots/stats", botHandler.Stats)
+			authed.GET("/bots/top", botHandler.Top)
+			authed.GET("/bots/trend", botHandler.Trend)
 
 			// 人机验证事件
 			authed.GET("/challenges", challengeHandler.List)
