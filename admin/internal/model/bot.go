@@ -4,6 +4,7 @@ import "time"
 
 // BotProfile 爬虫画像：UA 正则 + 可选 IP 段（搜索引擎类验证真实性）。
 // Engine=true 时校验来源 IP 是否在 Ips 网段内（不在 = 虚假爬虫）。
+// Source: ""（手动）| subscription（订阅同步）；SubID 关联订阅源。
 type BotProfile struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	Name      string    `gorm:"size:64;index" json:"name"`
@@ -12,12 +13,15 @@ type BotProfile struct {
 	Engine    bool      `json:"engine"`                  // 是否为搜索引擎类（需 IP 段验证）
 	Enabled   bool      `json:"enabled"`
 	SortOrder int       `json:"sort_order"`
+	Source    string    `gorm:"size:16;index" json:"source"` // "" | subscription
+	SubID     uint      `gorm:"index" json:"sub_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // BotFingerprint 恶意指纹库：HTTP 客户端指纹（组合头哈希）。
 // Match: exact（精确）| regex（正则）。
+// Source: ""（手动）| subscription（订阅同步）；SubID 关联订阅源。
 type BotFingerprint struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	Name        string    `gorm:"size:64" json:"name"`
@@ -25,6 +29,8 @@ type BotFingerprint struct {
 	Match       string    `gorm:"size:8" json:"match"` // exact | regex
 	Description string    `gorm:"size:255" json:"description"`
 	Enabled     bool      `json:"enabled"`
+	Source      string    `gorm:"size:16;index" json:"source"` // "" | subscription
+	SubID       uint      `gorm:"index" json:"sub_id"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
