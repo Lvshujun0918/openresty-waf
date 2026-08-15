@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref } from 'vue';
+import { h, onMounted, reactive, ref } from 'vue';
 import {
   NButton,
   NCard,
@@ -14,7 +14,7 @@ import {
   NSpace,
   NTag
 } from 'naive-ui';
-import { banEvent, consumeEvents, fetchEventDetail, fetchEvents } from '@/service/api';
+import { banEvent, consumeEvents, exemptEvent, exportEventsCsv, fetchEventDetail, fetchEvents, markFalsePositive } from '@/service/api';
 
 const groupMeta: Record<string, { label: string; color: string }> = {
   sqli: { label: 'SQL 注入', color: '#ef4444' },
@@ -151,10 +151,36 @@ const columns = [
   {
     title: '操作',
     key: 'action',
-    width: 150,
+    width: 210,
     render: (row: Api.Waf.EventItem) =>
       h(NSpace, { size: 4 }, [
         h(NButton, { size: 'small', quaternary: true, type: 'primary', onClick: () => openDetail(row.id) }, { default: () => '详情' }),
+        h(NButton, { size: 'small', quaternary: true, onClick: () => doExempt(row) }, { default: () => '豁免' }),
+        h(
+          NPopconfirm,
+          {
+            positiveText: row.false_positive ? '取消误报' : '标记误报',
+            negativeText: '取消',
+            onPositiveClick: () => doFlag(row)
+          },
+          {
+            trigger: () =>
+              h(
+                NButton,
+                {
+                  size: 'small',
+                  quaternary: true,
+                  type: row.false_positive ? 'warning' : 'default',
+                  onClick: (e: MouseEvent) => e.stopPropagation()
+                },
+                { default: () => (row.false_positive ? '已误报' : '误报') }
+              ),
+            default: () =>
+              row.false_positive
+                ? `取消误报标记？该事件将重新计入规则命中统计`
+                : `标记为误报？该事件将从规则命中率统计中排除`
+          }
+        ),
         h(
           NPopconfirm,
           {
@@ -176,6 +202,37 @@ const columns = [
       ])
   }
 ];
+
+// 标记/取消误报
+async function doFlag(row: Api.Waf.EventItem) {
+  await markFalsePositive(row.id, !row.false_positive);
+  window.$message?.success(row.false_positive ? '已取消误报标记' : '已标记误报');
+  await load();
+}
+
+// 一键豁免：生成 exempt 触发规则（host + 路径前缀，需到触发规则页发布）
+async function doExempt(row: Api.Waf.EventItem) {
+  const res = await exemptEvent(row.id);
+  window.$message?.success(`已生成豁免规则（ID ${res.data?.rule_id}），请到「触发规则」页发布后生效`);
+  await load();
+}
+
+// 导出 CSV
+async function doExport() {
+  const res = await exportEventsCsv({
+    ...(query.group ? { group: query.group } : {}),
+    ...(query.action ? { action: query.action } : {}),
+    ...(query.client_ip ? { client_ip: query.client_ip } : {}),
+    ...(query.host ? { host: query.host } : {}),
+    limit: 10000
+  });
+  const url = URL.createObjectURL(res.data as unknown as Blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `waf-events-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 // —— 详情弹窗 ——
 const detailOpen = ref(false);
@@ -260,7 +317,8 @@ onMounted(load);
         <h2 class="text-xl font-semibold">攻击事件</h2>
         <p class="text-sm text-[rgb(125,125,125)]">共 {{ total }} 条 · 攻击日志实时入库</p>
       </div>
-      <NButton secondary @click="consume" :loading="loading">消费 Redis 队列</NButton>
+      <NButton secondary :loading="loading" @click="consume">消费 Redis 队列</NButton>
+      <NButton secondary @click="doExport">导出 CSV</NButton>
     </div>
 
     <NCard :bordered="false" class="card-wrapper">
