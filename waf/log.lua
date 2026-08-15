@@ -150,6 +150,17 @@ end
 -- 攻击风暴下减少 timer 数量与 Redis 连接往返）
 local pending = {}
 
+-- 合并推送（在可能提前 return 的路径前调用，确保 traffic/爬虫记录不丢失）
+local function flush_pending()
+    if #pending > 0 then
+        local ok, err = ngx.timer.at(0, push_to_redis, pending)
+        if not ok then
+            ngx.log(ngx.ERR, "[waf] 调度事件上报失败: ", tostring(err))
+        end
+        pending = {}
+    end
+end
+
 -- ===== 全量流量记录（可选）：开启后每个请求上报一条（含是否命中攻击） =====
 local traffic = cfg.traffic_log
 if traffic and traffic.enabled then
@@ -213,10 +224,12 @@ end
 
 -- ===== 攻击事件 =====
 if not ctx or not ctx.matched or #ctx.matched == 0 then
+    flush_pending()  -- 普通请求：确保 traffic / 爬虫记录已推送
     return
 end
 
 if not (cfg.log and cfg.log.enabled) then
+    flush_pending()
     return
 end
 
@@ -231,12 +244,7 @@ else
 end
 
 -- 合并推送：traffic + 攻击事件一次 timer 完成，避免逐条连接往返
-if #pending > 0 then
-    local ok, err = ngx.timer.at(0, push_to_redis, pending)
-    if not ok then
-        ngx.log(ngx.ERR, "[waf] 调度事件上报失败: ", tostring(err))
-    end
-end
+flush_pending()
 
 -- ===== 高频攻击自动封禁计数（仅拦截模式；达到阈值自动临时封禁该 IP） =====
 if cfg.mode == "active" and ctx and ctx.client_ip then
