@@ -20,6 +20,7 @@ type Event struct {
 	Rules     string    `gorm:"type:text" json:"rules"`        // 命中规则详情 JSON（id/group/msg/severity）
 	Headers   string    `gorm:"type:text" json:"headers"`      // 请求头 JSON（name/value 数组）
 	Body      string    `gorm:"type:text" json:"body"`         // 请求体（最多保留 8KB）
+	Ja4       string    `gorm:"size:64" json:"ja4"`               // JA4 TLS 指纹（TLS 连接，空则回退 TLS/HTTP 指纹）
 	Group     string    `gorm:"size:32;index" json:"group"`
 	Message   string    `gorm:"size:255" json:"msg"` // 与 WAF 日志字段 msg 一致
 	Severity  int       `json:"severity"`

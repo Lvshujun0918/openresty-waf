@@ -283,11 +283,24 @@ func (s *BotService) List(profile, clientIP, fake, malicious string, page, pageS
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
+	// 列表不返回大字段（请求头/请求体），详情接口单独获取
 	var list []model.BotLog
-	if err := q.Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&list).Error; err != nil {
+	if err := q.Select("id", "time", "req_id", "client_ip", "country", "province", "city",
+		"method", "host", "uri", "ua", "fingerprint", "ja4", "profile", "engine",
+		"fake", "malicious_ip", "malicious_fp", "fp_source", "status", "created_at").
+		Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&list).Error; err != nil {
 		return nil, 0, err
 	}
 	return list, total, nil
+}
+
+// Get 按 ID 获取爬虫记录完整信息（含请求头/请求体证据）
+func (s *BotService) Get(id uint) (*model.BotLog, error) {
+	var rec model.BotLog
+	if err := s.db.First(&rec, id).Error; err != nil {
+		return nil, errors.New("记录不存在")
+	}
+	return &rec, nil
 }
 
 // BotStats 爬虫统计总览

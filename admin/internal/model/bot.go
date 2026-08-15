@@ -56,6 +56,8 @@ type BotLog struct {
 	MaliciousIP  bool      `json:"malicious_ip"`                     // 来源命中恶意 IP 库
 	MaliciousFP  string    `gorm:"size:64" json:"malicious_fp"`      // 指纹命中恶意指纹库名称（空=未命中）
 	FpSource     string    `gorm:"size:8" json:"fp_source"`          // 命中指纹来源（ja4 | http）
+	Headers      string    `gorm:"type:text" json:"headers"`         // 请求头 JSON（name/value 数组）
+	Body         string    `gorm:"type:text" json:"body"`            // 请求体（最多 8KB）
 	Status       int       `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
 }

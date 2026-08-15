@@ -146,6 +146,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 
 			// 爬虫记录与统计
 			authed.GET("/bots/logs", botHandler.ListLogs)
+			authed.GET("/bots/logs/:id", botHandler.GetLog)
 			authed.POST("/bots/consume", botHandler.ConsumeLogs)
 			authed.POST("/bots/logs/:id/blacklist", botHandler.BlacklistLog)
 			authed.GET("/bots/stats", botHandler.Stats)

@@ -15,6 +15,7 @@ type CcLog struct {
 	Host      string    `gorm:"size:255" json:"host"`
 	URI       string    `gorm:"type:text" json:"uri"`
 	RuleName  string    `gorm:"size:128" json:"rule_name"` // 触发的触发规则名称
+	Ja4       string    `gorm:"size:64" json:"ja4"`        // JA4 TLS 指纹
 	Headers   string    `gorm:"type:text" json:"headers"`  // 请求头 JSON（name/value 数组）
 	Body      string    `gorm:"type:text" json:"body"`     // 请求体（最多 8KB）
 	Status    int       `json:"status"`                    // 拦截时返回的状态码

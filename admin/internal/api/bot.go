@@ -135,6 +135,20 @@ func (h *BotHandler) ListLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"total": total, "items": list})
 }
 
+func (h *BotHandler) GetLog(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 64)
+	if id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "非法记录 ID"})
+		return
+	}
+	rec, err := h.svc.Get(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, rec)
+}
+
 func (h *BotHandler) ConsumeLogs(c *gin.Context) {
 	n, err := h.svc.Consume(100)
 	if err != nil {
