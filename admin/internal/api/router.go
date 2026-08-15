@@ -32,6 +32,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	triggerRuleHandler := NewTriggerRuleHandler(db, mgr, cfg)
 	banHandler := NewBanHandler(db, mgr, cfg)
 	healthHandler := NewHealthHandler(mgr, cfg)
+	alertHandler := NewAlertHandler(db, mgr, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -101,6 +102,18 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			// 引擎健康状态与实时监控
 			authed.GET("/health/engines", healthHandler.Engines)
 			authed.GET("/monitor/realtime", healthHandler.Realtime)
+
+			// 告警通知（通道 + 规则）
+			authed.GET("/alerts/channels", alertHandler.ListChannels)
+			authed.POST("/alerts/channels", alertHandler.CreateChannel)
+			authed.PUT("/alerts/channels/:id", alertHandler.UpdateChannel)
+			authed.DELETE("/alerts/channels/:id", alertHandler.DeleteChannel)
+			authed.POST("/alerts/channels/:id/test", alertHandler.TestChannel)
+			authed.GET("/alerts/rules", alertHandler.ListRules)
+			authed.POST("/alerts/rules", alertHandler.CreateRule)
+			authed.PUT("/alerts/rules/:id", alertHandler.UpdateRule)
+			authed.DELETE("/alerts/rules/:id", alertHandler.DeleteRule)
+			authed.PATCH("/alerts/rules/:id/enabled", alertHandler.SetRuleEnabled)
 
 			// 人机验证事件
 			authed.GET("/challenges", challengeHandler.List)

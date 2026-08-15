@@ -166,6 +166,21 @@ func main() {
 		}
 	}()
 
+	// 告警规则定时检查（每 10 秒）：事件风暴 / 引擎离线 → 通知通道 + 可选自动回滚
+	alertSvc := service.NewAlertService(db, mgr, cfg)
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if mgr.GetClient() == nil {
+				continue
+			}
+			if n := alertSvc.CheckAll(); n > 0 {
+				log.Printf("告警规则触发 %d 条", n)
+			}
+		}
+	}()
+
 	r := api.NewRouter(cfg, db, mgr)
 	log.Printf("WAF 管理后台启动，监听 %s", cfg.Server.Addr)
 	if err := r.Run(cfg.Server.Addr); err != nil {
