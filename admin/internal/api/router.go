@@ -99,6 +99,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.GET("/events/:id", eventHandler.Detail)
 			authed.POST("/events/consume", eventHandler.Consume)
 			authed.POST("/events/:id/ban", eventHandler.Ban)
+			authed.POST("/events/:id/false-positive", eventHandler.MarkFalsePositive)
+			authed.POST("/events/:id/exempt", eventHandler.Exempt)
 
 			// 封禁管理（临时/永久封禁 IP）
 			authed.GET("/bans", banHandler.List)

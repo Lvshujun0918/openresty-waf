@@ -99,3 +99,41 @@ func (h *EventHandler) Ban(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "ip": ev.ClientIP})
 }
+
+// MarkFalsePositive POST /api/events/:id/false-positive  body: {"flag": true}
+// 标记/取消误报（处置闭环：误报数据进入规则命中率统计）
+func (h *EventHandler) MarkFalsePositive(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "非法的事件 ID"})
+		return
+	}
+	var req struct {
+		Flag bool `json:"flag"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+	if err := h.svc.MarkFalsePositive(uint(id), req.Flag); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// Exempt POST /api/events/:id/exempt 一键豁免：生成 exempt 触发规则
+// （host + 路径前缀；需在触发规则页发布后生效，返回规则 ID 供提示）
+func (h *EventHandler) Exempt(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "非法的事件 ID"})
+		return
+	}
+	ruleID, err := h.svc.CreateExemptRule(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "rule_id": ruleID})
+}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -104,4 +106,49 @@ func (s *EventService) Get(id uint) (*model.Event, error) {
 		return nil, err
 	}
 	return &ev, nil
+}
+
+// MarkFalsePositive 标记/取消误报（事件处置闭环：误报标记计入规则命中率统计）
+func (s *EventService) MarkFalsePositive(id uint, flag bool) error {
+	res := s.db.Model(&model.Event{}).Where("id = ?", id).
+		Update("false_positive", flag)
+	if res.RowsAffected == 0 {
+		return errors.New("事件不存在")
+	}
+	return res.Error
+}
+
+// CreateExemptRule 一键豁免：基于事件 host + 路径前缀生成一条 exempt 触发规则
+// （命中即跳过规则检测；需在触发规则页发布后生效，返回生成的规则 ID）
+func (s *EventService) CreateExemptRule(id uint) (uint, error) {
+	ev, err := s.Get(id)
+	if err != nil {
+		return 0, err
+	}
+	path := ev.URI
+	if idx := strings.IndexByte(path, '?'); idx >= 0 {
+		path = path[:idx]
+	}
+	if path == "" {
+		path = "/"
+	}
+	conds := []model.TriggerCondition{
+		{Field: "host", Operator: "equals", Value: ev.Host},
+		{Field: "path", Operator: "prefix", Value: path},
+	}
+	body, err := json.Marshal(conds)
+	if err != nil {
+		return 0, err
+	}
+	rule := model.TriggerRule{
+		Name:       "事件豁免-" + strconv.FormatUint(uint64(ev.ID), 10) + "-" + ev.RuleID,
+		Kind:       "exempt",
+		MatchLogic: "and",
+		Enabled:    true,
+		Conditions: string(body),
+	}
+	if err := s.db.Create(&rule).Error; err != nil {
+		return 0, err
+	}
+	return rule.ID, nil
 }

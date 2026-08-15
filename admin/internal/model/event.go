@@ -24,5 +24,6 @@ type Event struct {
 	Message   string    `gorm:"size:255" json:"msg"` // 与 WAF 日志字段 msg 一致
 	Severity  int       `json:"severity"`
 	Status    int       `json:"status"`
+	FalsePositive bool  `gorm:"index" json:"false_positive"` // 人工标记为误报（命中率统计排除）
 	CreatedAt time.Time `json:"created_at"`
 }
