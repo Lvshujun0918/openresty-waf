@@ -185,8 +185,10 @@ t.test("check: 落盘无临时文件路径优雅跳过", function()
 end)
 t.test("upload: PHP 内容特征命中", function()
     local up = { enabled = true, deny_ext = {}, deny_mime = {}, content_scan = true }
-    local body = '--b\r\nContent-Disposition: form-data; name="file"; filename="a.png"\r\nContent-Type: image/png\r\n\r\n<?php system($_GET[c]); ?>\r\n--b--\r\n'
-    local hit = upload.scan_body(body, "--b", up)
+    local body = multipart(B,
+        'Content-Disposition: form-data; name="file"; filename="a.png"\r\nContent-Type: image/png',
+        '<?php system($_GET[c]); ?>')
+    local hit = upload.scan_body(body, B, up)
     t.notnil(hit)
     t.ok(hit:find("PHP", 1, true), "内容特征: " .. tostring(hit))
 end)
