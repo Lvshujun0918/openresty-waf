@@ -146,7 +146,7 @@ t.test("mask_sensitive: form 键值打码", function()
 end)
 
 t.test("mask_sensitive: 正则打码手机号", function()
-    local mask = { enabled = true, fields = {}, regex = { [[1[3-9]\d{9}]] } }
+    local mask = { enabled = true, fields = {}, regex = { [[1[3-9]\d\d\d\d\d\d\d\d\d]] } }
     local out = util.mask_sensitive("联系 13812345678 咨询", mask)
     t.ok(out:find("13812345678", 1, true) == nil, "手机号已打码")
 end)
