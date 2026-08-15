@@ -511,11 +511,12 @@ const columns = [
   }
 ];
 
-const highFpRules = ref<{ rule_id: string; hits: number; fps: number; fp_rate: number }[]>([]);
+type RuleStat = { rule_id: string; hits: number; blocks: number; fps: number; fp_rate?: number };
+const highFpRules = ref<RuleStat[]>([]);
 
 async function loadRuleStats() {
-  const res = await fetchRuleStats('', 20).catch(() => ({ data: { items: [] as { rule_id: string; hits: number; fps: number; fp_rate: number }[] } }));
-  const items = (res.data?.items ?? []).filter(x => x.fp_rate >= 20 && x.hits >= 3);
+  const res = await fetchRuleStats('', 20).catch(() => ({ data: { items: [] as RuleStat[] } }));
+  const items = (res.data?.items ?? []).filter(x => (x.fp_rate ?? 0) >= 20 && x.hits >= 3);
   highFpRules.value = items;
 }
 
@@ -528,7 +529,7 @@ onMounted(() => {
 <template>
   <div class="space-y-4">
     <NAlert v-if="highFpRules.length" type="warning" :bordered="false" class="card-wrapper" title="高误报规则提醒">
-      以下规则误报率 ≥20%（命中 ≥3 次）：{{ highFpRules.map(r => r.rule_id + '（' + r.fp_rate.toFixed(0) + '%）').join('、') }} —— 建议复查规则或对相关路径配置豁免
+      以下规则误报率 ≥20%（命中 ≥3 次）：{{ highFpRules.map(r => r.rule_id + '（' + (r.fp_rate ?? 0).toFixed(0) + '%）').join('、') }} —— 建议复查规则或对相关路径配置豁免
     </NAlert>
     <div class="flex items-center justify-between">
       <div>
