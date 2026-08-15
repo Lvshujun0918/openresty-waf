@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -153,4 +154,70 @@ func (s *DashboardService) Stats(days int) (*DashboardStats, error) {
 	}
 
 	return st, nil
+}
+
+// GroupTrendPoint 某攻击类型某天的命中数
+type GroupTrendPoint struct {
+	Date   string `json:"date"`
+	Attack int64  `json:"attack"`
+}
+
+// GroupTrend 指定攻击类型近 days 天趋势（缺失日期补 0）
+func (s *DashboardService) GroupTrend(group string, days int) ([]GroupTrendPoint, error) {
+	if days <= 0 || days > 90 {
+		days = 14
+	}
+	if group == "" {
+		return nil, errors.New("缺少攻击类型")
+	}
+	now := time.Now()
+	start := now.Add(-time.Duration(days-1) * 24 * time.Hour)
+	type row struct {
+		Date   string
+		Attack int64
+	}
+	var rows []row
+	if err := s.db.Raw(`SELECT strftime('%Y-%m-%d', time) AS date, COUNT(*) AS attack
+		FROM events WHERE `+"`group`"+` = ? AND time >= ?
+		GROUP BY strftime('%Y-%m-%d', time) ORDER BY date`,
+		group, start.Format("2006-01-02 15:04:05")).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	byDate := make(map[string]int64, len(rows))
+	for _, r := range rows {
+		byDate[r.Date] = r.Attack
+	}
+	out := make([]GroupTrendPoint, 0, days)
+	for i := 0; i < days; i++ {
+		d := now.Add(-time.Duration(days-1-i) * 24 * time.Hour).Format("2006-01-02")
+		out = append(out, GroupTrendPoint{Date: d, Attack: byDate[d]})
+	}
+	return out, nil
+}
+
+// RegionCount 攻击来源地区排行（国家+省份聚合，城市维度可选）
+type RegionCount struct {
+	Region string `json:"region"`
+	Count  int64  `json:"count"`
+}
+
+// TopRegions 攻击来源地区 Top N（国家 > 省份 > 城市 逐级聚合）
+func (s *DashboardService) TopRegions(level string, limit int) ([]RegionCount, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+	col := "country"
+	switch level {
+	case "province":
+		col = "province"
+	case "city":
+		col = "city"
+	}
+	var out []RegionCount
+	if err := s.db.Raw(`SELECT `+col+` AS region, COUNT(*) AS count FROM events
+		WHERE `+col+` IS NOT NULL AND `+col+` != ''
+		GROUP BY `+col+` ORDER BY count DESC LIMIT ?`, limit).Scan(&out).Error; err != nil {
+		return nil, err
+	}
+	return out, nil
 }

@@ -112,6 +112,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 
 			// 仪表盘聚合统计
 			authed.GET("/dashboard/stats", dashboardHandler.Stats)
+			authed.GET("/dashboard/group-trend", dashboardHandler.GroupTrend)
+			authed.GET("/dashboard/top-regions", dashboardHandler.TopRegions)
 
 			// 引擎健康状态与实时监控
 			authed.GET("/health/engines", healthHandler.Engines)
