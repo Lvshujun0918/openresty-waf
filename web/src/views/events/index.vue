@@ -9,11 +9,12 @@ import {
   NInput,
   NModal,
   NPagination,
+  NPopconfirm,
   NSelect,
   NSpace,
   NTag
 } from 'naive-ui';
-import { consumeEvents, fetchEventDetail, fetchEvents } from '@/service/api';
+import { banEvent, consumeEvents, fetchEventDetail, fetchEvents } from '@/service/api';
 
 const groupMeta: Record<string, { label: string; color: string }> = {
   sqli: { label: 'SQL 注入', color: '#ef4444' },
@@ -150,14 +151,41 @@ const columns = [
   {
     title: '操作',
     key: 'action',
-    width: 76,
-    render: (row: Api.Waf.EventItem) => h(NButton, { size: 'small', quaternary: true, type: 'primary', onClick: () => openDetail(row.id) }, { default: () => '详情' })
+    width: 150,
+    render: (row: Api.Waf.EventItem) =>
+      h(NSpace, { size: 4 }, [
+        h(NButton, { size: 'small', quaternary: true, type: 'primary', onClick: () => openDetail(row.id) }, { default: () => '详情' }),
+        h(
+          NPopconfirm,
+          {
+            positiveText: '永久封禁',
+            negativeText: '封禁 24 小时',
+            onPositiveClick: () => doBan(row, 0),
+            onNegativeClick: () => doBan(row, 24)
+          },
+          {
+            trigger: () =>
+              h(
+                NButton,
+                { size: 'small', quaternary: true, type: 'error', disabled: !row.client_ip, onClick: (e: MouseEvent) => e.stopPropagation() },
+                { default: () => '封禁' }
+              ),
+            default: () => `封禁来源 IP ${row.client_ip || ''}？将下发黑名单并热更新生效`
+          }
+        )
+      ])
   }
 ];
 
 // —— 详情弹窗 ——
 const detailOpen = ref(false);
 const detailLoading = ref(false);
+
+// 一键封禁事件来源 IP（hours<=0 永久）
+async function doBan(row: Api.Waf.EventItem, hours: number) {
+  const res = await banEvent(row.id, hours);
+  window.$message?.success(`已封禁 ${res.data?.ip ?? row.client_ip}（${hours > 0 ? hours + ' 小时' : '永久'}），引擎 5 秒内生效`);
+}
 const detail = ref<Api.Waf.EventItem | null>(null);
 
 interface RuleHit {
