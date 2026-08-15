@@ -281,8 +281,8 @@ local function protection_flow()
         return
     end
 
-    -- 2. 规则引擎（URL / Args / Cookie / Header / Body 等规则，按 Host 过滤站点规则）
-    local ruleset = engine.get_rules_for_host((ngx.var.host or ""):gsub(":%d+$", ""))
+    -- 2. 规则引擎（URL / Args / Cookie / Header / Body 等规则）
+    local ruleset = engine.get_ruleset()
     if ruleset then
         -- 豁免：URL/UA 白名单命中 或 exclude_paths 前缀 或 命中 exempt 触发规则
         -- （host/UA/请求头/IP 条件）时跳过规则检测
