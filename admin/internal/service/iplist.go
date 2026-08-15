@@ -57,7 +57,30 @@ func (s *IpListService) Update(id uint, sub *model.IpListSubscription) error {
 }
 
 func (s *IpListService) Delete(id uint) error {
-	return s.db.Delete(&model.IpListSubscription{}, id).Error
+	var sub model.IpListSubscription
+	if err := s.db.First(&sub, id).Error; err != nil {
+		return errors.New("订阅不存在")
+	}
+	if err := s.db.Delete(&model.IpListSubscription{}, id).Error; err != nil {
+		return err
+	}
+	// 清理该订阅同步产生的指纹/画像条目并重新下发
+	bot := NewBotService(s.db, s.mgr, s.cfg)
+	removed := int64(0)
+	if sub.Target == "fingerprint" {
+		res := s.db.Where("source = ? AND sub_id = ?", "subscription", sub.ID).
+			Delete(&model.BotFingerprint{})
+		removed = res.RowsAffected
+		_ = bot.publishFingerprints()
+	} else if sub.Target == "bot_profile" {
+		res := s.db.Where("source = ? AND sub_id = ?", "subscription", sub.ID).
+			Delete(&model.BotProfile{})
+		removed = res.RowsAffected
+		_ = bot.publishProfiles()
+	}
+	_ = s.db.Model(&model.IpListSubscription{}).Where("id = ?", id).
+		Update("last_status", fmt.Sprintf("已删除，清理同步条目 %d 条", removed)).Error
+	return nil
 }
 
 func (s *IpListService) SetEnabled(id uint, enabled bool) error {
