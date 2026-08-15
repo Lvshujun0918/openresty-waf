@@ -87,3 +87,58 @@ t.test("fp: 请求级缓存", function()
     local b = fp.get(ctx)
     t.eq(a, b, "ctx 缓存后头部变化不影响已计算指纹")
 end)
+
+-- ===== JA4 指纹 =====
+local ja4 = require "ja4"
+
+t.test("ja4: TLS1.3 基础格式", function()
+    local hello = {
+        version = "TLS 1.3",
+        cipher_suites = { 0x1301, 0x1302, 0x1303, 0x1304 },
+        extensions = { { type = 0 }, { type = 43 }, { type = 51 } },
+        sn = "example.com",
+        alpn = "h2",
+    }
+    local j = ja4.calc(hello)
+    t.notnil(j)
+    t.ok(j:match("^t13%d+%w%w_%w+_%w+$"), "格式: " .. tostring(j))
+    t.ok(j:sub(1, 3) == "t13", "TLS 1.3")
+    -- d = SNI(1) + ALPN(2) = 3
+    t.ok(j:sub(4, 4) == "3", "SNI+ALPN: " .. tostring(j))
+    -- c/e：4 个 cipher → 4；3 个 ext → 3
+    t.ok(j:match("^t13343_"), "cipher=4 ext=3: " .. tostring(j))
+end)
+
+t.test("ja4: TLS1.2 无 SNI/ALPN", function()
+    local hello = {
+        version = "TLS 1.2",
+        cipher_suites = { 0xc02f, 0xcca8 },
+        extensions = { { type = 0 } },
+    }
+    local j = ja4.calc(hello)
+    t.ok(j:sub(1, 7) == "t12021_", "TLS1.2 d0 c2 e1: " .. tostring(j))
+end)
+
+t.test("ja4: 相同握手指纹稳定", function()
+    local a = ja4.calc({ version = "TLS 1.3", cipher_suites = { 0x1301 }, extensions = { { type = 0 } }, sn = "x" })
+    local b = ja4.calc({ version = "TLS 1.3", cipher_suites = { 0x1301 }, extensions = { { type = 0 } }, sn = "x" })
+    t.eq(a, b)
+end)
+
+t.test("ja4: nil 输入返回 nil", function()
+    t.isnil(ja4.calc(nil))
+end)
+
+t.test("fp: effective 优先 ja4", function()
+    ngx_reset()
+    ngx.var.http_user_agent = "curl/8.5.0"
+    local ctx = { ja4 = "t13d1516h2_test_test" }
+    local jfp, src = fp.effective(ctx)
+    t.eq(jfp, "t13d1516h2_test_test")
+    t.eq(src, "ja4")
+    -- 无 ja4 回退 http
+    local ctx2 = {}
+    local hfp, src2 = fp.effective(ctx2)
+    t.ok(hfp ~= nil and #hfp > 0)
+    t.eq(src2, "http")
+end)

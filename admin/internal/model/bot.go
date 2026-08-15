@@ -48,12 +48,14 @@ type BotLog struct {
 	Host         string    `gorm:"size:255" json:"host"`
 	URI          string    `gorm:"type:text" json:"uri"`
 	UA           string    `gorm:"size:512" json:"ua"`
-	Fingerprint  string    `gorm:"size:64;index" json:"fingerprint"`
-	Profile      string    `gorm:"size:64;index" json:"profile"` // 命中的爬虫画像
-	Engine       bool      `json:"engine"`                       // 搜索引擎类
-	Fake         bool      `gorm:"index" json:"fake"`            // 虚假爬虫（UA 声称搜索引擎但 IP 不匹配）
-	MaliciousIP  bool      `json:"malicious_ip"`                 // 来源命中恶意 IP 库
-	MaliciousFP  string    `gorm:"size:64" json:"malicious_fp"`  // 指纹命中恶意指纹库名称（空=未命中）
+	Fingerprint  string    `gorm:"size:64;index" json:"fingerprint"` // HTTP 组合指纹（兜底/统计）
+	Ja4          string    `gorm:"size:64;index" json:"ja4"`         // JA4 TLS 指纹（TLS 连接）
+	Profile      string    `gorm:"size:64;index" json:"profile"`     // 命中的爬虫画像
+	Engine       bool      `json:"engine"`                           // 搜索引擎类
+	Fake         bool      `gorm:"index" json:"fake"`                // 虚假爬虫（UA 声称搜索引擎但 IP 不匹配）
+	MaliciousIP  bool      `json:"malicious_ip"`                     // 来源命中恶意 IP 库
+	MaliciousFP  string    `gorm:"size:64" json:"malicious_fp"`      // 指纹命中恶意指纹库名称（空=未命中）
+	FpSource     string    `gorm:"size:8" json:"fp_source"`          // 命中指纹来源（ja4 | http）
 	Status       int       `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
 }

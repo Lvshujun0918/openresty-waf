@@ -300,14 +300,15 @@ local function protection_flow()
         return
     end
 
-    -- 1.6 恶意指纹拦截（HTTP 客户端指纹命中恶意指纹库；库为空时零开销）
+    -- 1.6 恶意指纹拦截（JA4 TLS 指纹优先，非 TLS 回退 HTTP 组合指纹；库为空时零开销）
     local fingerprint = require "fingerprint"
-    local fp_hit = fingerprint.match_malicious(ctx, fingerprint.get(ctx))
+    local fp_hit, fp_source = fingerprint.match_malicious(ctx)
     if fp_hit then
         ctx.fp_malicious = fp_hit
+        ctx.fp_source = fp_source
         ctx.matched[#ctx.matched + 1] = {
             id = "FP-BLOCK", group = "fingerprint", severity = 3,
-            msg = "恶意指纹拦截: " .. tostring(fp_hit),
+            msg = "恶意指纹拦截: " .. tostring(fp_hit) .. " (" .. tostring(fp_source) .. ")",
         }
         if ctx.mode == "active" then
             block(cfg, ctx)

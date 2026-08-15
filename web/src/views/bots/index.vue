@@ -271,7 +271,21 @@ const logColumns = [
       ])
   },
   { title: 'UA', key: 'ua', ellipsis: { tooltip: true }, render: (row: Api.Waf.BotLog) => h('span', { class: 'text-xs' }, row.ua) },
-  { title: '指纹', key: 'fingerprint', width: 100, render: (row: Api.Waf.BotLog) => h('span', { class: 'font-mono text-[11px] text-[rgb(125,125,125)]', title: row.fingerprint }, row.fingerprint.slice(0, 8)) },
+  {
+    title: '指纹',
+    key: 'ja4',
+    width: 130,
+    render: (row: Api.Waf.BotLog) =>
+      h('div', { class: 'space-y-0.5' }, [
+        row.ja4
+          ? h('div', { class: 'flex items-center gap-1' }, [
+              h(NTag, { size: 'tiny', bordered: false, type: 'info' }, { default: () => 'JA4' }),
+              h('span', { class: 'font-mono text-[11px] text-[rgb(125,125,125)]', title: row.ja4 }, row.ja4.slice(0, 10) + '…')
+            ])
+          : null,
+        h('span', { class: 'font-mono text-[11px] text-[rgb(125,125,125)]', title: row.fingerprint }, 'http ' + row.fingerprint.slice(0, 8))
+      ])
+  },
   { title: '请求', key: 'uri', ellipsis: { tooltip: true }, render: (row: Api.Waf.BotLog) => h('span', { class: 'text-xs' }, `${row.method} ${row.host}${row.uri}`) },
   { title: '状态', key: 'status', width: 70 }
 ];

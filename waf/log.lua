@@ -211,11 +211,13 @@ if ctx and ctx.bot_result then
         uri          = ctx.request and ctx.request.uri or "",
         ua           = ngx.var.http_user_agent or "",
         fingerprint  = ctx.fingerprint or "",
+        ja4          = ctx.ja4 or "",
         profile      = bot.profile or "",
         engine       = bot.engine and true or false,
         fake         = bot.fake and true or false,
         malicious_ip = malicious_ip and true or false,
         malicious_fp = ctx.fp_malicious or "",
+        fp_source    = ctx.fp_source or "",
         status       = ngx.status,
     }
     pending[#pending + 1] = { key = config.bot.report_key or "waf:bot:list",

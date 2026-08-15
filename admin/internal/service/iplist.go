@@ -216,13 +216,18 @@ func (s *IpListService) syncIPEntries(sub *model.IpListSubscription, raw string)
 	return len(fetched), nil
 }
 
-// parseIPLines 按行解析 IP/CIDR（跳过注释与空行，支持逗号分隔）
+// parseIPLines 按行解析 IP/CIDR（跳过注释与空行，支持逗号分隔）。
+// 注释支持 # 与 ;（Spamhaus drop.txt 等使用 "CIDR ; 描述" 格式）
 func (s *IpListService) parseIPLines(body string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, line := range strings.Split(body, "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
+		// 截断注释部分
+		if idx := strings.IndexAny(line, "#;"); idx >= 0 {
+			line = strings.TrimSpace(line[:idx])
+		}
+		if line == "" {
 			continue
 		}
 		for _, part := range strings.FieldsFunc(line, func(r rune) bool {

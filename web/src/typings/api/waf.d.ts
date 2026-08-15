@@ -307,6 +307,10 @@ declare namespace Api {
       uri: string;
       ua: string;
       fingerprint: string;
+      /** JA4 TLS 指纹（TLS 连接） */
+      ja4?: string;
+      /** 命中指纹来源（ja4 | http） */
+      fp_source?: string;
       profile: string;
       engine: boolean;
       fake: boolean;

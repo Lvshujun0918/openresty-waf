@@ -39,15 +39,28 @@ function _M.get(ctx)
     return fp
 end
 
+-- 当前请求的比对用指纹：
+--   TLS 连接优先使用 JA4（ssl_client_hello 阶段计算，抗伪造）；
+--   非 TLS 连接（或未挂载钩子）回退 HTTP 组合指纹。
+-- 返回 fp, source（"ja4" | "http"）
+function _M.effective(ctx)
+    if ctx and ctx.ja4 and ctx.ja4 ~= "" then
+        return ctx.ja4, "ja4"
+    end
+    return _M.get(ctx), "http"
+end
+
 -- 指纹是否命中恶意库（active_config.blacklist.fingerprints）
 -- 条目：{ name, value, match("exact"|"regex") }
+-- JA4 优先（TLS 连接）；无 JA4 时回退 HTTP 指纹比对。
 -- 返回命中的条目名或 nil
-function _M.match_malicious(ctx, fp)
+function _M.match_malicious(ctx)
+    local fp, source = _M.effective(ctx)
     local engine = require "rule_engine.engine"
     local cfg = engine.get_active_config()
     local bl = cfg and cfg.blacklist and cfg.blacklist.fingerprints
     if type(bl) ~= "table" or #bl == 0 then
-        return nil
+        return nil, source
     end
     for _, item in ipairs(bl) do
         if type(item) ~= "table" then goto continue end
@@ -56,15 +69,15 @@ function _M.match_malicious(ctx, fp)
             if item.match == "regex" then
                 local ok, res = pcall(ngx.re.find, fp, v, "jo")
                 if ok and res then
-                    return tostring(item.name or v)
+                    return tostring(item.name or v), source
                 end
             elseif fp == v then
-                return tostring(item.name or v)
+                return tostring(item.name or v), source
             end
         end
         ::continue::
     end
-    return nil
+    return nil, source
 end
 
 return _M

@@ -176,6 +176,15 @@ ngx = {
 
     -- 确定性伪哈希（mock ngx.md5）
     md5 = function(s) return simple_hash(tostring(s or "")) end,
+    -- 伪 SHA-256（mock ngx.sha256_bin）：返回 32 字节二进制（确定性，仅验证格式与长度）
+    sha256_bin = function(s)
+        local h = simple_hash(tostring(s or ""))
+        local buf = {}
+        for i = 1, 32 do
+            buf[i] = string.char(h:byte(((i - 1) % #h) + 1))
+        end
+        return table.concat(buf)
+    end,
 
     -- 共享内存
     shared = {
