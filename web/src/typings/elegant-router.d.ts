@@ -20,6 +20,8 @@ declare module "@elegant-router/types" {
     "403": "/403";
     "404": "/404";
     "500": "/500";
+    "alerts": "/alerts";
+    "audit-logs": "/audit-logs";
     "bans": "/bans";
     "config": "/config";
     "dashboard": "/dashboard";
@@ -29,6 +31,7 @@ declare module "@elegant-router/types" {
     "iframe-page": "/iframe-page/:url";
     "ip-lists": "/ip-lists";
     "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?";
+    "monitor": "/monitor";
     "rules": "/rules";
     "security": "/security";
     "traffic": "/traffic";
@@ -68,6 +71,8 @@ declare module "@elegant-router/types" {
     | "403"
     | "404"
     | "500"
+    | "alerts"
+    | "audit-logs"
     | "bans"
     | "config"
     | "dashboard"
@@ -77,6 +82,7 @@ declare module "@elegant-router/types" {
     | "iframe-page"
     | "ip-lists"
     | "login"
+    | "monitor"
     | "rules"
     | "security"
     | "traffic"
@@ -103,6 +109,8 @@ declare module "@elegant-router/types" {
     | "500"
     | "iframe-page"
     | "login"
+    | "alerts"
+    | "audit-logs"
     | "bans"
     | "config"
     | "dashboard"
@@ -110,6 +118,7 @@ declare module "@elegant-router/types" {
     | "guide"
     | "home"
     | "ip-lists"
+    | "monitor"
     | "rules"
     | "security"
     | "traffic"

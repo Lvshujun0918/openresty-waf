@@ -40,6 +40,39 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'alerts',
+    path: '/alerts',
+    component: 'layout.base$view.alerts',
+    meta: {
+      title: 'alerts',
+      i18nKey: 'route.alerts',
+      icon: 'mdi:bell-ring-outline',
+      order: 11
+    }
+  },
+  {
+    name: 'audit-logs',
+    path: '/audit-logs',
+    component: 'layout.base$view.audit-logs',
+    meta: {
+      title: 'audit-logs',
+      i18nKey: 'route.audit-logs',
+      icon: 'mdi:clipboard-text-clock-outline',
+      order: 13
+    }
+  },
+  {
+    name: 'bans',
+    path: '/bans',
+    component: 'layout.base$view.bans',
+    meta: {
+      title: 'bans',
+      i18nKey: 'route.bans',
+      icon: 'mdi:do-not-disturb',
+      order: 8
+    }
+  },
+  {
     name: 'config',
     path: '/config',
     component: 'layout.base$view.config',
@@ -132,6 +165,17 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'monitor',
+    path: '/monitor',
+    component: 'layout.base$view.monitor',
+    meta: {
+      title: 'monitor',
+      i18nKey: 'route.monitor',
+      icon: 'mdi:chart-line',
+      order: 2
+    }
+  },
+  {
     name: 'rules',
     path: '/rules',
     component: 'layout.base$view.rules',
@@ -140,6 +184,17 @@ export const generatedRoutes: GeneratedRoute[] = [
       i18nKey: 'route.rules',
       icon: 'mdi:shield-check-outline',
       order: 5
+    }
+  },
+  {
+    name: 'security',
+    path: '/security',
+    component: 'layout.base$view.security',
+    meta: {
+      title: 'security',
+      i18nKey: 'route.security',
+      icon: 'mdi:shield-account-outline',
+      order: 9
     }
   },
   {
@@ -173,28 +228,6 @@ export const generatedRoutes: GeneratedRoute[] = [
       i18nKey: 'route.trigger-rules',
       icon: 'mdi:filter-variant',
       order: 6
-    }
-  },
-  {
-    name: 'bans',
-    path: '/bans',
-    component: 'layout.base$view.bans',
-    meta: {
-      title: 'bans',
-      i18nKey: 'route.bans',
-      icon: 'mdi:do-not-disturb',
-      order: 8
-    }
-  },
-  {
-    name: 'security',
-    path: '/security',
-    component: 'layout.base$view.security',
-    meta: {
-      title: 'security',
-      i18nKey: 'route.security',
-      icon: 'mdi:shield-account-outline',
-      order: 9
     }
   }
 ];
