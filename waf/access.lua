@@ -99,13 +99,39 @@ local function block(cfg, wctx)
     ngx.exit(status)
 end
 
--- 名单条目解析："地址" 或 "地址|unix时间戳"（临时封禁，到期自动跳过）
+-- 名单条目解析：
+--   "地址" | "地址|unix时间戳" | "地址|UA|unix时间戳"（IP+UA 维度封禁，UA 子串匹配）
+-- 临时封禁到期自动跳过。
 local function list_entry(entry)
-    local addr, ts = tostring(entry):match("^([^|]+)|(%d+)$")
-    if not addr then
-        return tostring(entry), nil
+    local addr, ua, ts = tostring(entry):match("^([^|]+)|([^|]*)|(%d+)$")
+    if addr then
+        if ua and ua ~= "" then
+            return addr, tonumber(ts), ua
+        end
+        return addr, tonumber(ts)
     end
-    return addr, tonumber(ts)
+    local addr2, ts2 = tostring(entry):match("^([^|]+)|(%d+)$")
+    if addr2 then
+        return addr2, tonumber(ts2)
+    end
+    return tostring(entry), nil
+end
+
+-- 名单条目是否命中：UA 维度存在时做子串匹配（UA 精确匹配不可靠）
+local function entry_matches(addr, ua, ts, client_ip)
+    if not (not ts or ngx.time() < ts) then
+        return false
+    end
+    if not operators.eval("CIDR", client_ip, addr) then
+        return false
+    end
+    if ua then
+        local actual = ngx.var.http_user_agent or ""
+        if actual == "" or not actual:find(ua, 1, true) then
+            return false
+        end
+    end
+    return true
 end
 
 -- IP 黑白名单快速检查（白名单优先）
@@ -113,8 +139,8 @@ end
 local function ip_check(ctx, cfg)
     local wl = cfg.whitelist and cfg.whitelist.ips or {}
     for _, entry in ipairs(wl) do
-        local addr, ts = list_entry(entry)
-        if (not ts or ngx.time() < ts) and operators.eval("CIDR", ctx.client_ip, addr) then
+        local addr, ts, ua = list_entry(entry)
+        if entry_matches(addr, ua, ts, ctx.client_ip) then
             return "whitelisted"
         end
     end
@@ -124,8 +150,8 @@ local function ip_check(ctx, cfg)
     end
     local bl = cfg.blacklist and cfg.blacklist.ips or {}
     for _, entry in ipairs(bl) do
-        local addr, ts = list_entry(entry)
-        if (not ts or ngx.time() < ts) and operators.eval("CIDR", ctx.client_ip, addr) then
+        local addr, ts, ua = list_entry(entry)
+        if entry_matches(addr, ua, ts, ctx.client_ip) then
             return "blocked"
         end
     end

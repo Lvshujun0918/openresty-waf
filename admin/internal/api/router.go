@@ -103,8 +103,9 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.POST("/events/:id/false-positive", eventHandler.MarkFalsePositive)
 			authed.POST("/events/:id/exempt", eventHandler.Exempt)
 
-			// 封禁管理（临时/永久封禁 IP）
+			// 封禁管理（临时/永久封禁 IP，支持 IP+UA 维度）
 			authed.GET("/bans", banHandler.List)
+			authed.POST("/bans", banHandler.Create)
 			authed.DELETE("/bans", banHandler.Unban)
 
 			// 仪表盘聚合统计

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -105,30 +106,45 @@ func (s *WafConfigService) Versions() (map[string]string, error) {
 }
 
 // BanEntry 临时/永久封禁条目
+// UA 为空 = 按 IP 封禁；非空 = 按 IP+UA 封禁（引擎侧 UA 子串匹配）
 type BanEntry struct {
 	IP        string `json:"ip"`
+	UA        string `json:"ua,omitempty"`
 	ExpiresAt *int64 `json:"expires_at"` // nil = 永久封禁
 	Permanent bool   `json:"permanent"`
 }
 
-// parseBanEntry 解析黑名单条目："地址" 或 "地址|unix时间戳"
-func parseBanEntry(entry string) (string, int64) {
-	if idx := strings.IndexByte(entry, '|'); idx >= 0 {
-		ip := entry[:idx]
-		var ts int64
-		if _, err := fmt.Sscanf(entry[idx+1:], "%d", &ts); err == nil && ts > 0 {
-			return ip, ts
+// parseBanEntry 解析黑名单条目：
+//   "地址" | "地址|unix时间戳" | "地址|UA|unix时间戳"（IP+UA 维度封禁）
+func parseBanEntry(entry string) (ip, ua string, ts int64) {
+	if idx := strings.LastIndexByte(entry, '|'); idx >= 0 {
+		part := entry[idx+1:]
+		if n, err := strconv.ParseInt(part, 10, 64); err == nil && n > 0 {
+			ts = n
+			rest := entry[:idx]
+			if j := strings.IndexByte(rest, '|'); j >= 0 {
+				return rest[:j], rest[j+1:], ts
+			}
+			return rest, "", ts
 		}
-		return ip, 0
 	}
-	return entry, 0
+	return entry, "", 0
 }
 
 // BanIP 封禁 IP：hours<=0 永久封禁，否则封禁 hours 小时；
 // 写入配置 blacklist.ips（条目格式 ip|unix_ts，引擎侧过期自动跳过）并下发。
 func (s *WafConfigService) BanIP(ip string, hours int) error {
-	if net.ParseIP(strings.TrimSpace(ip)) == nil {
+	return s.Ban(ip, "", hours)
+}
+
+// Ban 封禁：ua 非空时按 IP+UA 维度封禁（条目格式 ip|ua|unix_ts，UA 子串匹配）
+func (s *WafConfigService) Ban(ip, ua string, hours int) error {
+	ip = strings.TrimSpace(ip)
+	if net.ParseIP(ip) == nil {
 		return errors.New("非法 IP 地址")
+	}
+	if ua != "" && (strings.Contains(ua, "|") || len(ua) > 128) {
+		return errors.New("UA 维度非法（不能包含 | 且不超过 128 字符）")
 	}
 	cfg, err := s.Get()
 	if err != nil {
@@ -142,14 +158,17 @@ func (s *WafConfigService) BanIP(ip string, hours int) error {
 	ips := toStringSlice(blacklist["ips"])
 	out := make([]string, 0, len(ips)+1)
 	for _, e := range ips {
-		part, _ := parseBanEntry(e)
-		if part != ip {
+		partIP, partUA, _ := parseBanEntry(e)
+		if partIP != ip || partUA != ua {
 			out = append(out, e)
 		}
 	}
 	entry := ip
+	if ua != "" {
+		entry = ip + "|" + ua
+	}
 	if hours > 0 {
-		entry = fmt.Sprintf("%s|%d", ip, time.Now().Add(time.Duration(hours)*time.Hour).Unix())
+		entry = fmt.Sprintf("%s|%d", entry, time.Now().Add(time.Duration(hours)*time.Hour).Unix())
 	}
 	out = append(out, entry)
 	blacklist["ips"] = out
@@ -169,14 +188,14 @@ func (s *WafConfigService) ListBans() ([]BanEntry, error) {
 	}
 	now := time.Now().Unix()
 	for _, e := range toStringSlice(blacklist["ips"]) {
-		ip, ts := parseBanEntry(e)
+		ip, ua, ts := parseBanEntry(e)
 		if ip == "" || net.ParseIP(ip) == nil {
 			continue
 		}
 		if ts > 0 && ts <= now {
 			continue // 已过期
 		}
-		b := BanEntry{IP: ip}
+		b := BanEntry{IP: ip, UA: ua}
 		if ts > 0 {
 			t := ts
 			b.ExpiresAt = &t
@@ -189,7 +208,7 @@ func (s *WafConfigService) ListBans() ([]BanEntry, error) {
 	return out, nil
 }
 
-// UnbanIP 解除指定 IP 的封禁（含过期条目）
+// UnbanIP 解除指定 IP 的封禁（含过期条目；ip+ua 维度条目一并解除）
 func (s *WafConfigService) UnbanIP(ip string) error {
 	cfg, err := s.Get()
 	if err != nil {
@@ -202,7 +221,7 @@ func (s *WafConfigService) UnbanIP(ip string) error {
 	ips := toStringSlice(blacklist["ips"])
 	out := make([]string, 0, len(ips))
 	for _, e := range ips {
-		part, _ := parseBanEntry(e)
+		part, _, _ := parseBanEntry(e)
 		if part != ip {
 			out = append(out, e)
 		}

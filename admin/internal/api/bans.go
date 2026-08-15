@@ -31,6 +31,25 @@ func (h *BanHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, list)
 }
 
+// Create POST /api/bans  body: {"ip":"1.2.3.4","ua":"...","hours":1}
+// 封禁（hours<=0 永久）；ua 非空时按 IP+UA 维度封禁
+func (h *BanHandler) Create(c *gin.Context) {
+	var req struct {
+		IP    string `json:"ip"`
+		UA    string `json:"ua"`
+		Hours int    `json:"hours"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.IP == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+	if err := h.svc.Ban(req.IP, req.UA, req.Hours); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
 // Unban DELETE /api/bans?ip=1.2.3.4  解除封禁
 func (h *BanHandler) Unban(c *gin.Context) {
 	ip := c.Query("ip")
