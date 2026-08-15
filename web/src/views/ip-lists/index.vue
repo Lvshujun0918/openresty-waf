@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, onMounted, reactive, ref } from 'vue';
+import { computed, h, onMounted, reactive, ref } from 'vue';
 import {
   NButton,
   NCard,
@@ -13,12 +13,39 @@ import {
   NSelect,
   NSpace,
   NSwitch,
-  NTag
+  NTabPane,
+  NTabs,
+  NTag,
+  NAlert
 } from 'naive-ui';
 import { createIpListSub, deleteIpListSub, fetchIpListSubs, setIpListSubEnabled, syncIpListSub, updateIpListSub } from '@/service/api';
 
+// 订阅目标 tab
+type Target = 'ip' | 'fingerprint' | 'bot_profile';
+const activeTarget = ref<Target>('ip');
+
 const subs = ref<Api.Waf.IpListSub[]>([]);
 const loading = ref(false);
+
+const targetMeta: Record<Target, { label: string; hint: string; placeholder: string }> = {
+  ip: {
+    label: '恶意/信任 IP 库',
+    hint: '订阅远程 IP 情报（每行一个 IP/CIDR），同步后合并进黑/白名单下发引擎',
+    placeholder: 'https://example.com/ips.txt（每行一个 IP/CIDR，# 注释）'
+  },
+  fingerprint: {
+    label: '恶意指纹库',
+    hint: '订阅远程恶意指纹情报（JSON 数组或每行 名称|指纹值[|exact|regex]），同步后进入恶意指纹库并下发拦截',
+    placeholder: 'JSON 数组 [{"name":"..","value":"..","match":"exact"}] 或每行 名称|值|match'
+  },
+  bot_profile: {
+    label: '爬虫画像库',
+    hint: '订阅远程爬虫画像（JSON 数组），同步后进入爬虫画像库并下发引擎识别',
+    placeholder: 'JSON 数组 [{"name":"Googlebot","ua":"Googlebot","ips":["66.249.64.0/19"],"engine":true}]'
+  }
+};
+
+const filtered = computed(() => subs.value.filter(s => s.target === activeTarget.value));
 
 async function load() {
   loading.value = true;
@@ -51,10 +78,18 @@ async function doSync(row: Api.Waf.IpListSub) {
 // —— 表单 ——
 const editOpen = ref(false);
 const saving = ref(false);
-const form = reactive<Partial<Api.Waf.IpListSub>>({ name: '', url: '', type: 'blacklist', interval_min: 60, enabled: true });
+const form = reactive<Partial<Api.Waf.IpListSub>>({ name: '', url: '', target: 'ip', type: 'blacklist', interval_min: 60, enabled: true });
 
 function openCreate() {
-  Object.assign(form, { id: undefined, name: '', url: '', type: 'blacklist', interval_min: 60, enabled: true });
+  Object.assign(form, {
+    id: undefined,
+    name: '',
+    url: '',
+    target: activeTarget.value,
+    type: 'blacklist',
+    interval_min: 60,
+    enabled: true
+  });
   editOpen.value = true;
 }
 function openEdit(row: Api.Waf.IpListSub) {
@@ -69,7 +104,7 @@ async function save() {
     } else {
       await createIpListSub(form);
     }
-    window.$message?.success('已保存');
+    window.$message?.success('已保存，将在下个同步周期自动拉取，也可手动同步');
     editOpen.value = false;
     await load();
   } finally {
@@ -79,9 +114,28 @@ async function save() {
 
 const columns = [
   { title: '名称', key: 'name', minWidth: 140 },
-  { title: '类型', key: 'type', width: 90, render: (row: Api.Waf.IpListSub) => h(NTag, { size: 'small', type: row.type === 'whitelist' ? 'success' : 'error', bordered: false }, { default: () => (row.type === 'whitelist' ? '白名单' : '黑名单') }) },
+  {
+    title: '目标',
+    key: 'target',
+    width: 110,
+    render: (row: Api.Waf.IpListSub) =>
+      h(
+        NTag,
+        { size: 'small', bordered: false, type: row.target === 'ip' ? 'info' : row.target === 'fingerprint' ? 'warning' : 'success' },
+        { default: () => targetMeta[row.target as Target]?.label || row.target }
+      )
+  },
+  {
+    title: '名单方向',
+    key: 'type',
+    width: 90,
+    render: (row: Api.Waf.IpListSub) =>
+      row.target === 'ip'
+        ? h(NTag, { size: 'small', type: row.type === 'whitelist' ? 'success' : 'error', bordered: false }, { default: () => (row.type === 'whitelist' ? '白名单' : '黑名单') })
+        : h('span', { class: 'text-xs text-[rgb(125,125,125)]' }, '—')
+  },
   { title: '订阅 URL', key: 'url', minWidth: 200, ellipsis: { tooltip: true } },
-  { title: '同步周期(min)', key: 'interval_min', width: 110 },
+  { title: '周期(min)', key: 'interval_min', width: 90 },
   { title: '同步状态', key: 'last_status', width: 100, render: (row: Api.Waf.IpListSub) => row.last_status || '-' },
   { title: '条数', key: 'last_count', width: 70, render: (row: Api.Waf.IpListSub) => row.last_count ?? '-' },
   {
@@ -103,7 +157,7 @@ const columns = [
           { onPositiveClick: () => remove(row) },
           {
             trigger: () => h(NButton, { size: 'small', quaternary: true, type: 'error' }, { default: () => '删除' }),
-            default: () => '确认删除该订阅？'
+            default: () => '确认删除该订阅？同步产生的条目将一并移除'
           }
         )
       ])
@@ -117,26 +171,46 @@ onMounted(load);
   <div class="space-y-4">
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-xl font-semibold">黑白名单</h2>
-        <p class="text-sm text-[rgb(125,125,125)]">订阅远程威胁情报 IP 列表，定期自动同步</p>
+        <h2 class="text-xl font-semibold">订阅库</h2>
+        <p class="text-sm text-[rgb(125,125,125)]">远程威胁情报源订阅：IP 库 / 恶意指纹库 / 爬虫画像库，定时自动同步并下发引擎</p>
       </div>
       <NButton type="primary" @click="openCreate">新建订阅</NButton>
     </div>
 
-    <NCard :bordered="false" class="card-wrapper">
-      <NDataTable :columns="columns" :data="subs" :loading="loading" :bordered="false" size="small" />
-    </NCard>
+    <NAlert type="info" :bordered="false" class="card-wrapper">
+      同步后的条目可随时在各库页面手动修改（编辑/启停/删除）；「手动同步」立即拉取，后台每分钟自动检查到期订阅。
+    </NAlert>
+
+    <NTabs v-model:value="activeTarget" type="line">
+      <NTabPane v-for="(meta, t) in targetMeta" :key="t" :name="t" :tab="meta.label">
+        <p class="mb-3 text-xs text-[rgb(125,125,125)]">{{ meta.hint }}</p>
+        <NCard :bordered="false" class="card-wrapper">
+          <NDataTable :columns="columns" :data="filtered" :loading="loading" :bordered="false" size="small" />
+        </NCard>
+      </NTabPane>
+    </NTabs>
 
     <NModal v-model:show="editOpen" preset="card" :title="form.id ? '编辑订阅' : '新建订阅'" class="w-[min(96vw,560px)]">
-      <NForm :model="form" label-placement="left" label-width="100">
+      <NForm :model="form" label-placement="left" label-width="110">
         <NFormItem label="名称" required>
-          <NInput v-model:value="form.name" placeholder="如 恶意 IP 情报组" />
+          <NInput v-model:value="form.name" :placeholder="`如 ${targetMeta[activeTarget].label}情报组`" />
         </NFormItem>
-        <NFormItem label="类型" required>
-          <NSelect v-model:value="form.type" :options="[{ label: '白名单', value: 'whitelist' }, { label: '黑名单', value: 'blacklist' }]" />
+        <NFormItem label="订阅目标" required>
+          <NSelect
+            :value="form.target ?? activeTarget"
+            :options="[
+              { label: '恶意/信任 IP 库', value: 'ip' },
+              { label: '恶意指纹库', value: 'fingerprint' },
+              { label: '爬虫画像库', value: 'bot_profile' }
+            ]"
+            @update:value="v => (form.target = v as string)"
+          />
+        </NFormItem>
+        <NFormItem v-if="(form.target ?? activeTarget) === 'ip'" label="名单方向" required>
+          <NSelect v-model:value="form.type" :options="[{ label: '黑名单（拦截）', value: 'blacklist' }, { label: '白名单（放行）', value: 'whitelist' }]" />
         </NFormItem>
         <NFormItem label="订阅 URL" required>
-          <NInput v-model:value="form.url" placeholder="https://example.com/ips.txt（每行一个 IP/CIDR）" />
+          <NInput v-model:value="form.url" :placeholder="targetMeta[(form.target ?? activeTarget) as Target].placeholder" />
         </NFormItem>
         <NFormItem label="同步周期(min)">
           <NInputNumber v-model:value="form.interval_min" :min="5" />

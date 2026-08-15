@@ -236,7 +236,7 @@ const local: App.I18n.Schema = {
     rules: 'Rules',
     'trigger-rules': 'Trigger Rules',
     'trigger-records': 'Trigger Records',
-    'ip-lists': 'IP Lists',
+    'ip-lists': 'Subscriptions',
     alerts: 'Alerts',
     bots: 'Bots',
     'audit-logs': 'Audit Logs',

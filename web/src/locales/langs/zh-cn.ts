@@ -232,7 +232,7 @@ const local: App.I18n.Schema = {
     rules: '规则管理',
     'trigger-rules': '触发规则',
     'trigger-records': '触发记录',
-    'ip-lists': '黑白名单',
+    'ip-lists': '订阅库',
     alerts: '告警通知',
     bots: '爬虫管理',
     'audit-logs': '操作审计',

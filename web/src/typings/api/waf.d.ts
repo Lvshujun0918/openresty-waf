@@ -88,6 +88,8 @@ declare namespace Api {
       name: string;
       url: string;
       type: 'whitelist' | 'blacklist';
+      /** 订阅目标：ip（黑白名单）| fingerprint（恶意指纹库）| bot_profile（爬虫画像库） */
+      target: string;
       interval_min: number;
       enabled: boolean;
       last_sync_at?: string;
