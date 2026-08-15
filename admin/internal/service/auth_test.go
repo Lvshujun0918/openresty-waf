@@ -25,7 +25,7 @@ func seedUser(t *testing.T, db *gorm.DB, username, password string) {
 func TestAuthService_Login(t *testing.T) {
 	db := newTestDB(t)
 	seedUser(t, db, "admin", "secret")
-	s := NewAuthService(db, newTestConfig())
+	s := NewAuthService(db, nil, newTestConfig())
 
 	token, err := s.Login("admin", "secret")
 	if err != nil {
@@ -44,7 +44,7 @@ func TestAuthService_Login(t *testing.T) {
 }
 
 func TestAuthService_TokenRoundTrip(t *testing.T) {
-	s := NewAuthService(nil, newTestConfig())
+	s := NewAuthService(nil, nil, newTestConfig())
 
 	token, err := s.GenerateToken(model.User{ID: 7, Username: "u1"})
 	if err != nil {
@@ -69,7 +69,7 @@ func TestAuthService_TokenRoundTrip(t *testing.T) {
 func TestAuthService_LoginLockout(t *testing.T) {
 	db := newTestDB(t)
 	seedUser(t, db, "admin", "secret")
-	s := NewAuthService(db, newTestConfig())
+	s := NewAuthService(db, nil, newTestConfig())
 
 	// 连续失败 5 次
 	for i := 0; i < 5; i++ {
@@ -94,7 +94,7 @@ func TestAuthService_LoginLockout(t *testing.T) {
 func TestAuthService_TOTPFlow(t *testing.T) {
 	db := newTestDB(t)
 	seedUser(t, db, "admin", "secret")
-	s := NewAuthService(db, newTestConfig())
+	s := NewAuthService(db, nil, newTestConfig())
 	var u model.User
 	if err := db.Where("username = ?", "admin").First(&u).Error; err != nil {
 		t.Fatalf("find user: %v", err)
@@ -123,11 +123,11 @@ func TestAuthService_TOTPFlow(t *testing.T) {
 		t.Fatal("expected totp required")
 	}
 	// 错误验证码登录失败
-	if _, err := s.LoginWithTOTP("admin", "secret", wrong); err == nil {
+	if _, err := s.LoginWithTOTP("admin", "secret", wrong, "", ""); err == nil {
 		t.Fatal("expected wrong totp error")
 	}
 	// 正确验证码登录成功
-	if _, err := s.LoginWithTOTP("admin", "secret", totpCodeAt(secret, time.Now().Unix())); err != nil {
+	if _, err := s.LoginWithTOTP("admin", "secret", totpCodeAt(secret, time.Now().Unix()), "", ""); err != nil {
 		t.Fatalf("login with totp: %v", err)
 	}
 	// 关闭 TOTP 后无验证码登录成功

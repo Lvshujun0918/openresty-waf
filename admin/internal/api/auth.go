@@ -15,8 +15,8 @@ type AuthHandler struct {
 	svc *service.AuthService
 }
 
-func NewAuthHandler(db *gorm.DB, cfg *config.Config) *AuthHandler {
-	return &AuthHandler{svc: service.NewAuthService(db, cfg)}
+func NewAuthHandler(db *gorm.DB, mgr *service.RedisManager, cfg *config.Config) *AuthHandler {
+	return &AuthHandler{svc: service.NewAuthService(db, mgr, cfg)}
 }
 
 type loginReq struct {
@@ -32,7 +32,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
-	token, err := h.svc.LoginWithTOTP(req.Username, req.Password, req.TotpCode)
+	token, err := h.svc.LoginWithTOTP(req.Username, req.Password, req.TotpCode,
+		c.ClientIP(), c.GetHeader("User-Agent"))
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -40,6 +41,30 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// 登录成功：下发 CSRF Cookie（双提交校验，前端写请求需携带 X-CSRF-Token）
 	SetCSRFCookie(c)
 	c.JSON(http.StatusOK, gin.H{"token": token})
+}
+
+// Sessions GET /api/auth/sessions 当前全部登录会话
+func (h *AuthHandler) Sessions(c *gin.Context) {
+	list, err := h.svc.ListSessions()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"sessions": list})
+}
+
+// KickSession DELETE /api/auth/sessions/:jti 强制下线指定会话（当前会话除外）
+func (h *AuthHandler) KickSession(c *gin.Context) {
+	jti := c.Param("jti")
+	if jti == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少会话 ID"})
+		return
+	}
+	if err := h.svc.KickSession(jti); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 // Me GET /api/auth/me

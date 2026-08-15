@@ -20,8 +20,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	r.Use(SecurityHeaders())
 	r.Use(AllowedIP(cfg))
 
-	authHandler := NewAuthHandler(db, cfg)
-	authSvc := service.NewAuthService(db, cfg)
+	authHandler := NewAuthHandler(db, mgr, cfg)
+	authSvc := service.NewAuthService(db, mgr, cfg)
 	ruleHandler := NewRuleHandler(db, mgr, cfg)
 	eventHandler := NewEventHandler(db, mgr, cfg)
 	setupHandler := NewSetupHandler(db, mgr, cfg)
@@ -60,6 +60,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.POST("/auth/totp/setup", authHandler.TotpSetup)
 			authed.POST("/auth/totp/confirm", authHandler.TotpConfirm)
 			authed.DELETE("/auth/totp", authHandler.TotpDisable)
+			authed.GET("/auth/sessions", authHandler.Sessions)
+			authed.DELETE("/auth/sessions/:jti", authHandler.KickSession)
 
 			// 引导配置（登录后）
 			authed.POST("/setup/redis", setupHandler.SaveRedis)
