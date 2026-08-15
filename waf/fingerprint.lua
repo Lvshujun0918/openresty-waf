@@ -40,15 +40,22 @@ function _M.get(ctx)
 end
 
 -- 当前请求的比对用指纹（优先级 ja4 > tls > http）：
---   ja4：真实 JA4（需 ssl_client_hello 钩子 + 支持该回调的 OpenResty）
---   tls：TLS 握手指纹（nginx 内建 $ssl_* 变量版，任何 OpenResty 可用，
---        md5(ssl_protocol|ssl_ciphers|ssl_curves)——cipher 列表由客户端 TLS 栈决定，
---        伪造困难，作为 JA4 不可用时的标准替代）
+--   ja4：真实 JA4——优先 nginx 内建变量 $ssl_ja4（由带 JA4 补丁的 nginx 在握手阶段
+--        计算并写入连接上下文，任何请求阶段可读），其次兼容旧环境从共享内存读取
+--   tls：TLS 握手指纹（nginx 内建 $ssl_* 变量版，md5(ssl_protocol|ssl_ciphers|ssl_curves)，
+--        cipher 列表由客户端 TLS 栈决定，伪造困难，作为 JA4 不可用时的替代）
 --   http：HTTP 组合指纹（非 TLS 连接兜底）
 -- 返回 fp, source（"ja4" | "tls" | "http"）
 function _M.effective(ctx)
     if ctx and ctx.ja4 and ctx.ja4 ~= "" then
         return ctx.ja4, "ja4"
+    end
+    local sja4 = ngx.var.ssl_ja4
+    if sja4 and sja4 ~= "" then
+        if ctx then
+            ctx.ja4 = sja4
+        end
+        return sja4, "ja4"
     end
     local tfp = _M.tls(ctx)
     if tfp then
