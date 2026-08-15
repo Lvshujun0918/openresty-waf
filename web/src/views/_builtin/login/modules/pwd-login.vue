@@ -17,11 +17,13 @@ const { formRef, validate } = useNaiveForm();
 interface FormModel {
   userName: string;
   password: string;
+  totpCode: string;
 }
 
 const model: FormModel = reactive({
   userName: 'admin',
-  password: 'admin123'
+  password: 'admin123',
+  totpCode: ''
 });
 
 const rules = computed<Record<keyof FormModel, App.Global.FormRule[]>>(() => {
@@ -30,13 +32,14 @@ const rules = computed<Record<keyof FormModel, App.Global.FormRule[]>>(() => {
 
   return {
     userName: formRules.userName,
-    password: formRules.pwd
+    password: formRules.pwd,
+    totpCode: []
   };
 });
 
 async function handleSubmit() {
   await validate();
-  await authStore.login(model.userName, model.password);
+  await authStore.login(model.userName, model.password, model.totpCode);
 }
 
 type AccountKey = 'super' | 'admin' | 'user';
@@ -85,6 +88,13 @@ async function handleAccountLogin(account: Account) {
         type="password"
         show-password-on="click"
         :placeholder="$t('page.login.common.passwordPlaceholder')"
+      />
+    </NFormItem>
+    <NFormItem path="totpCode">
+      <NInput
+        v-model:value="model.totpCode"
+        maxlength="6"
+        :placeholder="$t('page.login.common.totpPlaceholder')"
       />
     </NFormItem>
     <NSpace vertical :size="24">

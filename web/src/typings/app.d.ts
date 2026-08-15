@@ -487,6 +487,7 @@ declare namespace App {
             userNamePlaceholder: string;
             phonePlaceholder: string;
             codePlaceholder: string;
+            totpPlaceholder: string;
             passwordPlaceholder: string;
             confirmPasswordPlaceholder: string;
             codeLogin: string;
