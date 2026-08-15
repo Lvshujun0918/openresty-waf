@@ -60,10 +60,10 @@ end
 -- EOF：运行 body_filter 阶段规则（一次），命中则替换最后 chunk 为拦截页
 if ngx.arg[2] and not ctx._resp_detected then
     ctx._resp_detected = true
-    local ruleset = engine.get_ruleset()
-    if ruleset then
+    local phase_rules = engine.get_phase_rules("body_filter")
+    if phase_rules and #phase_rules > 0 then
         -- fail-open：响应体检测异常不影响业务，记录错误后原样返回
-        local ok, result = pcall(engine.run, ruleset, "body_filter", ctx)
+        local ok, result = pcall(engine.run, { rules = phase_rules }, "body_filter", ctx)
         if not ok then
             ngx.log(ngx.ERR, "[waf] 响应体检测异常，fail-open: ", tostring(result))
         elseif result == "blocked" and ctx.response_block ~= nil then

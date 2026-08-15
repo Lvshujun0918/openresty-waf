@@ -20,10 +20,10 @@ if not ctx then
     ngx.ctx.waf_ctx = ctx
 end
 
-local ruleset = engine.get_ruleset()
-if ruleset then
+local phase_rules = engine.get_phase_rules("header_filter")
+if phase_rules and #phase_rules > 0 then
     -- fail-open：检测异常不阻断响应，记录错误后继续
-    local ok, err = pcall(engine.run, ruleset, "header_filter", ctx)
+    local ok, err = pcall(engine.run, { rules = phase_rules }, "header_filter", ctx)
     if not ok and not ctx._exited then
         ngx.log(ngx.ERR, "[waf] header_filter 检测异常，fail-open: ", tostring(err))
     end

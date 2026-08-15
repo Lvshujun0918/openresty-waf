@@ -223,6 +223,30 @@ function _M.get_ruleset()
     return ruleset
 end
 
+-- 按 phase 预过滤的规则列表（版本化缓存）：
+-- 规则集增大（后台 CRS 数百条）时，避免每个请求对全部规则逐条做 phase 判断
+-- （如 header_filter 阶段实际生效规则通常只有 1 条）。
+-- 注意：只过滤 phase，保留 disabled 规则在列表中——disabled 规则仍由
+-- run() 的 eligible 判断为不可评估（维持「禁用成员中断链」的原始语义）。
+local phase_cache = {}  -- phase -> { version = ..., rules = {...} }
+
+function _M.get_phase_rules(phase)
+    local ruleset = _M.get_ruleset()
+    local version = ruleset_cache.version
+    local e = phase_cache[phase]
+    if e and e.version == version then
+        return e.rules
+    end
+    local rs = {}
+    for _, r in ipairs(ruleset.rules or {}) do
+        if not r.phase or r.phase == phase then
+            rs[#rs + 1] = r
+        end
+    end
+    phase_cache[phase] = { version = version, rules = rs }
+    return rs
+end
+
 -- 读取当前生效配置（共享内存，按版本号缓存；无下发配置时回退默认 config）
 function _M.get_active_config()
     local config = require "config"

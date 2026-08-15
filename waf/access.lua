@@ -285,9 +285,9 @@ local function protection_flow()
         return
     end
 
-    -- 2. 规则引擎（URL / Args / Cookie / Header / Body 等规则）
-    local ruleset = engine.get_ruleset()
-    if ruleset then
+    -- 2. 规则引擎（URL / Args / Cookie / Header / Body 等规则；按 phase 预过滤复用）
+    local phase_rules = engine.get_phase_rules("access")
+    if phase_rules and #phase_rules > 0 then
         -- 豁免：URL/UA 白名单命中 或 exclude_paths 前缀 或 命中 exempt 触发规则
         -- （host/UA/请求头/IP 条件）时跳过规则检测
         local exempt = ctx.exempt_from_rules or false
@@ -317,7 +317,7 @@ local function protection_flow()
             ctx.capture_evidence = capture_evidence
             -- fail-open：规则引擎任何运行错误都不影响业务，记录错误后放行。
             -- ngx.exit 以 Lua 错误形式抛出：配合 _exited 标记区分「正常拦截」与「异常」。
-            local ok2, result = pcall(engine.run, ruleset, "access", ctx)
+            local ok2, result = pcall(engine.run, { rules = phase_rules }, "access", ctx)
             if ok2 then
                 if result == "blocked" or result == "accepted" then
                     return
