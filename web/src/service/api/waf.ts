@@ -355,3 +355,70 @@ export function kickSession(jti: string) {
 export function createBan(data: { ip: string; ua?: string; hours: number }) {
   return request<{ status: string }>({ url: '/bans', method: 'post', data });
 }
+
+/** 恶意指纹库列表 */
+export function fetchBotFingerprints() {
+  return request<Api.Waf.BotFingerprint[]>({ url: '/bots/fingerprints' });
+}
+
+/** 新建恶意指纹 */
+export function createBotFingerprint(data: Record<string, unknown>) {
+  return request<{ ok: boolean; id: number }>({ url: '/bots/fingerprints', method: 'post', data });
+}
+
+/** 更新恶意指纹 */
+export function updateBotFingerprint(id: number, data: Record<string, unknown>) {
+  return request<{ ok: boolean }>({ url: `/bots/fingerprints/${id}`, method: 'put', data });
+}
+
+/** 删除恶意指纹 */
+export function deleteBotFingerprint(id: number) {
+  return request<{ ok: boolean }>({ url: `/bots/fingerprints/${id}`, method: 'delete' });
+}
+
+/** 爬虫画像库列表 */
+export function fetchBotProfiles() {
+  return request<Api.Waf.BotProfile[]>({ url: '/bots/profiles' });
+}
+
+/** 新建爬虫画像 */
+export function createBotProfile(data: Record<string, unknown>) {
+  return request<{ ok: boolean; id: number }>({ url: '/bots/profiles', method: 'post', data });
+}
+
+/** 更新爬虫画像 */
+export function updateBotProfile(id: number, data: Record<string, unknown>) {
+  return request<{ ok: boolean }>({ url: `/bots/profiles/${id}`, method: 'put', data });
+}
+
+/** 删除爬虫画像 */
+export function deleteBotProfile(id: number) {
+  return request<{ ok: boolean }>({ url: `/bots/profiles/${id}`, method: 'delete' });
+}
+
+/** 爬虫访问记录 */
+export function fetchBotLogs(params: Record<string, string | number>) {
+  return request<Api.Waf.PageResult<Api.Waf.BotLog>>({ url: '/bots/logs', params });
+}
+
+/** 消费爬虫记录队列 */
+export function consumeBotLogs() {
+  return request<{ status: string; consumed: number }>({ url: '/bots/consume', method: 'post' });
+}
+
+/** 爬虫统计总览 */
+export function fetchBotStats() {
+  return request<{ total: number; real: number; fake: number; tools: number; malicious_ip: number; malicious_fp: number }>({
+    url: '/bots/stats'
+  });
+}
+
+/** 爬虫聚合排行（dim: ip | ua | fingerprint | profile） */
+export function fetchBotTop(dim: string, limit = 20) {
+  return request<{ items: { key: string; count: number }[] }>({ url: '/bots/top', params: { dim, limit } });
+}
+
+/** 爬虫趋势 */
+export function fetchBotTrend(days = 7) {
+  return request<{ items: { date: string; total: number; fake: number }[] }>({ url: '/bots/trend', params: { days } });
+}

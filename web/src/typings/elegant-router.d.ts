@@ -23,6 +23,7 @@ declare module "@elegant-router/types" {
     "alerts": "/alerts";
     "audit-logs": "/audit-logs";
     "bans": "/bans";
+    "bots": "/bots";
     "config": "/config";
     "dashboard": "/dashboard";
     "events": "/events";
@@ -74,6 +75,7 @@ declare module "@elegant-router/types" {
     | "alerts"
     | "audit-logs"
     | "bans"
+    | "bots"
     | "config"
     | "dashboard"
     | "events"
@@ -112,6 +114,7 @@ declare module "@elegant-router/types" {
     | "alerts"
     | "audit-logs"
     | "bans"
+    | "bots"
     | "config"
     | "dashboard"
     | "events"

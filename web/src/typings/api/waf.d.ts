@@ -269,5 +269,48 @@ declare namespace Api {
       ua: string;
       created_at: number;
     }
+
+    /** 恶意指纹条目 */
+    interface BotFingerprint {
+      id: number;
+      name: string;
+      value: string;
+      match: string;
+      description: string;
+      enabled: boolean;
+    }
+
+    /** 爬虫画像 */
+    interface BotProfile {
+      id: number;
+      name: string;
+      ua: string;
+      ips: string;
+      engine: boolean;
+      enabled: boolean;
+      sort_order: number;
+    }
+
+    /** 爬虫访问记录 */
+    interface BotLog {
+      id: number;
+      time: string;
+      req_id: string;
+      client_ip: string;
+      country?: string;
+      province?: string;
+      city?: string;
+      method: string;
+      host: string;
+      uri: string;
+      ua: string;
+      fingerprint: string;
+      profile: string;
+      engine: boolean;
+      fake: boolean;
+      malicious_ip: boolean;
+      malicious_fp: string;
+      status: number;
+    }
   }
 }

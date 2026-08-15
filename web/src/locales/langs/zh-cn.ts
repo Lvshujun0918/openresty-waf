@@ -234,6 +234,7 @@ const local: App.I18n.Schema = {
     'trigger-records': '触发记录',
     'ip-lists': '黑白名单',
     alerts: '告警通知',
+    bots: '爬虫管理',
     'audit-logs': '操作审计',
     bans: '封禁管理',
     monitor: '实时监控',

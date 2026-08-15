@@ -73,6 +73,17 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'bots',
+    path: '/bots',
+    component: 'layout.base$view.bots',
+    meta: {
+      title: 'bots',
+      i18nKey: 'route.bots',
+      icon: 'mdi:robot-outline',
+      order: 4
+    }
+  },
+  {
     name: 'config',
     path: '/config',
     component: 'layout.base$view.config',
