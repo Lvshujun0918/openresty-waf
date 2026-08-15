@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { NAlert, NButton, NCard, NInput, NSpace, NTag } from 'naive-ui';
-import { confirmTotp, disableTotp, fetchGetUserInfo, setupTotp } from '@/service/api';
+import { h, onMounted, ref } from 'vue';
+import { NAlert, NButton, NCard, NDataTable, NInput, NPopconfirm, NSpace, NTag } from 'naive-ui';
+import { confirmTotp, disableTotp, fetchGetUserInfo, fetchSessions, kickSession, setupTotp } from '@/service/api';
 
 const totpEnabled = ref(false);
 const loading = ref(false);
@@ -9,6 +9,7 @@ const secret = ref('');
 const otpauthUrl = ref('');
 const confirmCode = ref('');
 const disableCode = ref('');
+const sessions = ref<Api.Waf.Session[]>([]);
 
 async function load() {
   loading.value = true;
@@ -16,6 +17,8 @@ async function load() {
     const res = await fetchGetUserInfo();
     const info = res.data as unknown as { totp_enabled?: boolean } | null;
     totpEnabled.value = Boolean(info?.totp_enabled);
+    const ss = await fetchSessions().catch(() => ({ data: { sessions: [] as Api.Waf.Session[] } }));
+    sessions.value = ss.data?.sessions ?? [];
   } finally {
     loading.value = false;
   }
@@ -43,6 +46,39 @@ async function doDisable() {
   disableCode.value = '';
   await load();
 }
+
+async function doKick(row: Api.Waf.Session) {
+  await kickSession(row.jti);
+  window.$message?.success(`已将 ${row.username} 的会话强制下线`);
+  await load();
+}
+
+function fmtTs(ts: number) {
+  const d = new Date(ts * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const sessionColumns = [
+  { title: '用户', key: 'username', width: 100 },
+  { title: '登录 IP', key: 'ip', width: 140, render: (row: Api.Waf.Session) => h('span', { class: 'font-mono text-xs' }, row.ip || '-') },
+  { title: 'User-Agent', key: 'ua', ellipsis: { tooltip: true }, render: (row: Api.Waf.Session) => h('span', { class: 'text-xs' }, row.ua || '-') },
+  { title: '登录时间', key: 'created_at', width: 140, render: (row: Api.Waf.Session) => fmtTs(row.created_at) },
+  {
+    title: '操作',
+    key: 'action',
+    width: 90,
+    render: (row: Api.Waf.Session) =>
+      h(
+        NPopconfirm,
+        { onPositiveClick: () => doKick(row) },
+        {
+          trigger: () => h(NButton, { size: 'small', quaternary: true, type: 'error' }, { default: () => '强制下线' }),
+          default: () => `确认强制下线该会话？其登录态将立即失效`
+        }
+      )
+  }
+];
 
 onMounted(load);
 </script>
@@ -98,6 +134,13 @@ onMounted(load);
       <p class="text-sm text-[rgb(80,80,80)]">
         连续 5 次登录失败（密码或验证码错误）将锁定账号 15 分钟，锁定期间即使密码正确也无法登录。
       </p>
+    </NCard>
+
+    <NCard :bordered="false" class="card-wrapper" title="登录会话">
+      <template #header-extra>
+        <span class="text-xs text-[rgb(125,125,125)]">当前登录设备列表，可强制下线（该设备登录态立即失效）</span>
+      </template>
+      <NDataTable :columns="sessionColumns" :data="sessions" size="small" :bordered="false" />
     </NCard>
   </div>
 </template>
