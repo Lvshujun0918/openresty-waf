@@ -90,9 +90,14 @@ local function new_ctx(cfg)
     return ctx
 end
 
--- 发送拦截响应（wctx 传入时标记 _exited，供外层 fail-open 总闸区分正常拦截与异常）
+-- 发送拦截响应（wctx 传入时标记 _exited，供外层 fail-open 总闸区分正常拦截与异常）。
+-- 统一在此捕获请求证据：所有走 block() 的拦截路径（IP/URL 名单、恶意指纹、
+-- 触发规则、上传检测）都带请求头/请求体进入事件详情。
 local function block(cfg, wctx)
-    if wctx then wctx._exited = true end
+    if wctx then
+        wctx._exited = true
+        pcall(capture_evidence, wctx)
+    end
     local status = tonumber(cfg.block and cfg.block.status) or 403
     ngx.status = status
     ngx.header.content_type = "text/html; charset=utf-8"
@@ -291,6 +296,8 @@ local function protection_flow()
     elseif ip_result == "blocked" then
         if ctx.mode == "active" then
             block(cfg, ctx)
+        else
+            pcall(capture_evidence, ctx)
         end
         -- detect 模式：仅记录（命中信息后续由 log 阶段落盘）
         return
@@ -307,6 +314,8 @@ local function protection_flow()
     elseif util.match_regex_list(uri_for_list, cfg.blacklist and cfg.blacklist.urls) then
         if ctx.mode == "active" then
             block(cfg, ctx)
+        else
+            pcall(capture_evidence, ctx)
         end
         -- detect 模式：仅记录
         return
@@ -324,6 +333,8 @@ local function protection_flow()
         }
         if ctx.mode == "active" then
             block(cfg, ctx)
+        else
+            pcall(capture_evidence, ctx)
         end
         -- detect 模式：仅记录（log 阶段落盘）
         return
@@ -362,6 +373,8 @@ local function protection_flow()
         }
         if ctx.mode == "active" then
             block(cfg, ctx)
+        else
+            pcall(capture_evidence, ctx)
         end
         -- detect 模式：仅记录（log 阶段落盘）
         return
