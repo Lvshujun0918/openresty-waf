@@ -293,6 +293,9 @@ end
 
 -- 拦截页占位符渲染：{ip} {uri} {group} {req_id}
 -- 输出拦截页面前的最后一步，所有拦截路径统一调用。
+-- 注意：替换值可能含 %（如 URL 编码的 %20），必须用函数式替换——
+-- 字符串式 repl 会把 %2 等解析为回溯引用导致 "invalid capture index" 报错，
+-- 进而被外层 pcall 捕获走 fail-open（命中 BLOCK 却放行 200）。
 function _M.render_block_html(html, ctx, group)
     if not html or html == "" then
         return html
@@ -301,10 +304,10 @@ function _M.render_block_html(html, ctx, group)
     local uri = (ctx and ctx.request and ctx.request.uri) or ""
     local req_id = (ctx and ctx.req_id) or ""
     local g = (group_names and group_names[group]) or group or ""
-    return html:gsub("{ip}", ip)
-        :gsub("{uri}", uri)
-        :gsub("{group}", g)
-        :gsub("{req_id}", req_id)
+    return html:gsub("{ip}", function() return ip end)
+        :gsub("{uri}", function() return uri end)
+        :gsub("{group}", function() return g end)
+        :gsub("{req_id}", function() return req_id end)
 end
 
 -- ============================================================================

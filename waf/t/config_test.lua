@@ -190,3 +190,15 @@ t.test("block_page: 空 html 分组跳过，回退兜底", function()
     local config = require "config"
     t.eq(config.block_page(cfg, "crawler"), "DEFAULT", "空 html 分组不生效")
 end)
+
+t.test("render_block_html: 替换值含 % 与中文不抛错（gsub 回溯引用回归）", function()
+    ngx_reset()
+    local config = require "config"
+    local ctx = { client_ip = "1.2.3.4", req_id = "req-1",
+                  request = { uri = "/?id=1%20union%20select%201" } }
+    local out = config.render_block_html("<p>{ip} {uri} {group} {req_id}</p>", ctx, "sqli")
+    t.eq(out, "<p>1.2.3.4 /?id=1%20union%20select%201 SQL 注入攻击 req-1</p>")
+    -- uri 含 % 时不得报 invalid capture index
+    local ok, err = pcall(config.render_block_html, "<p>{uri}</p>", ctx, nil)
+    t.ok(ok, "含%的uri替换不得抛错: " .. tostring(err))
+end)
