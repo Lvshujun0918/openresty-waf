@@ -52,6 +52,13 @@ func (s *WafConfigService) Get() (map[string]interface{}, error) {
 
 // Save 保存配置到 DB 并下发 Redis（版本自增触发引擎热更新）
 func (s *WafConfigService) Save(cfg map[string]interface{}) error {
+	// 规范化：拦截页分组（block.pages）缺省时补空数组。
+	// 引擎按「数组整体替换」做热更新合并——若缺失该键会保留旧值（清理不干净）。
+	if block, ok := cfg["block"].(map[string]interface{}); ok {
+		if _, has := block["pages"]; !has {
+			block["pages"] = []map[string]interface{}{}
+		}
+	}
 	body, err := json.Marshal(cfg)
 	if err != nil {
 		return err
