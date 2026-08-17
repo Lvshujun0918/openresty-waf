@@ -112,11 +112,11 @@ local function set_pass_cookie(cfg, ip)
         "; Path=/; HttpOnly; Max-Age=" .. cfg.cookie_ttl
 end
 
--- 嵌入 JS 字符串前的安全化：剔除单引号/尖括号/&/控制字符，
--- 防止 redirect 参数以 </script> 闭合标签注入任意 JS（XSS）
+-- 嵌入 JS 字符串前的安全化：URL 编码（%XX 仅含字母数字与 %，不含引号/
+-- 反斜杠/尖括号/控制字符），JS 侧 decodeURIComponent 还原后跳转，
+-- 从根本上消除 redirect 参数闭合字符串注入 JS 的可能
 local function js_safe(s)
-    return (s or ""):gsub("'", "\\'"):gsub("<", ""):gsub(">", "")
-        :gsub("&", ""):gsub("[%c]", "")
+    return ngx.escape_uri(tostring(s or ""))
 end
 
 -- 品牌信息（config.challenge.brand：标题/公司/联系方式，后台可配置，空则隐藏页脚）
@@ -136,7 +136,7 @@ local function basic_page(ch, ip, redirect, token, bits)
     local title = (ch.brand and ch.brand.title ~= "" and ch.brand.title) or "安全验证"
     local js = "location.reload();"
     if redirect and redirect ~= "" then
-        js = "location.href='" .. js_safe(redirect) .. "';"
+        js = "location.href=decodeURIComponent('" .. js_safe(redirect) .. "');"
     end
     return [[<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>]] .. title .. [[</title>
@@ -171,7 +171,7 @@ local function advanced_page(cfg, redirect)
     local title = (cfg.brand and cfg.brand.title ~= "" and cfg.brand.title) or "安全验证"
     local js = "location.reload();"
     if redirect and redirect ~= "" then
-        js = "location.href='" .. js_safe(redirect) .. "';"
+        js = "location.href=decodeURIComponent('" .. js_safe(redirect) .. "');"
     end
     return [[<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>]] .. title .. [[</title>
