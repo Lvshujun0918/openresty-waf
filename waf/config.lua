@@ -413,4 +413,10 @@ if ok_local and type(local_cfg) == "table" then
     merge_cfg(_M, local_cfg)
 end
 
+-- 默认 cookie_secret 仅作回退：接入脚本生成 config_local.lua 时会写入随机密钥，
+-- 仍为默认值时告警（默认密钥可被伪造 waf_pass cookie 绕过人机验证/CC）
+if _M.challenge.cookie_secret == "openresty-waf-change-me" and ngx then
+    ngx.log(ngx.WARN, "WAF: challenge.cookie_secret 仍为默认值，请重新运行接入脚本（-f 强制）生成 config_local.lua")
+end
+
 return _M

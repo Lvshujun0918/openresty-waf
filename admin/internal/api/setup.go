@@ -262,6 +262,11 @@ echo "[2/4] Redis 配置..."
 if [ -f "$INSTALL_DIR/config_local.lua" ] && [ "${FORCE:-0}" != "1" ]; then
   echo "  已存在 config_local.lua，保留现有 Redis 配置"
   echo "  如需按本次参数重新生成，请加 -f/--force 参数: bash install.sh ... -f"
+  if ! grep -q 'cookie_secret' "$INSTALL_DIR/config_local.lua" 2>/dev/null; then
+    COOKIE_SECRET="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+    printf '\nchallenge = { cookie_secret = "%s" }\n' "$COOKIE_SECRET" >> "$INSTALL_DIR/config_local.lua"
+    echo "  已为 config_local.lua 追加随机 cookie_secret"
+  fi
 else
   HOST="${REDIS_ADDR%%:*}"
   PORT="${REDIS_ADDR##*:}"
@@ -275,10 +280,13 @@ else
   if [ -n "$REDIS_PASSWORD" ]; then
     PASS_SAFE="[[${REDIS_PASSWORD//]]/] ]}]]"
   fi
+  # 人机验证 cookie 签名密钥：随机 16 字节，避免默认密钥被伪造放行 cookie
+  COOKIE_SECRET="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
   cat > "$INSTALL_DIR/config_local.lua" <<EOF
 -- 由 OpenResty WAF 接入脚本生成（深合并覆盖 config.lua）
 return { redis = { host = [[$HOST_SAFE]], port = $PORT, password = $PASS_SAFE, db = $REDIS_DB },
-         log = { backend = "redis", redis_key = "waf:event:list" } }
+         log = { backend = "redis", redis_key = "waf:event:list" },
+         challenge = { cookie_secret = "$COOKIE_SECRET" } }
 EOF
   echo "  已生成 config_local.lua (Redis: $REDIS_ADDR db=$REDIS_DB)"
 fi
