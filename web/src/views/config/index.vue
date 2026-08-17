@@ -13,17 +13,6 @@ const cfg = reactive({
   upload: { enabled: true, spooled_scan_bytes: 524288 },
   block: { status: 403 },
   cc: { rate_count: 100, rate_seconds: 60, ban_duration: 300 },
-  challenge: {
-    enabled: true,
-    mode: 'basic',
-    pow_bits: 20,
-    cookie_ttl: 300,
-    issue_limit: 20,
-    issue_window: 60,
-    cookie_secret: '',
-    captcha_id: '',
-    captcha_key: ''
-  },
   traffic_log: { enabled: false, retention_days: 7 },
   auto_ban: { enabled: true, threshold: 10, window: 60, duration: 600 }
 });
@@ -35,20 +24,12 @@ const ipHeaderText = ref('');
 const uploadExtText = ref('');
 const uploadMimeText = ref('');
 const blockHtmlText = ref('');
-const wlIpText = ref('');
-const wlUrlText = ref('');
-const wlUaText = ref('');
-const blIpText = ref('');
-const blUrlText = ref('');
-// 证据脱敏 / 响应安全头 / 品牌化
+// 证据脱敏 / 响应安全头
 const maskEnabled = ref(true);
 const maskFieldsText = ref('');
 const maskRegexText = ref('');
 const rhAddText = ref('');
 const rhRemoveText = ref('');
-const brandTitle = ref('');
-const brandCompany = ref('');
-const brandContact = ref('');
 let rawConfig: Record<string, unknown> = {};
 
 function asList(v: unknown): string[] {
@@ -75,12 +56,8 @@ async function load() {
   const log = (rawConfig.log as Record<string, unknown>) ?? {};
   const cc = (rawConfig.cc as Record<string, unknown>) ?? {};
   const block = (rawConfig.block as Record<string, unknown>) ?? {};
-  const ch = (rawConfig.challenge as Record<string, unknown>) ?? {};
-  const captcha = (ch.captcha as Record<string, unknown>) ?? {};
   const tl = (rawConfig.traffic_log as Record<string, unknown>) ?? {};
   const ab = (rawConfig.auto_ban as Record<string, unknown>) ?? {};
-  const wl = (rawConfig.whitelist as Record<string, unknown>) ?? {};
-  const bl = (rawConfig.blacklist as Record<string, unknown>) ?? {};
   const rate = parseRate(cc.rate);
   Object.assign(cfg, {
     mode: rawConfig.mode || 'active',
@@ -111,17 +88,6 @@ async function load() {
       rate_seconds: rate.seconds,
       ban_duration: Number(cc.ban_duration) || 300
     },
-    challenge: {
-      enabled: ch.enabled !== false,
-      mode: String(ch.mode || 'basic'),
-      pow_bits: Number(ch.pow_bits) || 0,
-      cookie_ttl: Number(ch.cookie_ttl) || 300,
-      issue_limit: Number(ch.issue_limit) || 0,
-      issue_window: Number(ch.issue_window) || 60,
-      cookie_secret: String(ch.cookie_secret || ''),
-      captcha_id: String(captcha.id || ''),
-      captcha_key: String(captcha.key || '')
-    },
     traffic_log: {
       enabled: tl.enabled === true,
       retention_days: Number(tl.retention_days) || 7
@@ -149,20 +115,10 @@ async function load() {
     .map(([k, v]) => `${k}: ${v}`)
     .join('\n');
   rhRemoveText.value = asList(rh.remove).join('\n');
-  // 品牌化
-  const brand = (ch.brand as Record<string, unknown>) ?? {};
-  brandTitle.value = String(brand.title || '');
-  brandCompany.value = String(brand.company || '');
-  brandContact.value = String(brand.contact || '');
   const up = (rawConfig.upload as Record<string, unknown>) ?? {};
   uploadExtText.value = asList(up.deny_ext).join('\n');
   uploadMimeText.value = asList(up.deny_mime).join('\n');
   blockHtmlText.value = String(block.html || '');
-  wlIpText.value = asList(wl.ips).join('\n');
-  wlUrlText.value = asList(wl.urls).join('\n');
-  wlUaText.value = asList(wl.user_agents).join('\n');
-  blIpText.value = asList(bl.ips).join('\n');
-  blUrlText.value = asList(bl.urls).join('\n');
   loaded.value = true;
 }
 
@@ -185,22 +141,13 @@ async function save() {
     const trusted = lines(trustedText.value);
     const uploadExt = lines(uploadExtText.value);
     const uploadMime = lines(uploadMimeText.value);
-    const wlIps = lines(wlIpText.value);
-    const wlUrls = lines(wlUrlText.value);
-    const wlUas = lines(wlUaText.value);
-    const blIps = lines(blIpText.value);
-    const blUrls = lines(blUrlText.value);
     const rawDet = (rawConfig.detection as Record<string, unknown>) ?? {};
     const rawLog = (rawConfig.log as Record<string, unknown>) ?? {};
     const rawUp = (rawConfig.upload as Record<string, unknown>) ?? {};
     const rawBlock = (rawConfig.block as Record<string, unknown>) ?? {};
     const rawCc = (rawConfig.cc as Record<string, unknown>) ?? {};
-    const rawCh = (rawConfig.challenge as Record<string, unknown>) ?? {};
-    const rawCaptcha = (rawCh.captcha as Record<string, unknown>) ?? {};
     const rawTl = (rawConfig.traffic_log as Record<string, unknown>) ?? {};
     const rawAb = (rawConfig.auto_ban as Record<string, unknown>) ?? {};
-    const rawWl = (rawConfig.whitelist as Record<string, unknown>) ?? {};
-    const rawBl = (rawConfig.blacklist as Record<string, unknown>) ?? {};
     const next = {
       ...rawConfig,
       mode: cfg.mode,
@@ -259,26 +206,6 @@ async function save() {
         rate: `${cfg.cc.rate_count}/${cfg.cc.rate_seconds}`,
         ban_duration: cfg.cc.ban_duration
       },
-      challenge: {
-        ...rawCh,
-        enabled: cfg.challenge.enabled,
-        mode: cfg.challenge.mode,
-        pow_bits: cfg.challenge.pow_bits,
-        cookie_ttl: cfg.challenge.cookie_ttl,
-        issue_limit: cfg.challenge.issue_limit,
-        issue_window: cfg.challenge.issue_window,
-        cookie_secret: cfg.challenge.cookie_secret,
-        captcha: {
-          ...rawCaptcha,
-          id: cfg.challenge.captcha_id,
-          key: cfg.challenge.captcha_key
-        },
-        brand: {
-          title: brandTitle.value,
-          company: brandCompany.value,
-          contact: brandContact.value
-        }
-      },
       traffic_log: {
         ...rawTl,
         enabled: cfg.traffic_log.enabled,
@@ -290,17 +217,6 @@ async function save() {
         threshold: cfg.auto_ban.threshold,
         window: cfg.auto_ban.window,
         duration: cfg.auto_ban.duration
-      },
-      whitelist: {
-        ...rawWl,
-        ips: wlIps,
-        urls: wlUrls,
-        user_agents: wlUas
-      },
-      blacklist: {
-        ...rawBl,
-        ips: blIps,
-        urls: blUrls
       },
       trusted_proxies: trusted,
       client_ip_header: ipHeaderText.value.trim()
@@ -513,23 +429,6 @@ onMounted(loadVersions);
       </NForm>
     </NCard>
 
-    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="拦截/挑战页品牌化">
-      <NForm label-placement="left" label-width="120">
-        <NFormItem label="页面标题">
-          <NInput v-model:value="brandTitle" placeholder="如：XX 云安全验证（留空用默认）" />
-        </NFormItem>
-        <NFormItem label="公司/站点名">
-          <NInput v-model:value="brandCompany" placeholder="页脚展示，如：XX 科技有限公司" />
-        </NFormItem>
-        <NFormItem label="联系方式">
-          <NInput v-model:value="brandContact" placeholder="页脚展示，如：400-xxx-xxxx" />
-        </NFormItem>
-        <NFormItem label="说明">
-          <span class="text-xs text-[rgb(125,125,125)]">挑战页标题与页脚品牌信息；拦截页 HTML 在上方「拦截响应」卡片中自定义</span>
-        </NFormItem>
-      </NForm>
-    </NCard>
-
     <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="拦截响应">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="状态码">
@@ -561,85 +460,6 @@ onMounted(loadVersions);
           <span class="text-xs text-[rgb(125,125,125)] ml-2">超限后封禁该 IP 的秒数</span>
         </NFormItem>
         <p class="text-xs text-[rgb(125,125,125)]">全局缺省值；在「触发规则」页创建 CC 规则可对特定域名/路径单独配置阈值与维度</p>
-      </NForm>
-    </NCard>
-
-    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="人机验证">
-      <NForm label-placement="left" label-width="140">
-        <NFormItem label="启用">
-          <NSwitch v-model:value="cfg.challenge.enabled" />
-          <span class="text-xs text-[rgb(125,125,125)] ml-2">CC 超限后进入验证页（触发规则命中时不受此开关限制）</span>
-        </NFormItem>
-        <NFormItem label="验证模式">
-          <NRadioGroup v-model:value="cfg.challenge.mode">
-            <NSpace>
-              <NRadio value="basic" label="basic（JS 工作量证明）" />
-              <NRadio value="geetest" label="geetest（极验）" />
-              <NRadio value="gitee" label="gitee（Gitee 验证码）" />
-            </NSpace>
-          </NRadioGroup>
-        </NFormItem>
-        <template v-if="cfg.challenge.mode !== 'basic'">
-          <NFormItem label="Captcha ID">
-            <NInput v-model:value="cfg.challenge.captcha_id" class="w-80" placeholder="验证码服务商分配的 captcha_id" />
-          </NFormItem>
-          <NFormItem label="Captcha Key">
-            <NInput v-model:value="cfg.challenge.captcha_key" class="w-80" type="password" show-password-on="click" placeholder="验证码服务商分配的 captcha_key" />
-          </NFormItem>
-        </template>
-        <NFormItem label="POW 难度(bit)">
-          <NInputNumber v-model:value="cfg.challenge.pow_bits" :min="0" :max="28" class="w-32" />
-          <span class="text-xs text-[rgb(125,125,125)] ml-2">basic 模式哈希前导零位数（0 关闭，默认 20）</span>
-        </NFormItem>
-        <NFormItem label="放行时长(s)">
-          <NInputNumber v-model:value="cfg.challenge.cookie_ttl" :min="60" class="w-32" />
-          <span class="text-xs text-[rgb(125,125,125)] ml-2">验证通过后 Cookie 放行时长</span>
-        </NFormItem>
-        <NFormItem label="签发限频">
-          <NSpace align="center" :wrap="true">
-            <span class="text-sm text-[rgb(125,125,125)]">每</span>
-            <NInputNumber v-model:value="cfg.challenge.issue_window" :min="1" class="w-24" />
-            <span class="text-sm text-[rgb(125,125,125)]">秒最多下发</span>
-            <NInputNumber v-model:value="cfg.challenge.issue_limit" :min="1" class="w-24" />
-            <span class="text-sm text-[rgb(125,125,125)]">次（超限 444）</span>
-          </NSpace>
-        </NFormItem>
-        <NFormItem label="签名密钥">
-          <div class="w-full">
-            <NInput v-model:value="cfg.challenge.cookie_secret" class="w-96" type="password" show-password-on="click" placeholder="cookie_secret（生产环境务必修改）" />
-            <p class="mt-1 text-xs text-[rgb(125,125,125)]">用于签名验证 Cookie 与挑战 token，修改后已签发的验证立即失效</p>
-          </div>
-        </NFormItem>
-      </NForm>
-    </NCard>
-
-    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="黑白名单（内置兜底）">
-      <NForm label-placement="left" label-width="140">
-        <NFormItem label="白名单 IP">
-          <div class="w-full">
-            <NInput v-model:value="wlIpText" type="textarea" :rows="2" placeholder="每行一个 IP 或 CIDR，如 127.0.0.1、10.0.0.0/8（命中直接放行）" />
-          </div>
-        </NFormItem>
-        <NFormItem label="白名单 URL">
-          <div class="w-full">
-            <NInput v-model:value="wlUrlText" type="textarea" :rows="2" placeholder="每行一个正则，如 /favicon\\.ico（命中跳过规则检测）" />
-          </div>
-        </NFormItem>
-        <NFormItem label="白名单 UA">
-          <div class="w-full">
-            <NInput v-model:value="wlUaText" type="textarea" :rows="2" placeholder="每行一个正则（命中跳过规则检测）" />
-          </div>
-        </NFormItem>
-        <NFormItem label="黑名单 IP">
-          <div class="w-full">
-            <NInput v-model:value="blIpText" type="textarea" :rows="2" placeholder="每行一个 IP 或 CIDR（命中直接拦截）" />
-          </div>
-        </NFormItem>
-        <NFormItem label="黑名单 URL">
-          <div class="w-full">
-            <NInput v-model:value="blUrlText" type="textarea" :rows="2" placeholder="每行一个正则（命中直接拦截）" />
-          </div>
-        </NFormItem>
       </NForm>
     </NCard>
 
