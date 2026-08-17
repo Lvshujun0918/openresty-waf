@@ -36,14 +36,68 @@ t.test("get_client_ip: XFF 空白回退", function()
     t.eq(storage.get_client_ip(), "10.0.0.1")
 end)
 
--- 可信代理：列表为空时不信任 XFF（安全默认，防止伪造 XFF 绕过 IP 维度防护）
-t.test("get_client_ip: 可信代理列表为空时不信任 XFF", function()
+-- 可信代理：列表为空时无条件信任 XFF（兼容旧行为；
+-- 面向 CDN/反代回源 IP 不公开的部署，如腾讯云 EdgeOne）
+t.test("get_client_ip: 可信代理列表为空时信任 XFF", function()
     ngx_reset()
     local config = require "config"
     local orig = config.trusted_proxies
     config.trusted_proxies = {}
     ngx.var.remote_addr = "10.0.0.1"
     ngx.var.http_x_forwarded_for = "8.8.8.8"
+    t.eq(storage.get_client_ip(), "8.8.8.8")
+    config.trusted_proxies = orig
+end)
+
+t.test("get_client_ip: 自定义头优先（eo-connecting-ip）", function()
+    ngx_reset()
+    local config = require "config"
+    local orig = config.trusted_proxies
+    local orig_h = config.client_ip_header
+    config.trusted_proxies = {}
+    config.client_ip_header = "eo-connecting-ip"
+    ngx.var.remote_addr = "10.0.0.1"
+    ngx.var.http_x_forwarded_for = "8.8.8.8"
+    ngx.req._headers["eo-connecting-ip"] = "203.0.113.7"
+    t.eq(storage.get_client_ip(), "203.0.113.7")
+    config.trusted_proxies = orig
+    config.client_ip_header = orig_h
+end)
+
+t.test("get_client_ip: 自定义头非法 IP 时回退 XFF", function()
+    ngx_reset()
+    local config = require "config"
+    local orig = config.trusted_proxies
+    local orig_h = config.client_ip_header
+    config.trusted_proxies = {}
+    config.client_ip_header = "eo-connecting-ip"
+    ngx.var.remote_addr = "10.0.0.1"
+    ngx.var.http_x_forwarded_for = "8.8.8.8"
+    ngx.req._headers["eo-connecting-ip"] = "abc;drop"
+    t.eq(storage.get_client_ip(), "8.8.8.8")
+    config.trusted_proxies = orig
+    config.client_ip_header = orig_h
+end)
+
+t.test("get_client_ip: 自定义头 unknown 回退", function()
+    ngx_reset()
+    local config = require "config"
+    local orig_h = config.client_ip_header
+    config.client_ip_header = "eo-connecting-ip"
+    ngx.var.remote_addr = "10.0.0.1"
+    ngx.var.http_x_forwarded_for = nil
+    ngx.req._headers["eo-connecting-ip"] = "unknown"
+    t.eq(storage.get_client_ip(), "10.0.0.1")
+    config.client_ip_header = orig_h
+end)
+
+t.test("get_client_ip: XFF 脏值（;true）不通过", function()
+    ngx_reset()
+    local config = require "config"
+    local orig = config.trusted_proxies
+    config.trusted_proxies = {}
+    ngx.var.remote_addr = "10.0.0.1"
+    ngx.var.http_x_forwarded_for = "1.2.3.4;true"
     t.eq(storage.get_client_ip(), "10.0.0.1")
     config.trusted_proxies = orig
 end)

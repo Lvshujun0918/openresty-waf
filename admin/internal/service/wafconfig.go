@@ -127,7 +127,8 @@ type BanEntry struct {
 }
 
 // parseBanEntry 解析黑名单条目：
-//   "地址" | "地址|unix时间戳" | "地址|UA|unix时间戳"（IP+UA 维度封禁）
+//
+//	"地址" | "地址|unix时间戳" | "地址|UA|unix时间戳"（IP+UA 维度封禁）
 func parseBanEntry(entry string) (ip, ua string, ts int64) {
 	if idx := strings.LastIndexByte(entry, '|'); idx >= 0 {
 		part := entry[idx+1:]
@@ -255,6 +256,7 @@ func toStringSlice(v interface{}) []string {
 	}
 	return out
 }
+
 // 不含 redis 连接——该信息由部署引导 config_local.lua 提供）
 func defaultWafConfig() map[string]interface{} {
 	return map[string]interface{}{
@@ -302,17 +304,19 @@ h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
 			"urls":        []string{"/favicon.ico"},
 			"user_agents": []string{},
 		},
-		// 可信反向代理（精确 IP 或 CIDR）：仅直连地址命中时才信任 X-Forwarded-For；
+		// 可信反向代理（精确 IP 或 CIDR）：直连地址命中时才信任 X-Forwarded-For；
 		// 留空 = 无条件信任 XFF（兼容旧行为），公网直连部署建议配置以防伪造。
 		"trusted_proxies": []string{},
+		// 自定义来源 IP 头（优先级高于 XFF）：如腾讯云 EdgeOne 的 eo-connecting-ip
+		"client_ip_header": "",
 		"blacklist": map[string]interface{}{
 			"ips":  []string{},
 			"urls": []string{},
 		},
 		"upload": map[string]interface{}{
-			"enabled":   true,
-			"deny_ext":  []string{"php", "php3", "php5", "phtml", "jsp", "jspx", "asp", "aspx", "asa", "cer", "cgi", "pl", "sh", "py", "exe"},
-			"deny_mime": []string{"application/x-php", "application/x-httpd-php", "application/x-msdownload"},
+			"enabled":      true,
+			"deny_ext":     []string{"php", "php3", "php5", "phtml", "jsp", "jspx", "asp", "aspx", "asa", "cer", "cgi", "pl", "sh", "py", "exe"},
+			"deny_mime":    []string{"application/x-php", "application/x-httpd-php", "application/x-msdownload"},
 			"content_scan": true,
 			// 请求体落临时文件时扫描文件前缀字节数（防超大上传绕过）
 			"spooled_scan_bytes": 524288,

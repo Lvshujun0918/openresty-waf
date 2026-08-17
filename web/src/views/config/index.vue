@@ -31,6 +31,7 @@ const excludeText = ref('');
 const staticExtText = ref('');
 const staticPrefixText = ref('');
 const trustedText = ref('');
+const ipHeaderText = ref('');
 const uploadExtText = ref('');
 const uploadMimeText = ref('');
 const blockHtmlText = ref('');
@@ -136,6 +137,7 @@ async function load() {
   staticExtText.value = asList(skip.ext).join('\n');
   staticPrefixText.value = asList(skip.prefix).join('\n');
   trustedText.value = asList(rawConfig.trusted_proxies).join('\n');
+  ipHeaderText.value = String(rawConfig.client_ip_header || '');
   // 证据脱敏
   const mask = (det.evidence_mask as Record<string, unknown>) ?? {};
   maskEnabled.value = mask.enabled !== false;
@@ -300,7 +302,8 @@ async function save() {
         ips: blIps,
         urls: blUrls
       },
-      trusted_proxies: trusted
+      trusted_proxies: trusted,
+      client_ip_header: ipHeaderText.value.trim()
     };
     await saveConfig(next);
     window.$message?.success('配置已保存并下发，引擎 5 秒内热更新生效');
@@ -401,6 +404,12 @@ onMounted(loadVersions);
           <div class="w-full">
             <NInput v-model:value="trustedText" type="textarea" :rows="3" placeholder="每行一个精确 IP 或 CIDR，如 10.0.0.0/8&#10;留空 = 无条件信任 XFF（兼容旧行为）" />
             <p class="mt-1 text-xs text-[rgb(125,125,125)]">仅当直连地址命中此列表时才信任 XFF 最左值；公网直连部署建议配置，防止伪造 XFF 绕过 IP 名单/CC/人机验证</p>
+          </div>
+        </NFormItem>
+        <NFormItem label="来源 IP 自定义头">
+          <div class="w-full">
+            <NInput v-model:value="ipHeaderText" placeholder="如 eo-connecting-ip（腾讯云 EdgeOne）" />
+            <p class="mt-1 text-xs text-[rgb(125,125,125)]">CDN 把真实客户端 IP 放在私有头且回源 IP 不公开时填写；优先级高于 XFF，仅接受合法 IP 值</p>
           </div>
         </NFormItem>
       </NForm>

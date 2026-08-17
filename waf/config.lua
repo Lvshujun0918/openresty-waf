@@ -231,11 +231,16 @@ _M.blacklist = {
 }
 
 -- 可信反向代理列表（精确 IP 或 CIDR，IPv4）。
--- 仅当直连地址（remote_addr）命中此列表时才信任 X-Forwarded-For 最左值，
--- 防止公网直接暴露时攻击者伪造 XFF 绕过 IP 名单/CC/人机验证。
--- 列表为空时不信任任何 XFF（安全默认，真实 IP 取 remote_addr）；
--- 若部署在可信反代之后，请把反代出口 IP/网段加入此列表。
+-- 直连地址命中此列表时才信任 X-Forwarded-For 最左值；
+-- 列表为空 = 无条件信任 XFF（兼容旧行为；公网直连部署建议把
+-- 反代/CDN 回源 IP 加入此列表，防止攻击者伪造 XFF 绕过 IP 防护）。
 _M.trusted_proxies = { }
+
+-- 自定义来源 IP 头（可选，优先级高于 XFF）：
+-- 部分 CDN（如腾讯云 EdgeOne 的 eo-connecting-ip）把真实客户端 IP
+-- 放在私有头中且回源 IP 不公开，无法用 trusted_proxies 校验。
+-- 留空则不启用；开启后仅接受合法 IP 值，非法值自动回退 XFF/remote_addr。
+_M.client_ip_header = ""
 
 -- 高频攻击自动封禁：同 IP 短窗口内多次攻击命中后自动临时封禁（雷池同款能力）
 _M.auto_ban = {

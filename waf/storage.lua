@@ -193,13 +193,30 @@ end
 -- 列表为空视为未配置可信代理（安全默认），不信任任何 XFF。
 -- ============================================================================
 
--- 直连地址是否在可信代理列表中（空列表 → 不信任，安全默认：
--- 公网直连场景下攻击者可伪造 X-Forwarded-For，一旦信任即可绕过
--- IP 名单 / CC 计数 / 自动封禁 / 人机验证等所有 IP 维度防护）
+--- IP 合法性校验（IPv4 四段 0-255 / IPv6 含冒号合法字符），
+--- 防止 XFF / 自定义头中的脏值（如 ";|true"）进入 IP 维度防护。
+local function valid_ip(v)
+    if not v then return false end
+    local a, b, c, d = v:match("^(%d+)%.(%d+)%.(%d+)%.(%d+)$")
+    if a then
+        return a:len() <= 3 and b:len() <= 3 and c:len() <= 3 and d:len() <= 3
+            and tonumber(a) <= 255 and tonumber(b) <= 255
+            and tonumber(c) <= 255 and tonumber(d) <= 255
+    end
+    if v:find(":") then
+        return v:match("^[0-9a-fA-F:%.%%]+$") ~= nil
+    end
+    return false
+end
+
+--- 直连地址是否在可信代理列表中。
+--- 列表为空 → 无条件信任 X-Forwarded-For（兼容旧行为；面向 CDN/反代
+--- 回源 IP 不公开的部署，如腾讯云 EdgeOne；公网直连部署建议把
+--- 反代/CDN 回源 IP 填入以防伪造 XFF 绕过 IP 名单 / CC / 封禁）。
 local function is_trusted_proxy(ip)
     local list = config.trusted_proxies
     if not list or #list == 0 then
-        return false
+        return true
     end
     local operators = require "rule_engine.operators"
     for _, entry in ipairs(list) do
@@ -212,10 +229,22 @@ end
 
 function _M.get_client_ip()
     local ip = ngx.var.remote_addr or ""
+    -- 自定义来源 IP 头优先（CDN 场景，如腾讯云 EdgeOne 的 eo-connecting-ip）：
+    -- 仅接受合法 IP 值，非法时回退后续解析，防伪造脏值。
+    local hcfg = config.client_ip_header
+    if hcfg and hcfg ~= "" then
+        local hdr = ngx.req.get_headers()[string.lower(hcfg)]
+        if hdr and hdr ~= "" then
+            local cand = hdr:match("^%s*([^,%s]+)")
+            if cand and cand ~= "unknown" and valid_ip(cand) then
+                return cand
+            end
+        end
+    end
     local xff = ngx.var.http_x_forwarded_for
     if xff and xff ~= "" and is_trusted_proxy(ip) then
         local first = xff:match("^%s*([^,%s]+)")
-        if first and first ~= "unknown" then
+        if first and first ~= "unknown" and valid_ip(first) then
             ip = first
         end
     end
