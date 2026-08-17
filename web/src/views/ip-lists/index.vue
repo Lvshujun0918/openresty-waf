@@ -123,8 +123,21 @@ async function save() {
   }
 }
 
+const builtinNames = ['内置爬虫画像库', '内置JA4客户端库'];
+
 const columns = [
-  { title: '名称', key: 'name', minWidth: 140 },
+  {
+    title: '名称',
+    key: 'name',
+    minWidth: 160,
+    render: (row: Api.Waf.IpListSub) =>
+      h('div', { class: 'flex items-center gap-1.5' }, [
+        h('span', { class: 'truncate' }, row.name),
+        builtinNames.includes(row.name)
+          ? h(NTag, { size: 'tiny', bordered: false, type: 'success' }, { default: () => '内置' })
+          : null
+      ])
+  },
   {
     title: '目标',
     key: 'target',
