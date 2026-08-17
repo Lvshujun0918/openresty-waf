@@ -43,9 +43,13 @@ local function record_hit(waf_ctx, rule)
         msg      = rule.actions and rule.actions.msg,
         severity = rule.severity,
     }
+    -- 捕获由 capture_evidence 内部幂等（_evidence_captured 标记），
+    -- 此处不得预置标记，否则 capture_evidence 首行检查直接 return 导致证据丢失。
     if not waf_ctx._evidence_captured and waf_ctx.capture_evidence then
-        waf_ctx._evidence_captured = true
-        pcall(waf_ctx.capture_evidence, waf_ctx)
+        local ok, err = pcall(waf_ctx.capture_evidence, waf_ctx)
+        if not ok then
+            ngx.log(ngx.ERR, "[waf] capture_evidence 异常: " .. tostring(err))
+        end
     end
 end
 
