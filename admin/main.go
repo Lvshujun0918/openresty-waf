@@ -53,6 +53,7 @@ func ensureDefaultAdmin(db *gorm.DB) {
 	password := os.Getenv("ADMIN_INIT_PASSWORD")
 	if password == "" {
 		password = "admin123"
+		log.Printf("未设置 ADMIN_INIT_PASSWORD，已创建默认初始密码，请尽快登录修改")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -61,7 +62,7 @@ func ensureDefaultAdmin(db *gorm.DB) {
 	if err := db.Create(&model.User{Username: "admin", PasswordHash: string(hash)}).Error; err != nil {
 		log.Fatalf("创建默认管理员失败: %v", err)
 	}
-	log.Printf("已创建默认管理员 admin（初始密码: %s，请尽快修改）", password)
+	log.Printf("已创建默认管理员 admin，请尽快登录修改初始密码")
 }
 
 // seedRules 导入内置规则种子（带版本管理：版本变化时自动替换旧种子，保留用户自定义规则）
