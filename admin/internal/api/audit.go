@@ -37,8 +37,10 @@ func detailOf(c *gin.Context) string {
 	if c.Request.Body == nil {
 		return ""
 	}
+	// 读取前 2048 字节做摘要（不破坏原始流：剩余部分仍在原 Body 中，
+	// 与已读字节拼接回 Body，保证后续 handler 能读到完整请求体）
 	body, _ := io.ReadAll(io.LimitReader(c.Request.Body, 2048))
-	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	c.Request.Body = io.NopCloser(io.MultiReader(bytes.NewReader(body), c.Request.Body))
 	// 敏感字段打码
 	text := string(body)
 	for _, f := range []string{"password", "passwd", "secret", "smtp_pass", "totp_secret", "cookie_secret"} {

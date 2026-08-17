@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -38,6 +39,40 @@ func TestConfig_GetDefault(t *testing.T) {
 }
 
 // TestConfig_SaveAndGet 保存配置下发 Redis，再回读
+// TestConfig_SaveLargeBody 审计中间件不得截断请求体：
+// 完整配置（>2048 字节，含长黑白名单）保存应成功
+func TestConfig_SaveLargeBody(t *testing.T) {
+	db := newTestDB(t)
+	_, mgr := newTestRedis(t)
+	r := newTestRouter(t, db, mgr)
+	token := doLogin(t, r)
+
+	big := make([]string, 0, 300)
+	for i := 0; i < 300; i++ {
+		big = append(big, "10.0."+strconv.Itoa(i/256)+"."+strconv.Itoa(i%256))
+	}
+	cfg := map[string]interface{}{
+		"mode": "active",
+		"blacklist": map[string]interface{}{
+			"ips":  big,
+			"urls": []string{},
+		},
+		"whitelist": map[string]interface{}{
+			"ips":  []string{"127.0.0.1"},
+			"urls": []string{"/favicon.ico"},
+		},
+	}
+	body, _ := json.Marshal(map[string]interface{}{"config": cfg})
+	if len(body) < 2048 {
+		t.Fatalf("test body too small: %d bytes", len(body))
+	}
+	w := doReq(r, authedReq(http.MethodPut, "/api/config", token,
+		map[string]interface{}{"config": cfg}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("save large body: %d %s (body %d bytes)", w.Code, w.Body.String(), len(body))
+	}
+}
+
 func TestConfig_SaveAndGet(t *testing.T) {
 	db := newTestDB(t)
 	mr, mgr := newTestRedis(t)
