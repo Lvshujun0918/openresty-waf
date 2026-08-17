@@ -2,6 +2,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"log"
 	"os"
 	"time"
@@ -15,6 +17,30 @@ import (
 	"openresty-waf/admin/internal/model"
 	"openresty-waf/admin/internal/service"
 )
+
+// ensureJWTSecret 保证 JWT 签名密钥不可预测：
+// 显式配置了非默认密钥时直接使用；否则从数据库读取已持久化的密钥，
+// 首次启动生成随机 32 字节并存储（重启后沿用，已有会话不失效）。
+func ensureJWTSecret(cfg *config.Config, db *gorm.DB) {
+	if cfg.JWT.Secret != "" && cfg.JWT.Secret != config.DefaultJWTSecret {
+		return
+	}
+	const key = "admin_jwt_secret"
+	var row model.Setup
+	if err := db.Where("key = ?", key).First(&row).Error; err == nil && row.Value != "" {
+		cfg.JWT.Secret = row.Value
+		return
+	}
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		log.Fatalf("生成 JWT 签名密钥失败: %v", err)
+	}
+	cfg.JWT.Secret = hex.EncodeToString(buf)
+	if err := db.Create(&model.Setup{Key: key, Value: cfg.JWT.Secret}).Error; err != nil {
+		log.Fatalf("保存 JWT 签名密钥失败: %v", err)
+	}
+	log.Printf("已生成随机 JWT 签名密钥并持久化（未配置 ADMIN_JWT_SECRET）")
+}
 
 // ensureDefaultAdmin 首次启动时创建默认管理员
 // 账号 admin，密码取环境变量 ADMIN_INIT_PASSWORD，默认 admin123
@@ -76,6 +102,7 @@ func seedRules(db *gorm.DB) {
 func main() {
 	cfg := config.Load()
 	db := database.Init(cfg)
+	ensureJWTSecret(cfg, db)
 	ensureDefaultAdmin(db)
 	seedRules(db)
 

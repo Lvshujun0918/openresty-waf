@@ -265,8 +265,13 @@ func (s *AuthService) ParseToken(tokenStr string) (*Claims, error) {
 	if !ok || !token.Valid {
 		return nil, errors.New("无效 token")
 	}
-	// 会话校验：Redis 中无对应会话（被踢下线/会话过期）→ 拒绝
-	if claims.JTI != "" && s.mgr != nil {
+	// 会话校验：令牌必须携带会话 ID（jti）。强制 jti 必填——即使密钥泄露，
+	// 攻击者伪造令牌也因缺少真实会话记录而被拒；Redis 可用时校验会话存在
+	// （踢下线/会话过期 → 拒绝），Redis 未配置时退化为仅校验 jti 存在。
+	if claims.JTI == "" {
+		return nil, errors.New("令牌缺少会话 ID")
+	}
+	if s.mgr != nil {
 		if rdb := s.mgr.GetClient(); rdb != nil {
 			exists, err := rdb.Exists(s.ctx, sessionKey(claims.JTI)).Result()
 			if err == nil && exists == 0 {

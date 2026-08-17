@@ -21,7 +21,7 @@ services:
       ADMIN_ADDR: ":8232"
       ADMIN_DB_TYPE: "sqlite"
       ADMIN_DB_DSN: "/data/waf.db"
-      ADMIN_JWT_SECRET: "${ADMIN_JWT_SECRET:-openresty-waf-change-me}"
+      # 不设置 ADMIN_JWT_SECRET：首次启动自动生成随机密钥并持久化（见 main.ensureJWTSecret）
       ADMIN_INIT_PASSWORD: "${ADMIN_INIT_PASSWORD:-admin123}"
     # host 网络下把 1Panel 容器名解析到宿主回环
     extra_hosts:

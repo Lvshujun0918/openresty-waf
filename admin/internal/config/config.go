@@ -26,6 +26,10 @@ type DB struct {
 	DSN  string // sqlite 文件路径 或 mysql DSN
 }
 
+// DefaultJWTSecret 遗留的默认 JWT 签名密钥（仅用于识别未配置场景，
+// 实际运行时会被随机密钥替换，见 main.ensureJWTSecret）
+const DefaultJWTSecret = "openresty-waf-change-me"
+
 type JWT struct {
 	Secret string
 	Expire int // 过期时间（小时）
@@ -64,7 +68,7 @@ func Load() *Config {
 			DSN:  getEnv("ADMIN_DB_DSN", "waf.db"),
 		},
 		JWT: JWT{
-			Secret: getEnv("ADMIN_JWT_SECRET", "openresty-waf-change-me"),
+			Secret: getEnv("ADMIN_JWT_SECRET", ""),
 			Expire: getEnvInt("ADMIN_JWT_EXPIRE_HOURS", 24),
 		},
 		Rule: Rule{
