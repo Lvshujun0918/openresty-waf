@@ -45,7 +45,7 @@ function _M.execute(waf_ctx, action, rule, phase)
             local status = tonumber(action.status) or 403
             local cfg = get_config()
             local config = require "config"
-            local html = config.block_page(cfg, rule and rule.group)
+            local html = config.render_block_html(config.block_page(cfg, rule and rule.group), waf_ctx, rule and rule.group)
             if status == 444 then
                 -- 444：直接关闭连接（响应阶段无法关闭，仅标记清空响应体）
                 if phase == "access" then

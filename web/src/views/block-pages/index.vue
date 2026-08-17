@@ -39,14 +39,66 @@ let rawConfig: Record<string, unknown> = {};
 let seq = 0;
 
 const DEFAULT_HTML = `<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8">
-<title>访问被拒绝</title>
-<style>body{font-family:sans-serif;text-align:center;padding:80px 20px;color:#444}
-h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
-</head><body><div class="code">403</div>
-<h1>您的请求已被防火墙拦截</h1>
-<p>该请求可能包含恶意内容，如有疑问请联系网站管理员。</p>
-</body></html>`;
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>访问已被拦截</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: "PingFang SC", "Helvetica Neue", "Microsoft YaHei", Arial, sans-serif;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 20px; color: #334155;
+  }
+  .card {
+    background: #ffffff; border-radius: 16px;
+    width: 92%; max-width: 520px; padding: 48px 40px 36px;
+    text-align: center; position: relative;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+  }
+  .icon {
+    width: 76px; height: 76px; margin: 0 auto 24px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; background: #fef2f2; border: 1px solid #fecaca;
+  }
+  .icon svg { width: 42px; height: 42px; }
+  h1 { font-size: 22px; font-weight: 600; color: #0f172a; margin-bottom: 12px; }
+  .desc { font-size: 14px; color: #64748b; line-height: 1.9; margin-bottom: 26px; }
+  .meta {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 14px 18px; font-size: 13px; color: #94a3b8; text-align: left;
+    display: grid; gap: 8px; margin-bottom: 26px;
+  }
+  .meta .row { display: flex; gap: 8px; }
+  .meta .k { color: #64748b; flex-shrink: 0; min-width: 72px; }
+  .meta .v { color: #334155; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+  .footer { font-size: 12px; color: #94a3b8; }
+  .footer b { color: #64748b; font-weight: 500; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M12 3 2 20h20L12 3z" fill="#ef4444"/>
+        <path d="M13 9.5h-2V15h2V9.5zm0 7.5h-2v2h2v-2z" fill="#ffffff"/>
+      </svg>
+    </div>
+    <h1>访问已被拦截</h1>
+    <p class="desc">检测到您的请求存在恶意行为或异常特征，已由安全防火墙拦截。如有疑问请联系网站管理员。</p>
+    <div class="meta">
+      <div class="row"><span class="k">来源 IP</span><span class="v">{ip}</span></div>
+      <div class="row"><span class="k">请求地址</span><span class="v">{uri}</span></div>
+      <div class="row"><span class="k">拦截原因</span><span class="v">{group}</span></div>
+      <div class="row"><span class="k">事件编号</span><span class="v">{req_id}</span></div>
+    </div>
+    <div class="footer">Web Application Firewall 安全防护 · <b>请求已被拦截</b></div>
+  </div>
+</body>
+</html>`;
 
 const DEFAULT_GROUP_HTML = `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
@@ -142,7 +194,7 @@ async function save() {
         <h2 class="text-xl font-semibold">拦截页面</h2>
         <p class="text-sm text-[rgb(125,125,125)]">
           按命中规则分组显示不同拦截页面；未配置分组的请求使用「默认兜底页」。
-          页面支持任意 HTML（占位符 {ip} {uri} {group} 可分别展示来源 IP、请求地址、命中分组）。
+          页面支持任意 HTML，占位符 {ip} {uri} {group} {req_id} 将展示来源 IP、请求地址、命中分组与事件编号。
         </p>
       </div>
       <NSpace>

@@ -186,7 +186,7 @@ function _M.run(ruleset, phase, waf_ctx)
     if waf_ctx.score >= threshold and waf_ctx.mode ~= "detect" then
         local cfg = _M.get_active_config()
         local group = (waf_ctx.matched and waf_ctx.matched[1] and waf_ctx.matched[1].group) or ""
-        local html = config.block_page(cfg, group)
+        local html = config.render_block_html(config.block_page(cfg, group), waf_ctx, group)
         if phase == "access" then
             ngx.status = 403
             ngx.header.content_type = "text/html; charset=utf-8"

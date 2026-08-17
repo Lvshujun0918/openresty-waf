@@ -21,7 +21,19 @@ t.test("默认配置字段完整", function()
     t.eq(config.challenge.cookie_name, "waf_pass")
     t.ok(config.detection.skip_static.ext[1] == ".js")   -- 静态资源剪枝默认开启
     t.eq(config.block.status, 403)
-    t.match(config.block.html, "访问被拒绝")
+    t.match(config.block.html, "访问已被拦截")
+    t.match(config.block.html, "{req_id}")
+    t.match(config.block.html, "{group}")
+    t.ok(#config.block.pages == 0)
+    -- 占位符渲染：ip/uri/group/req_id
+    local ctx = { client_ip = "1.2.3.4", req_id = "req-abc-1",
+                  request = { uri = "/api/login" } }
+    local out = config.render_block_html("<p>{ip} {uri} {group} {req_id}</p>", ctx, "sqli")
+    t.eq(out, "<p>1.2.3.4 /api/login SQL 注入攻击 req-abc-1</p>")
+    local out2 = config.render_block_html("<p>{group}</p>", ctx, nil)
+    t.eq(out2, "<p></p>")
+    local out3 = config.render_block_html("<p>{group}</p>", nil, "crawler")
+    t.eq(out3, "<p>爬虫 / 自动化工具</p>")
     t.eq(config.log.backend, "file")
     t.eq(config.log.redis_key, "waf:event:list")
     t.eq(config.whitelist.ips[1], "127.0.0.1")

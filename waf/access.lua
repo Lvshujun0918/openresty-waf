@@ -99,9 +99,9 @@ local function block(cfg, wctx)
         pcall(capture_evidence, wctx)
     end
     local status = tonumber(cfg.block and cfg.block.status) or 403
-    -- 按命中分组选择自定义拦截页，未配置分组回退兜底默认页
+    -- 按命中分组选择自定义拦截页，未配置分组回退兜底默认页；再渲染请求占位符
     local group = (wctx and wctx.matched and wctx.matched[1] and wctx.matched[1].group) or ""
-    local html = config.block_page(cfg, group)
+    local html = config.render_block_html(config.block_page(cfg, group), wctx, group)
     ngx.status = status
     ngx.header.content_type = "text/html; charset=utf-8"
     ngx.say(html)
