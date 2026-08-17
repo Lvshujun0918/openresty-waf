@@ -324,4 +324,3 @@ func (s *AlertService) sendEmail(ch *model.AlertChannel, req NotifyRequest) erro
 	}
 	return smtp.SendMail(addr, auth, ch.SMTPFrom, []string{ch.SMTPFrom}, []byte(msg))
 }
-

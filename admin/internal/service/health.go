@@ -12,14 +12,14 @@ import (
 
 // EngineStatus 引擎在线状态（来自 Redis 心跳）
 type EngineStatus struct {
-	PID             int64  `json:"pid"`
-	EngineVersion   string `json:"engine_version"`
-	RulesetVersion  string `json:"ruleset_version"`
-	ConfigVersion   string `json:"config_version"`
-	TriggerVersion  string `json:"trigger_version"`
-	LastSeen        int64  `json:"last_seen"`
-	Online          bool   `json:"online"`
-	RuleSynced      bool   `json:"rule_synced"` // 心跳规则版本与后台已下发版本一致
+	PID            int64  `json:"pid"`
+	EngineVersion  string `json:"engine_version"`
+	RulesetVersion string `json:"ruleset_version"`
+	ConfigVersion  string `json:"config_version"`
+	TriggerVersion string `json:"trigger_version"`
+	LastSeen       int64  `json:"last_seen"`
+	Online         bool   `json:"online"`
+	RuleSynced     bool   `json:"rule_synced"` // 心跳规则版本与后台已下发版本一致
 }
 
 // RealtimePoint 实时监控秒级数据点

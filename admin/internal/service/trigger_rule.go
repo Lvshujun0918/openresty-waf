@@ -15,8 +15,8 @@ import (
 
 // TriggerRuleset 发布到 Redis 的触发规则集（引擎轮询热更新）
 type TriggerRuleset struct {
-	Version string                `json:"version"`
-	Rules   []model.TriggerRule   `json:"rules"`
+	Version string              `json:"version"`
+	Rules   []model.TriggerRule `json:"rules"`
 }
 
 // TriggerRuleService 触发规则：按条件（host/UA/请求头/IP 等 + AND/OR 组合）筛选请求，

@@ -16,10 +16,10 @@ import (
 // TrafficService 全量流量记录：消费引擎推送的 Redis 队列落库 + 分页查询 + 过期清理。
 // 与攻击事件分离：全量记录模式下引擎对每个请求上报一条（含是否命中攻击）。
 type TrafficService struct {
-	db     *gorm.DB
-	mgr    *RedisManager
-	cfg    *config.Config
-	ctx    context.Context
+	db  *gorm.DB
+	mgr *RedisManager
+	cfg *config.Config
+	ctx context.Context
 }
 
 func NewTrafficService(db *gorm.DB, mgr *RedisManager, cfg *config.Config) *TrafficService {

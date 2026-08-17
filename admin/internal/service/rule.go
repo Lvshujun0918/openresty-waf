@@ -11,8 +11,8 @@ import (
 	"gorm.io/gorm"
 
 	"openresty-waf/admin/internal/config"
-	"openresty-waf/admin/internal/ruletest"
 	"openresty-waf/admin/internal/model"
+	"openresty-waf/admin/internal/ruletest"
 )
 
 // Ruleset 下发给 Lua 引擎的规则集结构（与 waf/rule_engine 的 DSL 约定一致）
@@ -109,7 +109,9 @@ func (s *RuleService) currentParanoiaLevel() int {
 }
 
 // publishScript 原子下发规则集并自增版本号：
-//   KEYS[1]=规则集键，KEYS[2]=版本键，ARGV[1]=规则集 JSON
+//
+//	KEYS[1]=规则集键，KEYS[2]=版本键，ARGV[1]=规则集 JSON
+//
 // 先 SET 规则集再 INCR 版本，保证引擎读到新版本时规则集已就绪；
 // 返回新版本号（数字，Lua 引擎侧做单调校验）。
 const publishScript = `redis.call('SET', KEYS[1], ARGV[1]) return redis.call('INCR', KEYS[2])`

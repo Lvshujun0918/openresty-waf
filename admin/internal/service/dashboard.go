@@ -49,19 +49,19 @@ type AttackTrendPoint struct {
 // DashboardStats 仪表盘一次拉取的全部聚合数据
 type DashboardStats struct {
 	Today struct {
-		Request      int64 `json:"request"`        // 今日请求（流量表）
-		Attack       int64 `json:"attack"`         // 今日攻击（事件表）
-		Intercept24h int64 `json:"intercept_24h"`  // 近 24 小时拦截
+		Request      int64 `json:"request"`       // 今日请求（流量表）
+		Attack       int64 `json:"attack"`        // 今日攻击（事件表）
+		Intercept24h int64 `json:"intercept_24h"` // 近 24 小时拦截
 	} `json:"today"`
 	Total struct {
 		Events  int64 `json:"events"`
 		Traffic int64 `json:"traffic"`
 	} `json:"total"`
-	QPS         float64            `json:"qps"`         // 近 60s 请求+攻击 / 60
+	QPS         float64            `json:"qps"`          // 近 60s 请求+攻击 / 60
 	AttackTrend []AttackTrendPoint `json:"attack_trend"` // 近 days 天攻击趋势（事件表）
 	Groups      []GroupCount       `json:"groups"`       // 攻击类型分布
-	TopIPs      []TopIP            `json:"top_ips"`       // 攻击来源 Top 10
-	Countries   []CountryCount     `json:"countries"`     // 归属地分布 Top 8
+	TopIPs      []TopIP            `json:"top_ips"`      // 攻击来源 Top 10
+	Countries   []CountryCount     `json:"countries"`    // 归属地分布 Top 8
 }
 
 // Stats 聚合仪表盘数据
@@ -130,7 +130,7 @@ func (s *DashboardService) Stats(days int) (*DashboardStats, error) {
 	}
 
 	// —— 攻击类型分布 ——
-	if err := s.db.Raw("SELECT `group`, COUNT(*) AS count FROM events WHERE 1=1"+
+	if err := s.db.Raw("SELECT `group`, COUNT(*) AS count FROM events WHERE 1=1" +
 		" GROUP BY `group` ORDER BY count DESC").
 		Scan(&st.Groups).Error; err != nil {
 		return nil, err
@@ -139,7 +139,7 @@ func (s *DashboardService) Stats(days int) (*DashboardStats, error) {
 	// —— 攻击来源 Top 10（含归属地） ——
 	if err := s.db.Raw(`SELECT client_ip, COUNT(*) AS count,
 		MAX(country) AS country, MAX(province) AS province, MAX(city) AS city
-		FROM events WHERE 1=1`+
+		FROM events WHERE 1=1` +
 		` GROUP BY client_ip ORDER BY count DESC LIMIT 10`).
 		Scan(&st.TopIPs).Error; err != nil {
 		return nil, err
@@ -147,7 +147,7 @@ func (s *DashboardService) Stats(days int) (*DashboardStats, error) {
 
 	// —— 归属地分布 Top 8（国家维度） ——
 	if err := s.db.Raw(`SELECT country, COUNT(*) AS count FROM events
-		WHERE country IS NOT NULL AND country != ''`+
+		WHERE country IS NOT NULL AND country != ''` +
 		` GROUP BY country ORDER BY count DESC LIMIT 8`).
 		Scan(&st.Countries).Error; err != nil {
 		return nil, err

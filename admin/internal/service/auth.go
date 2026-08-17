@@ -33,7 +33,7 @@ type Claims struct {
 
 // 登录防爆破参数
 const (
-	maxLoginFailures = 5               // 连续失败次数阈值
+	maxLoginFailures = 5                // 连续失败次数阈值
 	lockoutDuration  = 15 * time.Minute // 锁定时长
 )
 

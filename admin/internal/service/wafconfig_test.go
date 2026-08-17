@@ -61,61 +61,61 @@ func TestWafConfigService_Save(t *testing.T) {
 	}
 }
 func TestWafConfigService_BanIP(t *testing.T) {
-        db := newTestDB(t)
-        _, mgr := newTestRedis(t)
-        s := NewWafConfigService(db, mgr, newTestConfig())
+	db := newTestDB(t)
+	_, mgr := newTestRedis(t)
+	s := NewWafConfigService(db, mgr, newTestConfig())
 
-        // 非法 IP 拒绝
-        if err := s.BanIP("not-an-ip", 1); err == nil {
-                t.Fatal("expected error for invalid ip")
-        }
-        // 永久封禁
-        if err := s.BanIP("1.2.3.4", 0); err != nil {
-                t.Fatalf("ban permanent: %v", err)
-        }
-        // 临时封禁
-        if err := s.BanIP("5.6.7.8", 1); err != nil {
-                t.Fatalf("ban temporary: %v", err)
-        }
+	// 非法 IP 拒绝
+	if err := s.BanIP("not-an-ip", 1); err == nil {
+		t.Fatal("expected error for invalid ip")
+	}
+	// 永久封禁
+	if err := s.BanIP("1.2.3.4", 0); err != nil {
+		t.Fatalf("ban permanent: %v", err)
+	}
+	// 临时封禁
+	if err := s.BanIP("5.6.7.8", 1); err != nil {
+		t.Fatalf("ban temporary: %v", err)
+	}
 
-        list, err := s.ListBans()
-        if err != nil {
-                t.Fatalf("list: %v", err)
-        }
-        if len(list) != 2 {
-                t.Fatalf("expected 2 bans, got %d", len(list))
-        }
-        var perm, temp *BanEntry
-        for i := range list {
-                if list[i].IP == "1.2.3.4" {
-                        perm = &list[i]
-                }
-                if list[i].IP == "5.6.7.8" {
-                        temp = &list[i]
-                }
-        }
-        if perm == nil || !perm.Permanent {
-                t.Errorf("permanent ban missing: %+v", list)
-        }
-        if temp == nil || temp.ExpiresAt == nil {
-                t.Errorf("temporary ban missing: %+v", list)
-        }
+	list, err := s.ListBans()
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("expected 2 bans, got %d", len(list))
+	}
+	var perm, temp *BanEntry
+	for i := range list {
+		if list[i].IP == "1.2.3.4" {
+			perm = &list[i]
+		}
+		if list[i].IP == "5.6.7.8" {
+			temp = &list[i]
+		}
+	}
+	if perm == nil || !perm.Permanent {
+		t.Errorf("permanent ban missing: %+v", list)
+	}
+	if temp == nil || temp.ExpiresAt == nil {
+		t.Errorf("temporary ban missing: %+v", list)
+	}
 
-        // 重复封禁去重
-        if err := s.BanIP("1.2.3.4", 2); err != nil {
-                t.Fatalf("re-ban: %v", err)
-        }
-        list, _ = s.ListBans()
-        if len(list) != 2 {
-                t.Errorf("re-ban should dedupe, got %d", len(list))
-        }
+	// 重复封禁去重
+	if err := s.BanIP("1.2.3.4", 2); err != nil {
+		t.Fatalf("re-ban: %v", err)
+	}
+	list, _ = s.ListBans()
+	if len(list) != 2 {
+		t.Errorf("re-ban should dedupe, got %d", len(list))
+	}
 
-        // 解除封禁
-        if err := s.UnbanIP("1.2.3.4"); err != nil {
-                t.Fatalf("unban: %v", err)
-        }
-        list, _ = s.ListBans()
-        if len(list) != 1 || list[0].IP != "5.6.7.8" {
-                t.Errorf("unban failed: %+v", list)
-        }
+	// 解除封禁
+	if err := s.UnbanIP("1.2.3.4"); err != nil {
+		t.Fatalf("unban: %v", err)
+	}
+	list, _ = s.ListBans()
+	if len(list) != 1 || list[0].IP != "5.6.7.8" {
+		t.Errorf("unban failed: %+v", list)
+	}
 }

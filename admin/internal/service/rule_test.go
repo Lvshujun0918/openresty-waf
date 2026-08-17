@@ -226,10 +226,10 @@ func TestRuleService_ImportExport(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 	imported, skipped, err := s.ImportRules([]model.Rule{
-		{RuleID: "dup", Operator: "REGEX", Pattern: "a"},          // 重复 → 跳过
-		{RuleID: "new1", Operator: "PM", Pattern: "x"},             // 合法 → 导入
-		{RuleID: "bad", Operator: "BOGUS", Pattern: "x"},           // 非法运算符 → 跳过
-		{RuleID: "", Operator: "REGEX", Pattern: "ok"},             // 空 ID 自动生成 → 导入
+		{RuleID: "dup", Operator: "REGEX", Pattern: "a"}, // 重复 → 跳过
+		{RuleID: "new1", Operator: "PM", Pattern: "x"},   // 合法 → 导入
+		{RuleID: "bad", Operator: "BOGUS", Pattern: "x"}, // 非法运算符 → 跳过
+		{RuleID: "", Operator: "REGEX", Pattern: "ok"},   // 空 ID 自动生成 → 导入
 	})
 	if err != nil {
 		t.Fatalf("import: %v", err)
