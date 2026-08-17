@@ -48,9 +48,9 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	{
 		api.POST("/auth/login", authHandler.Login)
 
-		// 引导相关（公开：状态/指引/组件下载）
+		// 引导相关（公开：状态/组件/脚本下载——引擎机安装无需面板凭据；
+		// guide 含 Redis 明文密码，必须登录后可见，见下方 authed 组）
 		api.GET("/setup/status", setupHandler.Status)
-		api.GET("/setup/guide", setupHandler.Guide)
 		api.GET("/setup/waf.tar.gz", setupHandler.DownloadWAF)
 		api.GET("/setup/install.sh", setupHandler.InstallScript)
 
@@ -67,6 +67,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 
 			// 引导配置（登录后）
 			authed.POST("/setup/redis", setupHandler.SaveRedis)
+			authed.GET("/setup/guide", setupHandler.Guide)
 
 			// 规则管理
 			authed.GET("/rules", ruleHandler.List)
