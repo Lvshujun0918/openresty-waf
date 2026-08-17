@@ -292,6 +292,8 @@ h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
 <h1>您的请求已被防火墙拦截</h1>
 <p>该请求可能包含恶意内容，如有疑问请联系网站管理员。</p>
 </body></html>`,
+			// 自定义拦截页面：按命中规则分组（group）显示不同 HTML；未配置分组回退上方 html 兜底
+			"pages": []map[string]interface{}{},
 		},
 		"log": map[string]interface{}{
 			// 默认走 Redis：攻击事件由后台消费展示（与 config_local 部署模式一致）；
