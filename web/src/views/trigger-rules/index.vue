@@ -12,6 +12,8 @@ import {
   NInputNumber,
   NModal,
   NPopconfirm,
+  NRadio,
+  NRadioGroup,
   NSelect,
   NSpace,
   NSwitch,
@@ -21,8 +23,10 @@ import {
 import {
   createTriggerRule,
   deleteTriggerRule,
+  fetchConfig,
   fetchTriggerRules,
   publishTriggerRules,
+  saveConfig,
   setTriggerRuleEnabled,
   updateTriggerRule
 } from '@/service/api';
@@ -30,7 +34,7 @@ import {
 const message = useMessage();
 
 const kindMeta: Record<string, { label: string; type: 'primary' | 'success' | 'warning' | 'error'; desc: string }> = {
-  challenge: { label: '人机验证', type: 'primary', desc: '命中后需先通过人机验证（JS 挑战 / 验证码）才可访问，验证模式可在此规则内单独配置' },
+  challenge: { label: '人机验证', type: 'primary', desc: '命中后需先通过人机验证（JS 挑战 / 验证码）才可访问，验证通道在上方「人机验证全局配置」统一设置' },
   exempt: { label: '豁免检测', type: 'success', desc: '命中后跳过全部规则检测，直接放行（用于可信来源 / 静态资源等）' },
   cc: { label: 'CC 限流', type: 'warning', desc: '命中后参与频率限制，超限自动封禁 IP，频率阈值与封禁时长可在此规则内单独配置' },
   block: { label: '直接拦截', type: 'error', desc: '命中后直接拦截（403），用于对特定爬虫/采集器/来源做分级封禁，detect 模式下仅记录' }
@@ -166,7 +170,7 @@ const columns = [
         return h('span', { class: 'font-mono text-xs' }, `${cfg.rate || '100/60'} · 封禁${cfg.ban_duration || 300}s`);
       }
       if (row.kind === 'challenge') {
-        return h('span', { class: 'font-mono text-xs' }, String(cfg.mode || 'basic'));
+        return h('span', { class: 'text-xs text-[rgb(125,125,125)]' }, '全局统一（见上方配置）');
       }
       return h('span', { class: 'text-xs text-[rgb(125,125,125)]' }, '-');
     }
@@ -203,8 +207,83 @@ const editingId = ref<number | null>(null);
 const form = reactive({ name: '', kind: 'challenge', match_logic: 'and', enabled: true, sort_order: 0 });
 // 规则级动作配置
 const ccConfig = reactive({ rate_count: 100, rate_seconds: 60, ban_duration: 300, dims: [] as string[] });
-const challengeMode = ref('basic');
 const conditions = ref<Cond[]>([]);
+
+// —— 人机验证全局配置（所有 challenge 规则共用同一通道）——
+const challengeCfg = reactive({
+  enabled: true,
+  mode: 'basic',
+  pow_bits: 20,
+  cookie_ttl: 300,
+  issue_limit: 20,
+  issue_window: 60,
+  cookie_secret: '',
+  captcha_id: '',
+  captcha_key: '',
+  brand_title: '',
+  brand_company: '',
+  brand_contact: ''
+});
+const chSaving = ref(false);
+
+async function loadChallengeConfig() {
+  const res = await fetchConfig();
+  const ch = (res.data?.config?.challenge as Record<string, unknown>) ?? {};
+  const captcha = (ch.captcha as Record<string, unknown>) ?? {};
+  const brand = (ch.brand as Record<string, unknown>) ?? {};
+  Object.assign(challengeCfg, {
+    enabled: ch.enabled !== false,
+    mode: String(ch.mode || 'basic'),
+    pow_bits: Number(ch.pow_bits) || 0,
+    cookie_ttl: Number(ch.cookie_ttl) || 300,
+    issue_limit: Number(ch.issue_limit) || 0,
+    issue_window: Number(ch.issue_window) || 60,
+    cookie_secret: String(ch.cookie_secret || ''),
+    captcha_id: String(captcha.id || ''),
+    captcha_key: String(captcha.key || ''),
+    brand_title: String(brand.title || ''),
+    brand_company: String(brand.company || ''),
+    brand_contact: String(brand.contact || '')
+  });
+}
+
+async function saveChallengeConfig() {
+  chSaving.value = true;
+  try {
+    const res = await fetchConfig();
+    const raw = (res.data?.config ?? {}) as Record<string, unknown>;
+    const rawCh = (raw.challenge as Record<string, unknown>) ?? {};
+    const rawCaptcha = (rawCh.captcha as Record<string, unknown>) ?? {};
+    const rawBrand = (rawCh.brand as Record<string, unknown>) ?? {};
+    const next = {
+      ...raw,
+      challenge: {
+        ...rawCh,
+        enabled: challengeCfg.enabled,
+        mode: challengeCfg.mode,
+        pow_bits: challengeCfg.pow_bits,
+        cookie_ttl: challengeCfg.cookie_ttl,
+        issue_limit: challengeCfg.issue_limit,
+        issue_window: challengeCfg.issue_window,
+        cookie_secret: challengeCfg.cookie_secret,
+        captcha: {
+          ...rawCaptcha,
+          id: challengeCfg.captcha_id,
+          key: challengeCfg.captcha_key
+        },
+        brand: {
+          title: challengeCfg.brand_title,
+          company: challengeCfg.brand_company,
+          contact: challengeCfg.brand_contact
+        }
+      }
+    };
+    await saveConfig(next);
+    message.success('人机验证全局配置已保存并下发，引擎 5 秒内热更新生效');
+  } finally {
+    chSaving.value = false;
+  }
+}
 
 function parseConfig(raw?: string): Record<string, unknown> {
   if (!raw) return {};
@@ -224,8 +303,6 @@ function applyConfig(raw?: string, kind = '') {
     ccConfig.rate_seconds = m ? Number(m[2]) : 60;
     ccConfig.ban_duration = Number(cfg.ban_duration) || 300;
     ccConfig.dims = Array.isArray(cfg.dims) ? (cfg.dims as string[]) : [];
-  } else if (kind === 'challenge') {
-    challengeMode.value = String(cfg.mode || 'basic');
   }
 }
 
@@ -238,7 +315,7 @@ function buildConfig(kind: string): string {
     });
   }
   if (kind === 'challenge') {
-    return JSON.stringify({ mode: challengeMode.value });
+    return '{}';
   }
   return '';
 }
@@ -246,8 +323,6 @@ function buildConfig(kind: string): string {
 function resetConfigDefaults(kind: string) {
   if (kind === 'cc') {
     Object.assign(ccConfig, { rate_count: 100, rate_seconds: 60, ban_duration: 300, dims: [] });
-  } else if (kind === 'challenge') {
-    challengeMode.value = 'basic';
   }
 }
 
@@ -336,6 +411,7 @@ async function save() {
 }
 
 onMounted(load);
+onMounted(loadChallengeConfig);
 </script>
 
 <template>
@@ -352,6 +428,64 @@ onMounted(load);
         <NButton type="primary" @click="openCreate">新建规则</NButton>
       </NSpace>
     </div>
+
+    <NCard :bordered="false" class="card-wrapper" title="人机验证全局配置">
+      <template #header-extra>
+        <NButton size="small" type="primary" :loading="chSaving" @click="saveChallengeConfig">保存配置</NButton>
+      </template>
+      <NForm label-placement="left" label-width="120">
+        <NFormItem label="启用">
+          <NSwitch v-model:value="challengeCfg.enabled" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">所有「人机验证」触发规则共用一个验证通道</span>
+        </NFormItem>
+        <NFormItem label="验证模式">
+          <NRadioGroup v-model:value="challengeCfg.mode">
+            <NSpace>
+              <NRadio value="basic" label="basic（JS 工作量证明）" />
+              <NRadio value="geetest" label="geetest（极验）" />
+              <NRadio value="gitee" label="gitee（Gitee 验证码）" />
+            </NSpace>
+          </NRadioGroup>
+        </NFormItem>
+        <template v-if="challengeCfg.mode !== 'basic'">
+          <NFormItem label="Captcha ID">
+            <NInput v-model:value="challengeCfg.captcha_id" class="w-80" placeholder="验证码服务商分配的 captcha_id" />
+          </NFormItem>
+          <NFormItem label="Captcha Key">
+            <NInput v-model:value="challengeCfg.captcha_key" class="w-80" type="password" show-password-on="click" placeholder="验证码服务商分配的 captcha_key" />
+          </NFormItem>
+        </template>
+        <NFormItem label="POW 难度(bit)">
+          <NInputNumber v-model:value="challengeCfg.pow_bits" :min="0" :max="28" class="w-32" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">basic 模式哈希前导零位数（0 关闭，默认 20）</span>
+        </NFormItem>
+        <NFormItem label="放行时长(s)">
+          <NInputNumber v-model:value="challengeCfg.cookie_ttl" :min="60" class="w-32" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">验证通过后 Cookie 放行时长</span>
+        </NFormItem>
+        <NFormItem label="签发限频">
+          <NSpace align="center" :wrap="true">
+            <span class="text-sm text-[rgb(125,125,125)]">每</span>
+            <NInputNumber v-model:value="challengeCfg.issue_window" :min="1" class="w-24" />
+            <span class="text-sm text-[rgb(125,125,125)]">秒最多下发</span>
+            <NInputNumber v-model:value="challengeCfg.issue_limit" :min="1" class="w-24" />
+            <span class="text-sm text-[rgb(125,125,125)]">次（超限 444）</span>
+          </NSpace>
+        </NFormItem>
+        <NFormItem label="签名密钥">
+          <NInput v-model:value="challengeCfg.cookie_secret" class="w-96" type="password" show-password-on="click" placeholder="cookie_secret（生产环境务必修改）" />
+        </NFormItem>
+        <NFormItem label="页面标题">
+          <NInput v-model:value="challengeCfg.brand_title" class="w-96" placeholder="如：XX 云安全验证（留空用默认）" />
+        </NFormItem>
+        <NFormItem label="公司/站点名">
+          <NInput v-model:value="challengeCfg.brand_company" class="w-96" placeholder="页脚展示，如：XX 科技有限公司" />
+        </NFormItem>
+        <NFormItem label="联系方式">
+          <NInput v-model:value="challengeCfg.brand_contact" class="w-96" placeholder="页脚展示，如：400-xxx-xxxx" />
+        </NFormItem>
+      </NForm>
+    </NCard>
 
     <NCard :bordered="false" class="card-wrapper">
       <template #header-extra>
@@ -420,17 +554,7 @@ onMounted(load);
           <p class="mt-1 text-xs text-[rgb(125,125,125)]">封禁仍为 IP 级；维度用于拆分计数桶，防止单 UA/脚本流量占用共享配额</p>
         </NFormItem>
 
-        <!-- 人机验证规则级配置 -->
-        <NFormItem v-if="form.kind === 'challenge'" label="验证模式">
-          <NSpace>
-            <NTag :type="challengeMode === 'basic' ? 'primary' : 'default'" bordered class="cursor-pointer" @click="challengeMode = 'basic'">
-              basic（JS/Cookie 挑战）
-            </NTag>
-            <NTag :type="challengeMode === 'geetest' ? 'primary' : 'default'" bordered class="cursor-pointer" @click="challengeMode = 'geetest'">
-              geetest（极验验证码）
-            </NTag>
-          </NSpace>
-        </NFormItem>
+        <!-- 人机验证规则（验证通道全局统一，无需规则级配置） -->
         <NFormItem label="排序">
           <NInputNumber v-model:value="form.sort_order" :min="0" />
         </NFormItem>
