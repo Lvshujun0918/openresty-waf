@@ -73,6 +73,17 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'block-pages',
+    path: '/block-pages',
+    component: 'layout.base$view.block-pages',
+    meta: {
+      title: 'block-pages',
+      i18nKey: 'route.block-pages',
+      icon: 'mdi:file-document-alert-outline',
+      order: 9.1
+    }
+  },
+  {
     name: 'bots',
     path: '/bots',
     component: 'layout.base$view.bots',

@@ -23,6 +23,7 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   alerts: () => import("@/views/alerts/index.vue"),
   "audit-logs": () => import("@/views/audit-logs/index.vue"),
   bans: () => import("@/views/bans/index.vue"),
+  "block-pages": () => import("@/views/block-pages/index.vue"),
   bots: () => import("@/views/bots/index.vue"),
   config: () => import("@/views/config/index.vue"),
   dashboard: () => import("@/views/dashboard/index.vue"),

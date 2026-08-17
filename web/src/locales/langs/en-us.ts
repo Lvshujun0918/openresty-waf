@@ -235,6 +235,7 @@ const local: App.I18n.Schema = {
     traffic: 'Traffic Logs',
     rules: 'Rules',
     'trigger-rules': 'Trigger Rules',
+    'block-pages': 'Block Pages',
     'trigger-records': 'Trigger Records',
     'ip-lists': 'Subscriptions',
     alerts: 'Alerts',

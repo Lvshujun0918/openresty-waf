@@ -231,6 +231,7 @@ const local: App.I18n.Schema = {
     traffic: '流量日志',
     rules: '规则管理',
     'trigger-rules': '触发规则',
+    'block-pages': '拦截页面',
     'trigger-records': '触发记录',
     'ip-lists': '订阅库',
     alerts: '告警通知',

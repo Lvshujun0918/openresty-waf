@@ -169,6 +169,7 @@ const routeMap: RouteMap = {
   "alerts": "/alerts",
   "audit-logs": "/audit-logs",
   "bans": "/bans",
+  "block-pages": "/block-pages",
   "bots": "/bots",
   "config": "/config",
   "dashboard": "/dashboard",
