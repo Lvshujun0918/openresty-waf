@@ -200,7 +200,25 @@ h1{font-size:36px;color:#c0392b}.code{font-size:72px;color:#eee}</style>
 <h1>您的请求已被防火墙拦截</h1>
 <p>该请求可能包含恶意内容，如有疑问请联系网站管理员。</p>
 </body></html>]],
+    -- 自定义拦截页面：按命中规则分组（group）显示不同 HTML。
+    -- pages = { { group = "crawler", name = "爬虫拦截", html = "<...>" }, ... }
+    -- 未配置分组命中的请求回退使用上方 html（兜底默认页）。
+    pages = {},
 }
+
+-- 按命中分组选择拦截页面：pages 中有该分组的自定义 HTML 则使用，
+-- 否则回退兜底默认页（cfg.block.html）。
+function _M.block_page(cfg, group)
+    local pages = cfg and cfg.block and cfg.block.pages
+    if type(pages) == "table" then
+        for _, p in ipairs(pages) do
+            if p and p.group == group and p.html and p.html ~= "" then
+                return p.html
+            end
+        end
+    end
+    return (cfg and cfg.block and cfg.block.html) or "Forbidden"
+end
 
 -- ============================================================================
 -- 日志

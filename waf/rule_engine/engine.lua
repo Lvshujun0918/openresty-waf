@@ -15,6 +15,7 @@ local operators  = require "rule_engine.operators"
 local variables  = require "rule_engine.variables"
 local transforms = require "rule_engine.transforms"
 local actions    = require "rule_engine.actions"
+local config     = require "config"
 
 -- 单条规则是否命中
 -- 说明：OpenResty 新版已移除 ngx.re.compile，正则走 ngx.re.find("joi")，
@@ -182,19 +183,21 @@ function _M.run(ruleset, phase, waf_ctx)
     local threshold = waf_ctx.score_threshold or 5
     if waf_ctx.score >= threshold and waf_ctx.mode ~= "detect" then
         local cfg = _M.get_active_config()
+        local group = (waf_ctx.matched and waf_ctx.matched[1] and waf_ctx.matched[1].group) or ""
+        local html = config.block_page(cfg, group)
         if phase == "access" then
             ngx.status = 403
             ngx.header.content_type = "text/html; charset=utf-8"
-            ngx.say(cfg.block and cfg.block.html or "Forbidden")
+            ngx.say(html)
             waf_ctx._exited = true
             ngx.exit(403)
         elseif phase == "header_filter" then
             ngx.status = 403
             ngx.header.content_type = "text/html; charset=utf-8"
             ngx.header.content_length = nil
-            waf_ctx.response_block = cfg.block and cfg.block.html or "Forbidden"
+            waf_ctx.response_block = html
         else
-            waf_ctx.response_block = cfg.block and cfg.block.html or "Forbidden"
+            waf_ctx.response_block = html
         end
         return "blocked"
     end

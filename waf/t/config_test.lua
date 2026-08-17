@@ -152,3 +152,29 @@ t.test("merge_cfg: 空数组清空名单", function()
     merge_cfg(base, overrides)
     t.eq(#base.blacklist.ips, 0, "空数组整体替换为空")
 end)
+
+t.test("block_page: 命中分组返回自定义页，否则回退兜底", function()
+    ngx_reset()
+    local cfg = {
+        block = {
+            html = "DEFAULT-PAGE",
+            pages = {
+                { group = "crawler", html = "CRAWLER-PAGE" },
+                { group = "sqli", html = "SQLI-PAGE" },
+            },
+        },
+    }
+    local config = require "config"
+    t.eq(config.block_page(cfg, "crawler"), "CRAWLER-PAGE", "命中 crawler 分组")
+    t.eq(config.block_page(cfg, "sqli"), "SQLI-PAGE", "命中 sqli 分组")
+    t.eq(config.block_page(cfg, "xss"), "DEFAULT-PAGE", "未配置分组回退兜底")
+    t.eq(config.block_page(cfg, nil), "DEFAULT-PAGE", "无分组回退兜底")
+    t.eq(config.block_page(nil, "xss"), "Forbidden", "无配置时纯兜底")
+end)
+
+t.test("block_page: 空 html 分组跳过，回退兜底", function()
+    ngx_reset()
+    local cfg = { block = { html = "DEFAULT", pages = { { group = "crawler", html = "" } } } }
+    local config = require "config"
+    t.eq(config.block_page(cfg, "crawler"), "DEFAULT", "空 html 分组不生效")
+end)
