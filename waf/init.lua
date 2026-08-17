@@ -78,9 +78,24 @@ local function publish_config()
 end
 
 -- 深合并：override 覆盖 t（表递归），返回 t
+-- 数组判断：连续整数 key（含空表）。数组字段整体替换，防止名单热更新残留旧元素。
+local function is_array(v)
+    local n = 0
+    for k in pairs(v) do
+        if type(k) ~= "number" or k < 1 or k % 1 ~= 0 then
+            return false
+        end
+        if k > n then n = k end
+    end
+    for i = 1, n do
+        if v[i] == nil then return false end
+    end
+    return true
+end
+
 local function merge_cfg(t, override)
     for k, v in pairs(override or {}) do
-        if type(v) == "table" and type(t[k]) == "table" then
+        if type(v) == "table" and type(t[k]) == "table" and not is_array(v) then
             merge_cfg(t[k], v)
         else
             t[k] = v

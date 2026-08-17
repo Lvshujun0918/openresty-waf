@@ -274,9 +274,25 @@ _M.traffic_log = {
 -- 本地覆盖配置：部署时由安装脚本生成 config_local.lua（含 Redis 连接信息），
 -- 深合并覆盖上述默认值，避免直接改动本文件。
 -- 注意：模块名用下划线（config_local），点号会被 require 解析为路径分隔。
+-- 数组判断：连续整数 key（含空表）。数组字段（名单列表等）需整体替换，
+-- 避免逐 key 递归合并导致旧元素残留/错位（热更新必须用新数组整体覆盖）。
+local function is_array(v)
+    local n = 0
+    for k in pairs(v) do
+        if type(k) ~= "number" or k < 1 or k % 1 ~= 0 then
+            return false
+        end
+        if k > n then n = k end
+    end
+    for i = 1, n do
+        if v[i] == nil then return false end
+    end
+    return true
+end
+
 local function merge_cfg(t, override)
     for k, v in pairs(override) do
-        if type(v) == "table" and type(t[k]) == "table" then
+        if type(v) == "table" and type(t[k]) == "table" and not is_array(v) then
             merge_cfg(t[k], v)
         else
             t[k] = v
