@@ -91,6 +91,8 @@ declare namespace Api {
       id: number;
       name: string;
       url: string;
+      /** 手动输入的 IP/CIDR 列表（每行一个），与 url 二选一 */
+      data?: string;
       type: 'whitelist' | 'blacklist';
       /** 订阅目标：ip（黑白名单）| fingerprint（恶意指纹库）| bot_profile（爬虫画像库） */
       target: string;

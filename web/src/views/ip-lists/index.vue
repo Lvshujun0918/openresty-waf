@@ -10,6 +10,8 @@ import {
   NInputNumber,
   NModal,
   NPopconfirm,
+  NRadio,
+  NRadioGroup,
   NSelect,
   NSpace,
   NSwitch,
@@ -83,7 +85,8 @@ async function doSync(row: Api.Waf.IpListSub) {
 // —— 表单 ——
 const editOpen = ref(false);
 const saving = ref(false);
-const form = reactive<Partial<Api.Waf.IpListSub>>({ name: '', url: '', target: 'ip', type: 'blacklist', interval_min: 60, enabled: true });
+const form = reactive<Partial<Api.Waf.IpListSub>>({ name: '', url: '', data: '', target: 'ip', type: 'blacklist', interval_min: 60, enabled: true });
+const sourceMode = ref<'url' | 'manual'>('url');
 
 function openCreate() {
   Object.assign(form, {
@@ -92,13 +95,16 @@ function openCreate() {
     url: '',
     target: activeTarget.value,
     type: 'blacklist',
+    data: '',
     interval_min: 60,
     enabled: true
   });
+  sourceMode.value = 'url';
   editOpen.value = true;
 }
 function openEdit(row: Api.Waf.IpListSub) {
   Object.assign(form, row);
+  sourceMode.value = row.data ? 'manual' : 'url';
   editOpen.value = true;
 }
 async function save() {
@@ -139,7 +145,7 @@ const columns = [
         ? h(NTag, { size: 'small', type: row.type === 'whitelist' ? 'success' : 'error', bordered: false }, { default: () => (row.type === 'whitelist' ? '白名单' : '黑名单') })
         : h('span', { class: 'text-xs text-[rgb(125,125,125)]' }, '—')
   },
-  { title: '订阅 URL', key: 'url', minWidth: 200, ellipsis: { tooltip: true } },
+  { title: '来源', key: 'url', minWidth: 200, render: (row: Api.Waf.IpListSub) => (row.data ? h('span', { class: 'text-xs' }, '手动输入 IP 列表') : h('span', { class: 'text-xs text-[rgb(125,125,125)]', style: { wordBreak: 'break-all' } }, row.url)) },
   { title: '周期(min)', key: 'interval_min', width: 90 },
   { title: '同步状态', key: 'last_status', width: 100, render: (row: Api.Waf.IpListSub) => row.last_status || '-' },
   { title: '条数', key: 'last_count', width: 70, render: (row: Api.Waf.IpListSub) => row.last_count ?? '-' },
@@ -215,8 +221,22 @@ onMounted(load);
         <NFormItem v-if="(form.target ?? activeTarget) === 'ip'" label="名单方向" required>
           <NSelect v-model:value="form.type" :options="[{ label: '黑名单（拦截）', value: 'blacklist' }, { label: '白名单（放行）', value: 'whitelist' }]" />
         </NFormItem>
-        <NFormItem label="订阅 URL" required>
+        <template v-if="(form.target ?? activeTarget) === 'ip'">
+          <NFormItem label="来源方式">
+            <NRadioGroup v-model:value="sourceMode">
+              <NRadio value="url" label="URL 订阅" />
+              <NRadio value="manual" label="手动输入" />
+            </NRadioGroup>
+          </NFormItem>
+        </template>
+        <NFormItem v-if="sourceMode === 'url'" label="订阅 URL" :required="sourceMode === 'url'">
           <NInput v-model:value="form.url" :placeholder="targetMeta[(form.target ?? activeTarget) as Target].placeholder" />
+        </NFormItem>
+        <NFormItem v-else label="IP 列表" :required="sourceMode === 'manual'">
+          <div class="w-full">
+            <NInput v-model:value="form.data" type="textarea" :rows="5" placeholder="每行一个 IP 或 CIDR，如&#10;1.2.3.4&#10;10.0.0.0/8&#10;# 注释行" />
+            <p class="mt-1 text-xs text-[rgb(125,125,125)]">保存后立即并入黑白名单下发；编辑或删除后重新同步即可更新</p>
+          </div>
         </NFormItem>
         <NFormItem label="同步周期(min)">
           <NInputNumber v-model:value="form.interval_min" :min="5" />
