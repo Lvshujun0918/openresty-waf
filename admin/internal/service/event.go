@@ -75,7 +75,7 @@ func (s *EventService) List(group, clientIP, ruleID, host, action string, page, 
 	var events []model.Event
 	if err := q.Select("id", "time", "req_id", "client_ip", "country", "province", "city",
 		"method", "host", "uri", "rule_id", "rule_ids", "`group`", "message",
-		"severity", "status", "created_at", "false_positive").
+		"severity", "status", "blocked", "created_at", "false_positive").
 		Order("id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&events).Error; err != nil {
 		return nil, 0, err
 	}
@@ -98,9 +98,9 @@ func (s *EventService) buildListQuery(group, clientIP, ruleID, host, action stri
 		q = q.Where("host LIKE ?", "%"+host+"%")
 	}
 	if action == "block" {
-		q = q.Where("status >= ?", 400)
+		q = q.Where("blocked = ?", true) // 仅 WAF 真正拦截（404 等后端状态码不算）
 	} else if action == "record" {
-		q = q.Where("status < ?", 400)
+		q = q.Where("blocked = ?", false)
 	}
 	return q
 }

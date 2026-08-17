@@ -26,6 +26,7 @@ type Event struct {
 	Message   string    `gorm:"size:255" json:"msg"` // 与 WAF 日志字段 msg 一致
 	Severity  int       `json:"severity"`
 	Status    int       `json:"status"`
+	Blocked   bool      `gorm:"index" json:"blocked"` // 是否 WAF 真正拦截（引擎 _exited 标记），后端 404 等状态码不算
 	FalsePositive bool  `gorm:"index" json:"false_positive"` // 人工标记为误报（命中率统计排除）
 	CreatedAt time.Time `json:"created_at"`
 }

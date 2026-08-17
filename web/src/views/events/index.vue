@@ -49,7 +49,7 @@ function geoText(e: Api.Waf.EventItem) {
   return [e.country, e.province, e.city].filter(Boolean).join(' ');
 }
 function isBlocked(e: Api.Waf.EventItem) {
-  return e.status >= 400;
+  return e.blocked === true;
 }
 
 async function load() {

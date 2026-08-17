@@ -88,14 +88,15 @@ func TestEventService_List(t *testing.T) {
 		t.Fatalf("page size 2 got %d", len(evs))
 	}
 
-	// action 过滤：拦截（status>=400）/ 仅记录（status<400）
-	db.Create(&model.Event{ClientIP: "9.9.9.9", Group: "sqli", Status: 403})
+	// action 过滤：拦截（仅 blocked=true，404 等后端状态码不算）/ 仅记录
+	db.Create(&model.Event{ClientIP: "9.9.9.9", Group: "sqli", Status: 403, Blocked: true})
+	db.Create(&model.Event{ClientIP: "9.9.9.10", Group: "sqli", Status: 404})
 	evs, total, _ = s.List("", "", "", "", "block", 1, 10)
 	if total != 1 || evs[0].ClientIP != "9.9.9.9" {
 		t.Fatalf("action block total=%d", total)
 	}
 	evs, total, _ = s.List("", "", "", "", "record", 1, 10)
-	if total != 3 {
+	if total != 4 {
 		t.Fatalf("action record total=%d", total)
 	}
 }

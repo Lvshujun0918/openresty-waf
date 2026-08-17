@@ -36,6 +36,8 @@ declare namespace Api {
       msg: string;
       severity: number;
       status: number;
+      /** 是否 WAF 真正拦截（404 等后端状态码不算） */
+      blocked?: boolean;
       /** JA4 TLS 指纹 */
       ja4?: string;
       /** JA4H HTTP 客户端指纹 */
