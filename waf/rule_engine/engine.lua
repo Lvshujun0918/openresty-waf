@@ -66,6 +66,7 @@ local function apply_action(waf_ctx, rule, hits)
         hits[#hits + 1] = {
             actions  = action,
             salience = tonumber(rule.salience) or 10,
+            group    = rule.group,   -- 拦截页按命中分组选择（actions.execute 的 rule 参数）
         }
     end
     local skip = tonumber(action.skip_after)
@@ -169,7 +170,8 @@ function _M.run(ruleset, phase, waf_ctx)
             end
         end
         if best then
-            local result = actions.execute(waf_ctx, best.actions, nil, phase)
+            local rule_ref = { group = best.group, actions = best.actions }
+            local result = actions.execute(waf_ctx, best.actions, rule_ref, phase)
             if result == "accepted" then
                 return "accepted"
             end
