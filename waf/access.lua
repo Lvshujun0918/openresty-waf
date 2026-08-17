@@ -206,19 +206,9 @@ local function challenge_section()
     local trigger = require "rule_engine.trigger"
     local rule = trigger.match_first("challenge", ctx)
     if not rule then return false end
-    -- 规则级验证模式（缺省用全局）：浅拷贝构造局部配置，避免修改缓存配置表
-    local rule_cfg = rule.config or {}
-    local eff_cfg = cfg
-    if rule_cfg.mode and rule_cfg.mode ~= cfg.challenge.mode then
-        eff_cfg = {}
-        for k, v in pairs(cfg) do eff_cfg[k] = v end
-        local ch_copy = {}
-        for k, v in pairs(cfg.challenge) do ch_copy[k] = v end
-        ch_copy.mode = rule_cfg.mode
-        eff_cfg.challenge = ch_copy
-    end
+    -- 验证通道全局统一（触发规则不再携带 mode，旧数据带 mode 也忽略）
     -- 未通过验证（无有效 cookie）才进入挑战
-    if not ch.check(ctx, eff_cfg, true) then
+    if not ch.check(ctx, cfg, true) then
         return true  -- 已通过验证，放行
     end
     -- 记录触发规则名 + 捕获请求证据（供「触发记录」详情）
