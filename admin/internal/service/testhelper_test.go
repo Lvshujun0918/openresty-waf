@@ -20,7 +20,8 @@ func newTestDB(t *testing.T) *gorm.DB {
 	}
 	if err := db.AutoMigrate(&model.User{}, &model.Rule{},
 		&model.Event{}, &model.Setup{}, &model.IpListSubscription{},
-		&model.TrafficLog{}, &model.PublishHistory{}); err != nil {
+		&model.TrafficLog{}, &model.PublishHistory{},
+		&model.BotProfile{}, &model.Ja4Profile{}, &model.BotFingerprint{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	return db

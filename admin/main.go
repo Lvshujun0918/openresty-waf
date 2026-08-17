@@ -168,8 +168,10 @@ func main() {
 
 	// 爬虫识别记录：定时消费 Redis 队列实时落库（每 3 秒）
 	botSvc := service.NewBotService(db, mgr, cfg)
-	botSvc.SeedProfiles()
-	service.NewJa4Service(db, mgr, cfg).SeedJa4Profiles()
+	// 内置订阅初始化（爬虫画像库 / JA4 客户端库），替代旧 seed 直接写入
+	if err := service.NewIpListService(db, mgr, cfg).EnsureBuiltinSubscriptions(); err != nil {
+		log.Printf("初始化内置订阅失败: %v", err)
+	}
 	go func() {
 		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()

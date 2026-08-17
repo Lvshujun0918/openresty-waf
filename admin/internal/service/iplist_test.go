@@ -142,3 +142,55 @@ func TestIpListService_SyncFail(t *testing.T) {
 		t.Errorf("status should record failure: %+v", updated)
 	}
 }
+
+func TestIpListService_EnsureBuiltinSubscriptions(t *testing.T) {
+	_, mgr := newTestRedis(t)
+	db := newTestDB(t)
+	s := NewIpListService(db, mgr, newTestConfig())
+
+	// 首次：创建两条内置订阅并完成首次同步
+	if err := s.EnsureBuiltinSubscriptions(); err != nil {
+		t.Fatal(err)
+	}
+	var subs []model.IpListSubscription
+	db.Find(&subs)
+	if len(subs) != 2 {
+		t.Fatalf("expected 2 builtin subs, got %d", len(subs))
+	}
+	for _, sub := range subs {
+		if !sub.Enabled {
+			t.Errorf("builtin sub %s should be enabled", sub.Name)
+		}
+		if sub.LastStatus != "ok" || sub.LastCount == 0 {
+			t.Errorf("builtin sub %s sync failed: %+v", sub.Name, sub.LastStatus)
+		}
+	}
+
+	// 画像库：内置画像已写入 BotProfile 并发布
+	var profiles []model.BotProfile
+	db.Find(&profiles)
+	if len(profiles) != 18 {
+		t.Errorf("expected 18 profiles, got %d", len(profiles))
+	}
+	// JA4 库：内置条目已写入 Ja4Profile，malware 联动恶意指纹库
+	var ja4s []model.Ja4Profile
+	db.Find(&ja4s)
+	if len(ja4s) != 30 {
+		t.Errorf("expected 30 ja4 profiles, got %d", len(ja4s))
+	}
+	var fps []model.BotFingerprint
+	db.Find(&fps)
+	if len(fps) == 0 {
+		t.Error("expected malware-linked fingerprints")
+	}
+
+	// 幂等：再次调用不重复创建
+	if err := s.EnsureBuiltinSubscriptions(); err != nil {
+		t.Fatal(err)
+	}
+	var subs2 []model.IpListSubscription
+	db.Find(&subs2)
+	if len(subs2) != 2 {
+		t.Errorf("idempotent: got %d subs", len(subs2))
+	}
+}

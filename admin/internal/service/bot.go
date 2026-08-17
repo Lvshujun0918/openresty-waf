@@ -2,9 +2,9 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -152,44 +152,6 @@ func (s *BotService) DeleteProfile(id uint) error {
 		return err
 	}
 	return s.publishProfiles()
-}
-
-// SeedProfiles 内置画像种子（引擎内置的同类画像，供后台展示与编辑）
-func (s *BotService) SeedProfiles() {
-	var count int64
-	s.db.Model(&model.BotProfile{}).Count(&count)
-	if count > 0 {
-		return
-	}
-	seeds := []model.BotProfile{
-		{Name: "Googlebot", UA: `Googlebot|Google-InspectionTool|Mediapartners-Google`, Engine: true, Enabled: true,
-			Ips: `["66.249.64.0/19","64.233.160.0/19","66.249.80.0/20","216.58.192.0/19"]`, SortOrder: 1},
-		{Name: "Bingbot", UA: `bingbot|adidxbot`, Engine: true, Enabled: true,
-			Ips: `["40.77.0.0/16","157.55.0.0/16","13.64.0.0/16","52.160.0.0/11"]`, SortOrder: 2},
-		{Name: "Baiduspider", UA: `Baiduspider`, Engine: true, Enabled: true,
-			Ips: `["220.181.108.0/24","119.63.192.0/21","123.125.68.0/24","180.76.15.0/24","116.179.32.0/19"]`, SortOrder: 3},
-		{Name: "Sogou", UA: `Sogou.*spider|Sogou web spider`, Engine: true, Enabled: true,
-			Ips: `["61.135.162.0/24","220.181.0.0/16"]`, SortOrder: 4},
-		{Name: "360Spider", UA: `360Spider|haosouSpider`, Engine: true, Enabled: true,
-			Ips: `["60.191.0.0/16","221.200.0.0/16","180.163.220.0/24"]`, SortOrder: 5},
-		{Name: "YandexBot", UA: `YandexBot|YandexImages|YaDirectFetcher`, Engine: true, Enabled: true,
-			Ips: `["77.88.0.0/18","5.255.192.0/18","213.180.192.0/19"]`, SortOrder: 6},
-		{Name: "bytespider", UA: `bytespider`, Engine: true, Enabled: true,
-			Ips: `["108.160.160.0/19","8.39.224.0/24"]`, SortOrder: 7},
-		{Name: "facebookexternalhit", UA: `facebookexternalhit|Facebot`, Engine: true, Enabled: true,
-			Ips: `["69.171.224.0/19","31.13.24.0/21"]`, SortOrder: 8},
-		{Name: "curl", UA: `^curl/`, Engine: false, Enabled: true, SortOrder: 20},
-		{Name: "python-requests", UA: `^python-requests/`, Engine: false, Enabled: true, SortOrder: 21},
-		{Name: "Go-http-client", UA: `^Go-http-client/`, Engine: false, Enabled: true, SortOrder: 22},
-		{Name: "Java/OkHttp", UA: `^Java/|OkHttp/`, Engine: false, Enabled: true, SortOrder: 23},
-		{Name: "Scrapy", UA: `Scrapy`, Engine: false, Enabled: true, SortOrder: 24},
-		{Name: "Wget", UA: `^Wget/`, Engine: false, Enabled: true, SortOrder: 25},
-		{Name: "AhrefsBot", UA: `AhrefsBot`, Engine: false, Enabled: true, SortOrder: 30},
-		{Name: "SemrushBot", UA: `SemrushBot`, Engine: false, Enabled: true, SortOrder: 31},
-		{Name: "MJ12bot", UA: `MJ12bot`, Engine: false, Enabled: true, SortOrder: 32},
-		{Name: "PetalBot", UA: `PetalBot`, Engine: false, Enabled: true, SortOrder: 33},
-	}
-	_ = s.db.Create(&seeds).Error
 }
 
 // publishProfiles 发布启用中的画像到 Redis（引擎轮询热更新）
@@ -451,7 +413,6 @@ func (s *BotService) Trend(days int) ([]BotTrendPoint, error) {
 	return out, nil
 }
 
-
 // BlacklistLog 把爬虫记录的指纹（TLS 指纹优先，HTTP 指纹兜底）一键加入恶意指纹库
 // 并下发引擎（同指纹请求后续直接拦截）
 func (s *BotService) BlacklistLog(id uint) (uint, error) {
@@ -479,7 +440,7 @@ func (s *BotService) BlacklistLog(id uint) (uint, error) {
 		desc += " (" + rec.ClientIP + ")"
 	}
 	f := model.BotFingerprint{
-		Name: "记录#" + fmt.Sprintf("%d", rec.ID) + "-" + rec.Profile,
+		Name:  "记录#" + fmt.Sprintf("%d", rec.ID) + "-" + rec.Profile,
 		Value: fp, Match: "exact", Description: desc,
 		Enabled: true,
 	}

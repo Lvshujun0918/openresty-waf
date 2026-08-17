@@ -37,68 +37,6 @@ func AcPrefix(ja4 string) string {
 	return parts[0] + "_" + c
 }
 
-// SeedJa4Profiles 内置种子（来自 FoxIO ja4plus-mapping.csv 的 ja4 条目）。
-// malware 类条目联动写入恶意指纹库（BotFingerprint，引擎精确拦截）。
-func (s *Ja4Service) SeedJa4Profiles() {
-	var count int64
-	s.db.Model(&model.Ja4Profile{}).Count(&count)
-	if count > 0 {
-		return
-	}
-	now := time.Now()
-	seeds := []struct {
-		Ja4  string
-		Name string
-		Cat  string
-	}{
-		// 恶意软件（联动恶意指纹库拦截）
-		{"t12i190700_d83cc789557e_16bbda4055b2", "Cobalt Strike v4.9.1 beacon", "malware"},
-		{"t12i210700_76e208dd3e22_16bbda4055b2", "Cobalt Strike v4.9.1 beacon", "malware"},
-		{"t12d190800_d83cc789557e_16bbda4055b2", "Cobalt Strike v4.9.1 beacon", "malware"},
-		{"t12d210800_76e208dd3e22_16bbda4055b2", "Cobalt Strike v4.9.1 beacon", "malware"},
-		{"t13d201100_2b729b4bf6f3_9e7b989ebec8", "IcedID", "malware"},
-		{"t13d190900_9dc949149365_97f8aa674fd9", "Sliver Agent", "malware"},
-		{"t13i190800_9dc949149365_97f8aa674fd9", "Sliver Agent", "malware"},
-		// 浏览器
-		{"t13d1516h2_8daaf6152771_02713d6af862", "Chromium Browser", "browser"},
-		{"t13d1517h2_8daaf6152771_b0da82dd1658", "Chromium Browser", "browser"},
-		{"t13d1517h2_8daaf6152771_b1ff8ab2d16f", "Chromium Browser", "browser"},
-		{"t13i1515h2_8daaf6152771_02713d6af862", "Chromium Browser", "browser"},
-		{"t13i1516h2_8daaf6152771_b0da82dd1658", "Chromium Browser", "browser"},
-		{"t13i1516h2_8daaf6152771_b1ff8ab2d16f", "Chromium Browser", "browser"},
-		{"t13d1715h2_5b57614c22b0_7121afd63204", "Mozilla Firefox", "browser"},
-		{"t13i1714h2_5b57614c22b0_7121afd63204", "Mozilla Firefox", "browser"},
-		{"t13d2014h2_a09f3c656075_14788d8d241b", "Safari", "browser"},
-		{"t13i2013h2_a09f3c656075_14788d8d241b", "Safari", "browser"},
-		// 工具/库
-		{"t13i181000_85036bcba153_d41ae481755e", "Python", "tool"},
-		{"t13d181000_85036bcba153_d41ae481755e", "Python", "tool"},
-		{"t13d4312h1_c7886603b240_b26ce05bbdd6", "Python", "tool"},
-		{"t13d191000_9dc949149365_e7c285222651", "GoLang net package", "tool"},
-		{"t13d1412h2_e33ad33b3d25_6b314db333b6", "GoLang webhooks", "tool"},
-		{"t12d160700_8cdfa2d4673b_18dd7303c4a5", "GoLang", "tool"},
-		{"t13d141000_cbb2034c60b8_e7c285222651", "GoLang", "tool"},
-		{"t12d190800_d83cc789557e_7af1ed941c26", "WinINET / GoLang", "tool"},
-		{"t13d880900_fcb5b95cb75a_b0d3b4ac2a14", "SoftEther VPN Client", "tool"},
-		{"t13i880900_fcb5b95cb75a_b0d3b4ac2a14", "SoftEther VPN Client", "tool"},
-		{"t12d520600_b380db6257eb_0a9c83bf8b96", "Unknown Client", "tool"},
-		{"t12d8008h1_9cedc1f1428b_046e095b7c4a", "Unknown Client", "tool"},
-		{"t12d350600_9d4c96c0953b_0a9c83bf8b96", "Unknown Client", "tool"},
-	}
-	for _, sd := range seeds {
-		p := model.Ja4Profile{
-			Ja4: sd.Ja4, AcPrefix: AcPrefix(sd.Ja4),
-			Name: sd.Name, Category: sd.Cat,
-			Description: "FoxIO ja4plus-mapping", Enabled: true, Source: "seed",
-			CreatedAt: now, UpdatedAt: now,
-		}
-		if err := s.db.Create(&p).Error; err != nil {
-			continue
-		}
-	}
-	_ = s.PublishMalware()
-}
-
 // PublishMalware 把启用中的 malware 类 Ja4Profile 同步到恶意指纹库（JA4- 前缀）并下发引擎。
 // 引擎对同 TLS 栈请求精确 403 拦截；订阅/删除时同样调用保持同步。
 func (s *Ja4Service) PublishMalware() error {
