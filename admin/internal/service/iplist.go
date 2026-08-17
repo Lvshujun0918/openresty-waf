@@ -96,7 +96,12 @@ func validateSub(sub *model.IpListSubscription) error {
 	if sub.Name == "" {
 		return errors.New("名称不能为空")
 	}
-	if !strings.HasPrefix(sub.URL, "http://") && !strings.HasPrefix(sub.URL, "https://") {
+	hasURL := strings.HasPrefix(sub.URL, "http://") || strings.HasPrefix(sub.URL, "https://")
+	hasData := strings.TrimSpace(sub.Data) != ""
+	if !hasURL && !hasData {
+		return errors.New("订阅 URL 或手动输入 IP 列表至少填一项")
+	}
+	if hasURL && !strings.HasPrefix(sub.URL, "http://") && !strings.HasPrefix(sub.URL, "https://") {
 		return errors.New("URL 必须以 http:// 或 https:// 开头")
 	}
 	if sub.Target == "" {
@@ -129,15 +134,20 @@ func (s *IpListService) Sync(id uint) (int, error) {
 }
 
 func (s *IpListService) syncSub(sub *model.IpListSubscription) (int, error) {
-	raw, err := s.fetchRaw(sub.URL)
-	now := time.Now()
-	if err != nil {
-		_ = s.db.Model(&model.IpListSubscription{}).Where("id = ?", sub.ID).Updates(map[string]interface{}{
-			"last_status":  "失败: " + err.Error(),
-			"last_sync_at": now,
-		}).Error
-		return 0, err
+	// 手动输入的 IP 列表直接使用 Data，否则拉取远程 URL
+	raw := strings.TrimSpace(sub.Data)
+	if raw == "" {
+		var ferr error
+		raw, ferr = s.fetchRaw(sub.URL)
+		if ferr != nil {
+			_ = s.db.Model(&model.IpListSubscription{}).Where("id = ?", sub.ID).Updates(map[string]interface{}{
+				"last_status":  "失败: " + ferr.Error(),
+				"last_sync_at": time.Now(),
+			}).Error
+			return 0, ferr
+		}
 	}
+	now := time.Now()
 
 	var count int
 	var syncErr error

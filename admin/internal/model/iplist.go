@@ -10,6 +10,7 @@ type IpListSubscription struct {
 	ID          uint       `gorm:"primaryKey" json:"id"`
 	Name        string     `gorm:"size:128" json:"name"`
 	URL         string     `gorm:"type:text" json:"url"`
+	Data        string     `gorm:"type:text" json:"data"` // 手动输入的 IP/CIDR 列表（每行一个），与 URL 二选一
 	Type        string     `gorm:"size:16" json:"type"` // 仅 target=ip 时使用：whitelist | blacklist
 	Target      string     `gorm:"size:16;default:ip" json:"target"` // ip | fingerprint | bot_profile
 	IntervalMin int        `gorm:"default:60" json:"interval_min"`   // 同步周期（分钟）
