@@ -266,14 +266,18 @@ else
   HOST="${REDIS_ADDR%%:*}"
   PORT="${REDIS_ADDR##*:}"
   if [ "$PORT" = "$REDIS_ADDR" ]; then PORT=6379; fi
+  case "$REDIS_DB" in
+    ''|*[!0-9]*) echo "错误：Redis 库号必须为数字: $REDIS_DB" >&2; exit 1 ;;
+  esac
+  # 长括号字符串转义：密码/主机含 ]] 会提前闭合 [[...]] 逃逸注入 Lua，替换为 ] ] 破坏闭合
+  HOST_SAFE="${HOST//]]/] ]}"
+  PASS_SAFE="nil"
   if [ -n "$REDIS_PASSWORD" ]; then
-    PASS="[[$REDIS_PASSWORD]]"
-  else
-    PASS="nil"
+    PASS_SAFE="[[${REDIS_PASSWORD//]]/] ]}]]"
   fi
   cat > "$INSTALL_DIR/config_local.lua" <<EOF
 -- 由 OpenResty WAF 接入脚本生成（深合并覆盖 config.lua）
-return { redis = { host = [[$HOST]], port = $PORT, password = $PASS, db = $REDIS_DB },
+return { redis = { host = [[$HOST_SAFE]], port = $PORT, password = $PASS_SAFE, db = $REDIS_DB },
          log = { backend = "redis", redis_key = "waf:event:list" } }
 EOF
   echo "  已生成 config_local.lua (Redis: $REDIS_ADDR db=$REDIS_DB)"
