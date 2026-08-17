@@ -77,6 +77,7 @@ local function build_event(ctx)
         msg       = primary and primary.msg,
         severity  = primary and primary.severity,
         status    = ngx.status,
+        blocked   = ctx._exited == true,   -- 是否 WAF 真正拦截（拦截响应由引擎发出），404 等后端状态码不算
         ja4       = (ctx.ja4 and ctx.ja4 ~= "" and ctx.ja4) or ctx.tls_fp or "",
         ja4h      = ctx.ja4h or "",
         country   = geo and geo.country or "",
