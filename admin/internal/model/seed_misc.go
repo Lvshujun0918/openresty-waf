@@ -29,10 +29,10 @@ var SeedRulesMisc = []Rule{
 		Operator: `REGEX`, Pattern: "[A-Za-z0-9+/=]{100,}",
 		Transforms: "[]", Vars: "[{\"type\":\"URI_ARGS\"},{\"type\":\"POST_ARGS\"},{\"type\":\"BODY\"}]",
 		Actions: "{\"chain\":true}", Status: 0, Message: `编码混淆载荷-超长 base64 形态`, SortOrder: 2200},
-	{RuleID: `65942-2`, Name: `编码混淆载荷-解码后危险内容`, Group: `obfuscation`, Phase: "access", Severity: 3, Enabled: true,
+	{RuleID: `65942-2`, Name: `编码混淆载荷-解码后危险内容`, Group: `obfuscation`, Phase: "access", Severity: 1, Enabled: true,
 		Operator: `REGEX`, Pattern: "(?i)((?:\\\\u[0-9a-fA-F]{4}){3,}|(?:\\\\x[0-9a-fA-F]{2}){3,}|\\{\\{[^}]{2,}\\}\\})",
 		Transforms: "[\"base64_decode\"]", Vars: "[{\"type\":\"URI_ARGS\"},{\"type\":\"POST_ARGS\"},{\"type\":\"BODY\"}]",
-		Actions: "{\"chain\":true,\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"编码混淆载荷：base64 解码后含 unicode/hex 转义连串或模板表达式\"}", Status: 403, Message: `编码混淆载荷-解码后危险内容`, SortOrder: 2201},
+		Actions: "{\"chain\":true,\"disrupt\":\"SCORE\",\"value\":2,\"msg\":\"编码混淆载荷：base64 解码后含 unicode/hex 转义连串或模板表达式（累积计分，需多特征叠加）\"}", Status: 200, Message: `编码混淆载荷-解码后危险内容`, SortOrder: 2201},
 	// 路径内 SQL 注入（如 /api/products/123 and 1=1/reviews）
 	{RuleID: `65943`, Name: `路径内 SQL 注入特征`, Group: `sqli`, Phase: "access", Severity: 3, Enabled: true,
 		Operator: `REGEX`, Pattern: "(?i)\\d+\\s+and\\s+\\d+\\s*=\\s*\\d+",
@@ -44,8 +44,9 @@ var SeedRulesMisc = []Rule{
 		Transforms: "[]", Vars: "[{\"type\":\"URI\"},{\"type\":\"REQUEST_URI\"}]",
 		Actions: "{\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"分号路径穿越 (..;)\"}", Status: 403, Message: `分号路径穿越 (..;)`, SortOrder: 2203},
 	// 双重编码路径遍历（.%252e / %252e%252e / %c0%ae 等原始形态；url_decode 后 .%252e 变 .%2e 字面，故直接匹配原始形态）
+	// 注意：%252f 单出现太常见（Google Analytics uafvl=Not.A%252FBrand Sec-CH-UA 标准编码、微信 pass_ticket），已移除该分支，仅保留路径穿越强特征
 	{RuleID: `65945`, Name: `双重编码路径遍历`, Group: `lfi`, Phase: "access", Severity: 3, Enabled: true,
-		Operator: `REGEX`, Pattern: "(?i)(\\.%252e|%252e%252e|%252f|%c0%ae|%c0%af)",
+		Operator: `REGEX`, Pattern: "(?i)(\\.%252e|%252e%252e|%c0%ae|%c0%af)",
 		Transforms: "[]", Vars: "[{\"type\":\"REQUEST_URI\"}]",
 		Actions: "{\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"双重编码路径遍历\"}", Status: 403, Message: `双重编码路径遍历`, SortOrder: 2204},
 }

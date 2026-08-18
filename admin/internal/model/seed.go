@@ -112,7 +112,13 @@ package model
 // v27: 65945 双重编码遍历 pattern 改为匹配原始形态（url_decode 后 .%252e 变 .%2e
 //
 //	字面导致失配），transforms 移除，覆盖 .%252e/%252e%252e/%252f/%c0%ae/%c0%af
-const SeedVersion = "27"
+//
+// v28: blazehttp 全量测试第2轮（v29，误报 5.03%）修复：65945 移除 %252f 分支
+//
+//	（Google Analytics uafvl=Not.A%252FBrand Sec-CH-UA 标准 URL 编码+微信 pass_ticket
+//	含 %252F 致 466 次误报，仅保留路径穿越强特征 .%252e/%252e%252e/%c0%ae/%c0%af）；
+//	65942-2 改 SCORE+2 弱特征（base64 解码后 \uXXXX 连串在正常序列化数据常见，116 次误报）
+const SeedVersion = "28"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
