@@ -108,7 +108,11 @@ package model
 //	(?=\s|;|\||&|$) 排除 &id=/&cat= 参数名撞命令词误报；新增编码混淆载荷链式
 //	65942（超长 base64+解码后 \uXXXX/\xXX 连串/模板表达式）、路径内 SQLi 65943、
 //	分号穿越 65944、双重编码遍历 65945；65901 补 URI_ARGS 覆盖 query 参数反序列化
-const SeedVersion = "26"
+//
+// v27: 65945 双重编码遍历 pattern 改为匹配原始形态（url_decode 后 .%252e 变 .%2e
+//
+//	字面导致失配），transforms 移除，覆盖 .%252e/%252e%252e/%252f/%c0%ae/%c0%af
+const SeedVersion = "27"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
