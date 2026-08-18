@@ -46,8 +46,32 @@ end
 -- JSON 序列化（OpenResty 自带 cjson）
 -- ============================================================================
 
+-- cjson.safe 对含函数字段的表（如 config 模块的 block_page 渲染函数）
+-- 不抛错但返回 nil → 调用方 set_shared(nil) 会触发删除语义，
+-- 导致 active_config 等含函数配置永远写不进共享内存。
+-- 这里在编码前做一次深拷贝剔除函数字段（纯数据表零开销可忽略）。
+local function sanitize(t, seen)
+    if type(t) ~= "table" then
+        return t
+    end
+    if seen[t] then
+        return seen[t]
+    end
+    local out = {}
+    seen[t] = out
+    for k, v in pairs(t) do
+        if type(k) ~= "function" and type(v) ~= "function" then
+            out[k] = sanitize(v, seen)
+        end
+    end
+    return out
+end
+
 function _M.encode(t)
     if type(t) == "string" then return t end
+    if type(t) == "table" then
+        t = sanitize(t, {})
+    end
     return cjson.encode(t)
 end
 
