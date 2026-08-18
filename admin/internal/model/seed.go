@@ -14,7 +14,15 @@ package model
 //     逆向雷池(SafeLine) libfusion2.so 内置规则库转译，覆盖 ThinkPHP/Struts2/
 //     Spring/Drupal/Dedecms/Solr/Weblogic/用友/泛微/Druid/Shiro 等历史 CVE 指纹，
 //     risk=3 默认 BLOCK，risk=1/2 默认 LOG_ONLY
-const SeedVersion = "10"
+// v10: 新增反序列化攻击检测规则（seed_deser.go，15 条）：
+//     逆向雷池 rskynet 反序列化模块提取，覆盖 Java 序列化包头 rO0AB/Class 字节码
+//     yv66vg/BCEL/反射链/OGNL/SpEL/freemarker/XStream/Jackson/JNDI/
+//     Commons-Collections gadget/.NET BinaryFormatter/fastjson @type 等攻击特征
+// v11: 新增雷池多条件漏洞指纹规则集（seed_multi.go，162 条链式 AND 规则）：
+//     每条漏洞规则多个条件（路径+请求体/方法/参数/头 组合）转链式成员，
+//     覆盖 ActiveMQ/Kafka/Solr/Exchange/WebLogic/致远/蓝凌/金蝶/用友/F5/
+//     深信服/HW2020-HW2024 系列等历史高危漏洞，risk=3 默认 BLOCK
+const SeedVersion = "12"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -24,15 +32,18 @@ var LegacySeedIDs = []string{
 }
 
 // SeedRules 内置规则种子：libinjection 语义检测 + 基础兜底 + OWASP CRS 转译规则
-// （seed_crs.go）+ CVE/HW 指纹规则（seed_cve.go）。首次启动时导入 Rule 表；
-// 导入后可在管理后台增删改，发布后热更新。
+// （seed_crs.go）+ CVE/HW 指纹规则（seed_cve.go）+ 反序列化检测（seed_deser.go）
+// + 多条件漏洞指纹链式规则（seed_multi.go）。
+// 首次启动时导入 Rule 表；导入后可在管理后台增删改，发布后热更新。
 //
 // 检测分层：
 //   1. libinjection 语义规则（SQLi/XSS 词法分析，抗编码/注释绕过，需 libinjection.so）
 //   2. OWASP CRS 转译规则（约 180 条正则/语义规则，覆盖 OWASP Top 10）
 //   3. CVE/HW 指纹规则（94 条历史漏洞指纹，逆向雷池检测引擎转译）
-//   4. 基础兜底（敏感文件泄露、扫描器 UA）
-var SeedRules = append(append(baseRules, SeedRulesCRS...), SeedRulesCVE...)
+//   4. 反序列化攻击检测（15 条 Java/.NET 反序列化 gadget 特征，逆向雷池 rskynet 模块转译）
+//   5. 多条件漏洞指纹（162 条链式 AND 规则，路径+请求体/方法/参数/头组合，逆向雷池 HW 规则库）
+//   6. 基础兜底（敏感文件泄露、扫描器 UA）
+var SeedRules = append(append(append(append(baseRules, SeedRulesCRS...), SeedRulesCVE...), SeedRulesDeser...), SeedRulesMulti...)
 
 // baseRules 基础兜底规则
 var baseRules = []Rule{
