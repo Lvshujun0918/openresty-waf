@@ -149,6 +149,19 @@ if config.stats and config.stats.enabled ~= false then
     end
 end
 
+-- crawler_only：本请求仅命中 crawler 组规则（如空 UA/爬虫指纹）。爬虫不算攻击：
+-- 不生成攻击事件，但作为爬虫记录上报（即使 bot 画像未命中，如空 UA 场景）。
+local crawler_only = false
+if ctx and ctx.matched and #ctx.matched > 0 then
+    crawler_only = true
+    for _, m in ipairs(ctx.matched) do
+        if m.group ~= "crawler" then
+            crawler_only = false
+            break
+        end
+    end
+end
+
 -- 本请求待上报的 Redis 负载（traffic + 攻击事件合并为一次 timer 推送，
 -- 攻击风暴下减少 timer 数量与 Redis 连接往返）
 local pending = {}
@@ -183,7 +196,7 @@ if traffic and traffic.enabled then
         uri           = ctx and ctx.request and ctx.request.uri or "",
         status        = ngx.status,
         user_agent    = ngx.var.http_user_agent or "",
-        attack        = ctx and ctx.matched and #ctx.matched > 0,
+        attack        = ctx and ctx.matched and #ctx.matched > 0 and not crawler_only,
         rule_ids      = table.concat(rule_ids, ","),
         response_time = ctx and ((ngx.now() - ctx.start_time) * 1000) or 0,
         country       = geo and geo.country or "",
@@ -195,8 +208,8 @@ if traffic and traffic.enabled then
 end
 
 -- ===== 爬虫识别记录（可选：识别为爬虫的请求上报一条，供后台爬虫统计页） =====
-if ctx and ctx.bot_result then
-    local bot = ctx.bot_result
+if ctx and (ctx.bot_result or crawler_only) then
+    local bot = ctx.bot_result or {}
     local geo = lookup_geo(ctx.client_ip)
     local okb, malicious_ip = pcall(function()
         return require("detectors.bot").is_malicious_ip(ctx)
@@ -233,6 +246,13 @@ end
 -- ===== 攻击事件 =====
 if not ctx or not ctx.matched or #ctx.matched == 0 then
     flush_pending()  -- 普通请求：确保 traffic / 爬虫记录已推送
+    return
+end
+
+-- 爬虫命中不算攻击：仅 crawler 组命中不生成攻击事件
+-- （爬虫记录已在上文 bot_result/crawler_only 分支上报）
+if crawler_only then
+    flush_pending()
     return
 end
 

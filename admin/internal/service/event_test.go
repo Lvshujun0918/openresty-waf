@@ -44,6 +44,33 @@ func TestEventService_Consume(t *testing.T) {
 	}
 }
 
+func TestEventService_ConsumeSkipsCrawler(t *testing.T) {
+	mr, mgr := newTestRedis(t)
+	db := newTestDB(t)
+	s := NewEventService(db, mgr, newTestConfig())
+
+	mr.Lpush("waf:event:list",
+		`{"time":"2026-01-01T00:00:00Z","client_ip":"1.2.3.4","group":"crawler","rule_id":"28002","msg":"x"}`)
+	mr.Lpush("waf:event:list",
+		`{"time":"2026-01-01T00:00:00Z","client_ip":"5.6.7.8","group":"sqli","rule_id":"1","msg":"y"}`)
+
+	n, err := s.Consume(10)
+	if err != nil {
+		t.Fatalf("consume: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("expected 1 consumed (crawler skipped), got %d", n)
+	}
+	var evs []model.Event
+	db.Find(&evs)
+	if len(evs) != 1 {
+		t.Fatalf("expected 1 event in db, got %d", len(evs))
+	}
+	if evs[0].Group != "sqli" {
+		t.Errorf("expected only sqli event, got %+v", evs[0])
+	}
+}
+
 func TestEventService_List(t *testing.T) {
 	// 空列表
 	db := newTestDB(t)

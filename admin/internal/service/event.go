@@ -53,6 +53,11 @@ func (s *EventService) Consume(limit int) (int, error) {
 		if ev.Time.IsZero() {
 			ev.Time = time.Now()
 		}
+		// 爬虫命中不算攻击：丢弃 crawler 组事件（引擎新版本已不上报，
+		// 此处防御旧引擎/历史队列残留数据）
+		if ev.Group == "crawler" {
+			continue
+		}
 		events = append(events, ev)
 	}
 	if len(events) > 0 {
