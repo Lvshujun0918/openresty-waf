@@ -6,10 +6,10 @@ package model
 
 // SeedRulesCRS OWASP CRS 转译的内置规则种子
 var SeedRulesCRS = []Rule{
-	{RuleID: `913100`, Name: `Found User-Agent associated with security scanner`, Group: `scanner`, Phase: "access", Severity: 3, Enabled: true,
-		Operator: `PM`, Pattern: `arachni|betabot|bewica-security-scan|BFAC|commix|Detectify|dirbuster|fimap|fuzz faster|whatwaf|gobuster|havij|hexometer|jbrofuzz|jorgee|libwhisker|masscan|morfeus|Mozlila|Mozilla/5.g|nessus|netlab360|netsparker|nettacker|nikto|nmap|nuclei|openvas|securityagent|sitelockspider|sqlmap|sysscan|TsunamiSecurityScanner|w3af.org|webbandit|webshag|wfuzz|whatweb|wprecon|wpscan|feroxbuster|l9explore|l9tcpid|wapiti|vega|appspider|ironwasp|skipfish|qualysguard|n-stalker|acunetix|cmsmap|sqlninja|xsstrike|xsser|joomscan|droopescan|zgrab|Ghauri|zmeu|WPProbe|SSTIMap|Mozilla/4.0 (Hydra)|tplmap|DotDotPwn|shortscan|Kadimus|LFISuite|Mozilla/5.0 (compatible; Panoptic|LFImap|graphw00f|graphql-cop|jSQL|noseyparker|TruffleHog|YesWeHack-Hunter|TInjA|Mozilla/5.0 (compatible; AppScan;`,
+	{RuleID: `913100`, Name: `Found User-Agent associated with security scanner`, Group: `scanner`, Phase: "access", Severity: 1, Enabled: true,
+		Operator: `PM`, Pattern: `arachni|betabot|bewica-security-scan|BFAC|commix|Detectify|dirbuster|fimap|fuzz faster|whatwaf|gobuster|havij|hexometer|jbrofuzz|jorgee|libwhisker|masscan|morfeus|nessus|netlab360|netsparker|nettacker|nikto|nmap|nuclei|openvas|securityagent|sitelockspider|sqlmap|sysscan|TsunamiSecurityScanner|w3af.org|webbandit|webshag|wfuzz|whatweb|wprecon|wpscan|feroxbuster|l9explore|l9tcpid|wapiti|vega|appspider|ironwasp|skipfish|qualysguard|n-stalker|acunetix|cmsmap|sqlninja|xsstrike|xsser|joomscan|droopescan|zgrab|Ghauri|zmeu|WPProbe|SSTIMap|tplmap|DotDotPwn|shortscan|Kadimus|LFISuite|LFImap|graphw00f|graphql-cop|jSQL|noseyparker|TruffleHog|YesWeHack-Hunter|TInjA|Panoptic|AppScan|Hydra`,
 		Transforms: "[]", Vars: "[{\"type\":\"HEADERS\",\"specific\":\"User-Agent\"}]",
-		Actions: "{\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"Found User-Agent associated with security scanner\"}", Status: 403, Message: `Found User-Agent associated with security scanner`, SortOrder: 0},
+		Actions: "{\"disrupt\":\"SCORE\",\"value\":2,\"msg\":\"Found User-Agent associated with security scanner（扫描器UA特征，累积计分，需多特征叠加）\"}", Status: 200, Message: `Found User-Agent associated with security scanner`, SortOrder: 0},
 	{RuleID: `920210`, Name: `Multiple/Conflicting Connection Header Data Found`, Group: `protocol`, Phase: "access", Severity: 2, Enabled: true,
 		Operator: `REGEX`, Pattern: `\b(?:keep-alive|close),\s?(?:keep-alive|close)\b`,
 		Transforms: "[]", Vars: "[{\"type\":\"HEADERS\",\"specific\":\"Connection\"}]",

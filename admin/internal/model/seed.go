@@ -30,7 +30,14 @@ package model
 // v14: 新增 SCORE 弱特征评分规则集（seed_score.go，19 条）：
 //     逆向雷池 SQLChop 评分制（线性分类器+阈值分级 1.5/3.0）落地为弱特征累加评分，
 //     单特征命中 +1 分（LOG 可见），累计达到 score_warn(3) 告警、score_threshold(5) 阻断
-const SeedVersion = "17"
+// v15: 932350 等 10 条 PL3 RCE 规则改 SCORE 弱特征 + RuleParanoiaLevel 按官方 paranoia 过滤
+// v16: 930130/930121 敏感文件访问改 SCORE+2，10001 移除 .sql/.zip/.log 后缀（blazehttp 实测误报修复）
+// v17: 19 条高误报 CRS 规则改 SCORE+2（921150/921210/921220/931131/932236/941150/942100/
+//     942120/942180/942190/942330/942360/942361/942362/942421/942460/942511/942520/942530），
+//     blazehttp 实测正常遥测流量被单条宽正则直接拦截，改为弱特征累积计分
+// v18: 913100 扫描器 UA 检测改 SCORE+2 并移除 Mozilla/5.g/Mozlila 等模糊子串
+//     （PM 子串匹配导致所有 Mozilla/5.x 浏览器 UA 误命中）
+const SeedVersion = "18"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
