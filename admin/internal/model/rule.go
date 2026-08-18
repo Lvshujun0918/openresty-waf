@@ -8,7 +8,7 @@ import (
 // RuleParanoiaLevel 返回 CRS 规则所属偏执级别（1-4）。
 // 非 CRS / 用户自定义规则返回 1（始终在最低档位参与检测）。
 // 高档位规则：SQL 注入启发式（认证绕过探测 / classic probings / 特殊字符异常）、
-// XSS 混淆/编码类——误报高，仅在用户调高档位时启用。
+// XSS 混淆/编码类、RCE 无参命令检测——误报高，仅在用户调高档位时启用。
 func RuleParanoiaLevel(ruleID string) int {
 	id, err := strconv.Atoi(ruleID)
 	if err != nil {
@@ -22,6 +22,12 @@ func RuleParanoiaLevel(ruleID string) int {
 		return 2
 	case id >= 941350 && id <= 941399:
 		return 2
+	// RCE 高误报规则（官方 CRS paranoia-level/3）：无参命令直接执行类——
+	// 裸命令名（id/ls/whoami 等）即可命中，默认不启用，调高到 PL3 时才参与检测
+	case id == 932190 || id == 932232 || id == 932237 || id == 932238 ||
+		id == 932290 || id == 932301 || id == 932311 || id == 932321 ||
+		id == 932331 || id == 932350:
+		return 3
 	default:
 		return 1
 	}
