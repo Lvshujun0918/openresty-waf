@@ -37,7 +37,10 @@ package model
 //     blazehttp 实测正常遥测流量被单条宽正则直接拦截，改为弱特征累积计分
 // v18: 913100 扫描器 UA 检测改 SCORE+2 并移除 Mozilla/5.g/Mozlila 等模糊子串
 //     （PM 子串匹配导致所有 Mozilla/5.x 浏览器 UA 误命中）
-const SeedVersion = "18"
+// v19: 5 条高误报 CRS 规则改 SCORE+2（941330/941340 IE XSS Filters 宽正则、
+//     932239 UA/Referer 命令注入宽正则、942400 and 数字比较、942300 MySQL 注释/条件），
+//     blazehttp 实测 bilibili/微信上报等正常流量误报修复
+const SeedVersion = "19"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
