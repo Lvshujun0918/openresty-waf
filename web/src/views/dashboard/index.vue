@@ -36,7 +36,8 @@ const groupMeta: Record<string, { label: string; color: string }> = {
   upload: { label: '文件上传', color: '#fb923c' },
   fingerprint: { label: '指纹识别', color: '#94a3b8' },
   trigger: { label: '触发规则', color: '#84cc16' },
-  deser: { label: '反序列化', color: '#7c3aed' }
+  deser: { label: '反序列化', color: '#7c3aed' },
+  webshell: { label: 'Webshell', color: '#be185d' }
 };
 
 const modeMeta: Record<string, { label: string; type: 'success' | 'warning' | 'default' }> = {

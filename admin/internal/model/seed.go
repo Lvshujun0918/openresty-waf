@@ -24,7 +24,10 @@ package model
 //     深信服/HW2020-HW2024 系列等历史高危漏洞，risk=3 默认 BLOCK
 // v12: 新增杂项补充规则（seed_misc.go，4 条）：Log4j JNDI 注入/Python 危险函数/
 //     Java 代码注入通用防御/路径穿越编码绕过，逆向雷池内嵌检测模块提取
-const SeedVersion = "13"
+// v13: 新增加密 Webshell 流量特征规则（seed_webshell.go，4 条）：
+//     逆向雷池 webshell 检测模块（解密后语义检测）提炼为高置信流量指纹，
+//     覆盖冰蝎 3.x AES 流量特征/哥斯拉 PHP 马/罕见脚本后缀
+const SeedVersion = "14"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -35,7 +38,8 @@ var LegacySeedIDs = []string{
 
 // SeedRules 内置规则种子：libinjection 语义检测 + 基础兜底 + OWASP CRS 转译规则
 // （seed_crs.go）+ CVE/HW 指纹规则（seed_cve.go）+ 反序列化检测（seed_deser.go）
-// + 多条件漏洞指纹链式规则（seed_multi.go）。
+// + 多条件漏洞指纹链式规则（seed_multi.go）+ 杂项补充（seed_misc.go）
+// + 加密 Webshell 流量特征（seed_webshell.go）。
 // 首次启动时导入 Rule 表；导入后可在管理后台增删改，发布后热更新。
 //
 // 检测分层：
@@ -44,8 +48,10 @@ var LegacySeedIDs = []string{
 //   3. CVE/HW 指纹规则（94 条历史漏洞指纹，逆向雷池检测引擎转译）
 //   4. 反序列化攻击检测（15 条 Java/.NET 反序列化 gadget 特征，逆向雷池 rskynet 模块转译）
 //   5. 多条件漏洞指纹（162 条链式 AND 规则，路径+请求体/方法/参数/头组合，逆向雷池 HW 规则库）
-//   6. 基础兜底（敏感文件泄露、扫描器 UA）
-var SeedRules = append(append(append(append(append(baseRules, SeedRulesCRS...), SeedRulesCVE...), SeedRulesDeser...), SeedRulesMulti...), SeedRulesMisc...)
+//   6. 杂项补充（Log4j JNDI/Python 危险函数/Java 注入/路径穿越编码绕过）
+//   7. 加密 Webshell 流量特征（冰蝎 3.x/哥斯拉/罕见脚本后缀）
+//   8. 基础兜底（敏感文件泄露、扫描器 UA）
+var SeedRules = append(append(append(append(append(append(baseRules, SeedRulesCRS...), SeedRulesCVE...), SeedRulesDeser...), SeedRulesMulti...), SeedRulesMisc...), SeedRulesWebshell...)
 
 // baseRules 基础兜底规则
 var baseRules = []Rule{

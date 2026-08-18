@@ -57,7 +57,8 @@ const groupMeta: Record<string, string> = {
   trigger: '触发规则',
   upload: '文件上传',
   fingerprint: '指纹识别',
-  deser: '反序列化'
+  deser: '反序列化',
+  webshell: 'Webshell'
 };
 const phaseMeta: Record<string, string> = {
   access: '请求阶段',
