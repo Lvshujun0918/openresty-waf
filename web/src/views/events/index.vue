@@ -396,6 +396,50 @@ onMounted(loadLogConfig);
       <NButton secondary @click="doExport">导出 CSV</NButton>
     </div>
 
+        <!-- 日志配置 -->
+    <NCard :bordered="false" class="card-wrapper" title="日志配置">
+      <NForm label-placement="left" label-width="140">
+        <NFormItem label="攻击日志">
+          <NSwitch v-model:value="logCfg.enabled" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">关闭后引擎不再产生攻击事件</span>
+        </NFormItem>
+        <NFormItem label="后端">
+          <NRadioGroup v-model:value="logCfg.backend">
+            <NSpace>
+              <NRadio value="redis" label="Redis（后台消费展示，推荐）" />
+              <NRadio value="file" label="本地文件" />
+            </NSpace>
+          </NRadioGroup>
+        </NFormItem>
+        <NFormItem v-if="logCfg.backend === 'file'" label="文件目录">
+          <NInput v-model:value="logCfg.dir" class="w-80" placeholder="/var/log/waf" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">按天分文件 waf_YYYYMMDD.log</span>
+        </NFormItem>
+        <NFormItem v-if="logCfg.backend === 'redis'" label="事件队列键">
+          <NInput v-model:value="logCfg.redis_key" class="w-80" placeholder="waf:event:list" />
+        </NFormItem>
+        <NFormItem label="格式">
+          <NRadioGroup v-model:value="logCfg.format">
+            <NSpace>
+              <NRadio value="json" label="JSON" />
+              <NRadio value="plain" label="纯文本" />
+            </NSpace>
+          </NRadioGroup>
+        </NFormItem>
+        <NFormItem label="级别">
+          <NSelect
+            v-model:value="logCfg.level"
+            :options="['debug', 'info', 'warn', 'error'].map(v => ({ label: v, value: v }))"
+            class="w-32"
+          />
+        </NFormItem>
+        <NFormItem label=" ">
+          <NButton type="primary" :loading="logSaving" @click="saveLogConfig">保存日志配置</NButton>
+        </NFormItem>
+      </NForm>
+    </NCard>
+
+
     <NCard :bordered="false" class="card-wrapper">
       <NForm inline label-placement="left" :show-feedback="false">
         <NFormItem label="攻击类型">
@@ -440,48 +484,6 @@ onMounted(loadLogConfig);
       </div>
     </NCard>
 
-    <!-- 日志配置 -->
-    <NCard :bordered="false" class="card-wrapper" title="日志配置">
-      <NForm label-placement="left" label-width="140">
-        <NFormItem label="攻击日志">
-          <NSwitch v-model:value="logCfg.enabled" />
-          <span class="text-xs text-[rgb(125,125,125)] ml-2">关闭后引擎不再产生攻击事件</span>
-        </NFormItem>
-        <NFormItem label="后端">
-          <NRadioGroup v-model:value="logCfg.backend">
-            <NSpace>
-              <NRadio value="redis" label="Redis（后台消费展示，推荐）" />
-              <NRadio value="file" label="本地文件" />
-            </NSpace>
-          </NRadioGroup>
-        </NFormItem>
-        <NFormItem v-if="logCfg.backend === 'file'" label="文件目录">
-          <NInput v-model:value="logCfg.dir" class="w-80" placeholder="/var/log/waf" />
-          <span class="text-xs text-[rgb(125,125,125)] ml-2">按天分文件 waf_YYYYMMDD.log</span>
-        </NFormItem>
-        <NFormItem v-if="logCfg.backend === 'redis'" label="事件队列键">
-          <NInput v-model:value="logCfg.redis_key" class="w-80" placeholder="waf:event:list" />
-        </NFormItem>
-        <NFormItem label="格式">
-          <NRadioGroup v-model:value="logCfg.format">
-            <NSpace>
-              <NRadio value="json" label="JSON" />
-              <NRadio value="plain" label="纯文本" />
-            </NSpace>
-          </NRadioGroup>
-        </NFormItem>
-        <NFormItem label="级别">
-          <NSelect
-            v-model:value="logCfg.level"
-            :options="['debug', 'info', 'warn', 'error'].map(v => ({ label: v, value: v }))"
-            class="w-32"
-          />
-        </NFormItem>
-        <NFormItem label=" ">
-          <NButton type="primary" :loading="logSaving" @click="saveLogConfig">保存日志配置</NButton>
-        </NFormItem>
-      </NForm>
-    </NCard>
 
     <!-- 事件详情弹窗 -->
     <NModal
