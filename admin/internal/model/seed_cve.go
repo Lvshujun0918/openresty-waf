@@ -331,7 +331,7 @@ var SeedRulesCVE = []Rule{
 		Transforms: `[]`, Vars: `[{"type":"POST_ARGS","parse":["keys"]}]`,
 		Actions: `{"disrupt":"BLOCK","status":403,"msg":"CVE 指纹：mongodb nosql 注入-form"}`, Status: 403, Message: "CVE 指纹：mongodb nosql 注入-form", SortOrder: 1079},
 	{RuleID: "65707", Name: "Drupal Mail 命令注入", Group: "cve", Phase: "access", Severity: 3, Enabled: true,
-		Operator: `REGEX`, Pattern: `\s*-`,
+		Operator: `REGEX`, Pattern: `^\s*-`,
 		Transforms: `[]`, Vars: `[{"type":"POST_ARGS","specific":"site_mail"}]`,
 		Actions: `{"disrupt":"BLOCK","status":403,"msg":"CVE 指纹：Drupal Mail 命令注入"}`, Status: 403, Message: "CVE 指纹：Drupal Mail 命令注入", SortOrder: 1080},
 	{RuleID: "65621", Name: "[HW2021] GoAhead Server 环境变量注入漏洞(CVE-2021-42342)", Group: "cve", Phase: "access", Severity: 3, Enabled: true,

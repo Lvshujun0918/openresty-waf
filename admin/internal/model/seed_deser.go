@@ -3,7 +3,9 @@ package model
 
 // SeedRulesDeser 反序列化攻击检测规则（逆向 libfusion2.so rskynet 反序列化模块提取）
 // 覆盖：Java 原生序列化/class 字节码/BCEL/反射链/OGNL/SpEL/freemarker/XStream/Jackson/JNDI/
-//       Commons-Collections gadget/.NET BinaryFormatter/fastjson @type 等已知反序列化攻击特征
+//
+//	Commons-Collections gadget/.NET BinaryFormatter/fastjson @type 等已知反序列化攻击特征
+//
 // 默认 BLOCK 403，可在后台改为 LOG_ONLY
 var SeedRulesDeser = []Rule{
 	{RuleID: "65900", Name: "Java 反序列化 gadget 链特征", Group: "deser", Phase: "access", Severity: 3, Enabled: true,
@@ -12,7 +14,7 @@ var SeedRulesDeser = []Rule{
 		Actions: `{"disrupt":"BLOCK","status":403,"msg":"反序列化：Java 反序列化 gadget 链特征（YsoSerial/内存马/命令执行）"}`, Status: 403, Message: "反序列化：Java 反序列化 gadget 链特征（YsoSerial/内存马/命令执行）", SortOrder: 2000},
 	{RuleID: "65901", Name: "Java 序列化数据包头特征", Group: "deser", Phase: "access", Severity: 3, Enabled: true,
 		Operator: `REGEX`, Pattern: `(?i)^rO0AB[a-zA-Z0-9\/+ ]{30,}`,
-		Transforms: `[]`, Vars: `[{"type":"BODY"},{"type":"POST_ARGS"},{"type":"COOKIE"}]`,
+		Transforms: `[]`, Vars: `[{"type":"BODY"},{"type":"POST_ARGS"},{"type":"URI_ARGS"},{"type":"COOKIE"}]`,
 		Actions: `{"disrupt":"BLOCK","status":403,"msg":"反序列化：Java 原生序列化数据（rO0AB 头）疑似反序列化攻击"}`, Status: 403, Message: "反序列化：Java 原生序列化数据（rO0AB 头）疑似反序列化攻击", SortOrder: 2001},
 	{RuleID: "65902", Name: "Java Class 字节码特征", Group: "deser", Phase: "access", Severity: 3, Enabled: true,
 		Operator: `REGEX`, Pattern: `(?i)^yv66vgAAAD[a-zA-Z0-9\/+ ]{40,}`,
