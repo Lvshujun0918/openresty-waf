@@ -4,7 +4,9 @@ package model
 // SeedRulesCVE 雷池(SafeLine) 检测引擎内置 CVE/HW 指纹规则转译（逆向 libfusion2.so 规则库提取）
 // 来源：safeline-detector:9.4.0 libfusion2.so 内嵌 rules 库（374 条 HW 规则中的高价值单条件部分）
 // 映射：decoded_path→URI、decoded_query/query→URI_ARGS、request_body→BODY、form→POST_ARGS、
-//       custom_header/cookie/user_agent/xff/referer/host/content_type→HEADERS/COOKIE 对应变量
+//
+//	custom_header/cookie/user_agent/xff/referer/host/content_type→HEADERS/COOKIE 对应变量
+//
 // 双字段规则：key 精确→specific 取指定参数；key 为正则→parse=["keys"] 同时收集键名以匹配键名特征
 // 等级：risk=3 默认 BLOCK 403；risk=1/2 默认 LOG_ONLY（后台可改 BLOCK）
 var SeedRulesCVE = []Rule{
@@ -300,10 +302,10 @@ var SeedRulesCVE = []Rule{
 		Operator: `REGEX`, Pattern: `(?i)\.php#`,
 		Transforms: `[]`, Vars: `[{"type":"POST_ARGS","specific":"info[content]"}]`,
 		Actions: `{"disrupt":"BLOCK","status":403,"msg":"CVE 指纹：PHPCMS v9.6.0 任意文件上传"}`, Status: 403, Message: "CVE 指纹：PHPCMS v9.6.0 任意文件上传", SortOrder: 1072},
-	{RuleID: "65665", Name: "Spring 框架漏洞", Group: "cve", Phase: "access", Severity: 3, Enabled: true,
+	{RuleID: "65665", Name: "Spring 框架漏洞", Group: "cve", Phase: "access", Severity: 1, Enabled: true,
 		Operator: `REGEX`, Pattern: `T\(`,
 		Transforms: `[]`, Vars: `[{"type":"POST_ARGS","parse":["keys"]}]`,
-		Actions: `{"disrupt":"BLOCK","status":403,"msg":"CVE 指纹：Spring 框架漏洞"}`, Status: 403, Message: "CVE 指纹：Spring 框架漏洞", SortOrder: 1073},
+		Actions: `{"disrupt":"SCORE","value":2,"msg":"CVE 指纹：Spring 框架漏洞（累积计分，需多特征叠加）"}`, Status: 200, Message: "CVE 指纹：Spring 框架漏洞", SortOrder: 1073},
 	{RuleID: "65594", Name: "ThinkPHP 5.0.x _method 代码注入", Group: "cve", Phase: "access", Severity: 3, Enabled: true,
 		Operator: `REGEX`, Pattern: `^__construct$`,
 		Transforms: `[]`, Vars: `[{"type":"POST_ARGS","specific":"_method"}]`,

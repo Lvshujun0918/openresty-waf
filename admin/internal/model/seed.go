@@ -7,50 +7,88 @@ package model
 // v5: 新增协议异常规则 25003-25006（方法字符集/Content-Length/编码与控制字符）
 // v6: 新增响应泄露检测规则 26001/26002（默认 LOG_ONLY 监控，可改 BLOCK）
 // v7: 新增协议计数 25007/25008、HPP 27001/27002、API 安全 27010-27012、
-//     编码混淆 27013、DLP 26010-26014、爬虫/客户端指纹 28001-28004
+//
+//	编码混淆 27013、DLP 26010-26014、爬虫/客户端指纹 28001-28004
+//
 // v8: 修复 921170 误报（原 pattern=. 匹配所有参数键）：改为链式规则，
-//     仅 GET/HEAD 且请求体存在时记录
+//
+//	仅 GET/HEAD 且请求体存在时记录
+//
 // v9: 新增 CVE/HW 指纹规则集（seed_cve.go，94 条）：
-//     逆向雷池(SafeLine) libfusion2.so 内置规则库转译，覆盖 ThinkPHP/Struts2/
-//     Spring/Drupal/Dedecms/Solr/Weblogic/用友/泛微/Druid/Shiro 等历史 CVE 指纹，
-//     risk=3 默认 BLOCK，risk=1/2 默认 LOG_ONLY
+//
+//	逆向雷池(SafeLine) libfusion2.so 内置规则库转译，覆盖 ThinkPHP/Struts2/
+//	Spring/Drupal/Dedecms/Solr/Weblogic/用友/泛微/Druid/Shiro 等历史 CVE 指纹，
+//	risk=3 默认 BLOCK，risk=1/2 默认 LOG_ONLY
+//
 // v10: 新增反序列化攻击检测规则（seed_deser.go，15 条）：
-//     逆向雷池 rskynet 反序列化模块提取，覆盖 Java 序列化包头 rO0AB/Class 字节码
-//     yv66vg/BCEL/反射链/OGNL/SpEL/freemarker/XStream/Jackson/JNDI/
-//     Commons-Collections gadget/.NET BinaryFormatter/fastjson @type 等攻击特征
+//
+//	逆向雷池 rskynet 反序列化模块提取，覆盖 Java 序列化包头 rO0AB/Class 字节码
+//	yv66vg/BCEL/反射链/OGNL/SpEL/freemarker/XStream/Jackson/JNDI/
+//	Commons-Collections gadget/.NET BinaryFormatter/fastjson @type 等攻击特征
+//
 // v11: 新增雷池多条件漏洞指纹规则集（seed_multi.go，162 条链式 AND 规则）：
-//     每条漏洞规则多个条件（路径+请求体/方法/参数/头 组合）转链式成员，
-//     覆盖 ActiveMQ/Kafka/Solr/Exchange/WebLogic/致远/蓝凌/金蝶/用友/F5/
-//     深信服/HW2020-HW2024 系列等历史高危漏洞，risk=3 默认 BLOCK
+//
+//	每条漏洞规则多个条件（路径+请求体/方法/参数/头 组合）转链式成员，
+//	覆盖 ActiveMQ/Kafka/Solr/Exchange/WebLogic/致远/蓝凌/金蝶/用友/F5/
+//	深信服/HW2020-HW2024 系列等历史高危漏洞，risk=3 默认 BLOCK
+//
 // v12: 新增杂项补充规则（seed_misc.go，4 条）：Log4j JNDI 注入/Python 危险函数/
-//     Java 代码注入通用防御/路径穿越编码绕过，逆向雷池内嵌检测模块提取
+//
+//	Java 代码注入通用防御/路径穿越编码绕过，逆向雷池内嵌检测模块提取
+//
 // v13: 新增加密 Webshell 流量特征规则（seed_webshell.go，4 条）：
-//     逆向雷池 webshell 检测模块（解密后语义检测）提炼为高置信流量指纹，
-//     覆盖冰蝎 3.x AES 流量特征/哥斯拉 PHP 马/罕见脚本后缀
+//
+//	逆向雷池 webshell 检测模块（解密后语义检测）提炼为高置信流量指纹，
+//	覆盖冰蝎 3.x AES 流量特征/哥斯拉 PHP 马/罕见脚本后缀
+//
 // v14: 新增 SCORE 弱特征评分规则集（seed_score.go，19 条）：
-//     逆向雷池 SQLChop 评分制（线性分类器+阈值分级 1.5/3.0）落地为弱特征累加评分，
-//     单特征命中 +1 分（LOG 可见），累计达到 score_warn(3) 告警、score_threshold(5) 阻断
+//
+//	逆向雷池 SQLChop 评分制（线性分类器+阈值分级 1.5/3.0）落地为弱特征累加评分，
+//	单特征命中 +1 分（LOG 可见），累计达到 score_warn(3) 告警、score_threshold(5) 阻断
+//
 // v15: 932350 等 10 条 PL3 RCE 规则改 SCORE 弱特征 + RuleParanoiaLevel 按官方 paranoia 过滤
 // v16: 930130/930121 敏感文件访问改 SCORE+2，10001 移除 .sql/.zip/.log 后缀（blazehttp 实测误报修复）
 // v17: 19 条高误报 CRS 规则改 SCORE+2（921150/921210/921220/931131/932236/941150/942100/
-//     942120/942180/942190/942330/942360/942361/942362/942421/942460/942511/942520/942530），
-//     blazehttp 实测正常遥测流量被单条宽正则直接拦截，改为弱特征累积计分
+//
+//	942120/942180/942190/942330/942360/942361/942362/942421/942460/942511/942520/942530），
+//	blazehttp 实测正常遥测流量被单条宽正则直接拦截，改为弱特征累积计分
+//
 // v18: 913100 扫描器 UA 检测改 SCORE+2 并移除 Mozilla/5.g/Mozlila 等模糊子串
-//     （PM 子串匹配导致所有 Mozilla/5.x 浏览器 UA 误命中）
+//
+//	（PM 子串匹配导致所有 Mozilla/5.x 浏览器 UA 误命中）
+//
 // v19: 5 条高误报 CRS 规则改 SCORE+2（941330/941340 IE XSS Filters 宽正则、
-//     932239 UA/Referer 命令注入宽正则、942400 and 数字比较、942300 MySQL 注释/条件），
-//     blazehttp 实测 bilibili/微信上报等正常流量误报修复
+//
+//	932239 UA/Referer 命令注入宽正则、942400 and 数字比较、942300 MySQL 注释/条件），
+//	blazehttp 实测 bilibili/微信上报等正常流量误报修复
+//
 // v20: 920460 异常转义字符/942550 JSON-Based SQLi 改 SCORE+2（宽正则对正常
-//     遥测/JSON 请求体误报）；score_warn 3→5、score_threshold 5→8 降低 SCORE 叠加误报
+//
+//	遥测/JSON 请求体误报）；score_warn 3→5、score_threshold 5→8 降低 SCORE 叠加误报
+//
 // v21: 25009 路径反斜杠/双重编码拦截码 400→403（blazehttp 判定基准统一）；
-//     27013 base64 载荷改 SCORE+2（base64 解码后正常参数误判）
+//
+//	27013 base64 载荷改 SCORE+2（base64 解码后正常参数误判）
+//
 // v22: 全部 SCORE 弱特征规则 value 2→1（30 条：seed_crs.go 29 条 + 27013），
-//     942230 条件 SQL 注入改 SCORE+1（blazehttp 实测正常请求同时命中 4-8 条 +2
-//     规则轻易叠加到阈值 8 误报，降为 +1 需 8 条同时命中才阻断）
+//
+//	942230 条件 SQL 注入改 SCORE+1（blazehttp 实测正常请求同时命中 4-8 条 +2
+//	规则轻易叠加到阈值 8 误报，降为 +1 需 8 条同时命中才阻断）
+//
 // v23: 942260 SQL 认证绕过/932281 brace expansion 改 SCORE+1（blazehttp 实测
-//     英文句子 "select a few items from" 与 JSON body 花括号内逗号误报）；
-//     score_threshold 8→10（URL 编码 JSON 遥测体仍可同时命中 8 条 +1 规则）
-const SeedVersion = "23"
+//
+//	英文句子 "select a few items from" 与 JSON body 花括号内逗号误报）；
+//	score_threshold 8→10（URL 编码 JSON 遥测体仍可同时命中 8 条 +1 规则）
+//
+// v24: blazehttp 实测第 5 轮误报修复：libinjection XSS 三规则（940002/941100/
+//
+//	941101）改 SCORE+2（英文纯文本 content 参数与 JS 错误上报被 XSS 语义
+//	误判）；65665 Spring T( 宽泛匹配 protobuf body、942270 union.*?select.*?from
+//	跨词匹配英文句子（"The union leaders select their representatives from..."）、
+//	932235 RCE 匹配参数值内 =passwd 均改 SCORE+2；新增 65941 命令序列强特征
+//	BLOCK 规则（分隔符+命令词）替代 932235 拦截 ";whoami" 类攻击；
+//	940001 libinjection SQLi 保留 BLOCK（核心语义检测，JS 错误上报误判 1/138 可接受）
+const SeedVersion = "24"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -66,15 +104,15 @@ var LegacySeedIDs = []string{
 // 首次启动时导入 Rule 表；导入后可在管理后台增删改，发布后热更新。
 //
 // 检测分层：
-//   1. libinjection 语义规则（SQLi/XSS 词法分析，抗编码/注释绕过，需 libinjection.so）
-//   2. OWASP CRS 转译规则（约 180 条正则/语义规则，覆盖 OWASP Top 10）
-//   3. CVE/HW 指纹规则（94 条历史漏洞指纹，逆向雷池检测引擎转译）
-//   4. 反序列化攻击检测（15 条 Java/.NET 反序列化 gadget 特征，逆向雷池 rskynet 模块转译）
-//   5. 多条件漏洞指纹（162 条链式 AND 规则，路径+请求体/方法/参数/头组合，逆向雷池 HW 规则库）
-//   6. 杂项补充（Log4j JNDI/Python 危险函数/Java 注入/路径穿越编码绕过）
-//   7. 加密 Webshell 流量特征（冰蝎 3.x/哥斯拉/罕见脚本后缀）
-//   8. SCORE 弱特征评分（19 条弱特征累加评分，参考雷池 SQLChop 阈值分级思想）
-//   9. 基础兜底（敏感文件泄露、扫描器 UA）
+//  1. libinjection 语义规则（SQLi/XSS 词法分析，抗编码/注释绕过，需 libinjection.so）
+//  2. OWASP CRS 转译规则（约 180 条正则/语义规则，覆盖 OWASP Top 10）
+//  3. CVE/HW 指纹规则（94 条历史漏洞指纹，逆向雷池检测引擎转译）
+//  4. 反序列化攻击检测（15 条 Java/.NET 反序列化 gadget 特征，逆向雷池 rskynet 模块转译）
+//  5. 多条件漏洞指纹（162 条链式 AND 规则，路径+请求体/方法/参数/头组合，逆向雷池 HW 规则库）
+//  6. 杂项补充（Log4j JNDI/Python 危险函数/Java 注入/路径穿越编码绕过）
+//  7. 加密 Webshell 流量特征（冰蝎 3.x/哥斯拉/罕见脚本后缀）
+//  8. SCORE 弱特征评分（19 条弱特征累加评分，参考雷池 SQLChop 阈值分级思想）
+//  9. 基础兜底（敏感文件泄露、扫描器 UA）
 var SeedRules = append(append(append(append(append(append(append(baseRules, SeedRulesCRS...), SeedRulesCVE...), SeedRulesDeser...), SeedRulesMulti...), SeedRulesMisc...), SeedRulesWebshell...), SeedRulesScore...)
 
 // baseRules 基础兜底规则
@@ -84,10 +122,10 @@ var baseRules = []Rule{
 		Operator: "LIBINJECTION_SQLI", Pattern: "",
 		Transforms: `[]`, Vars: `[{"type":"URI_ARGS"},{"type":"POST_ARGS"},{"type":"BODY"}]`,
 		Actions: `{"disrupt":"BLOCK","status":403,"msg":"SQL 注入语义检测"}`, Status: 403, Message: "SQL 注入语义检测", SortOrder: 1},
-	{RuleID: "940002", Name: "XSS 语义检测", Group: "xss", Phase: "access", Severity: 3, Enabled: true,
+	{RuleID: "940002", Name: "XSS 语义检测", Group: "xss", Phase: "access", Severity: 1, Enabled: true,
 		Operator: "LIBINJECTION_XSS", Pattern: "",
 		Transforms: `[]`, Vars: `[{"type":"URI_ARGS"},{"type":"POST_ARGS"},{"type":"BODY"}]`,
-		Actions: `{"disrupt":"BLOCK","status":403,"msg":"XSS 语义检测"}`, Status: 403, Message: "XSS 语义检测", SortOrder: 2},
+		Actions: `{"disrupt":"SCORE","value":2,"msg":"XSS 语义检测（累积计分，需多特征叠加）"}`, Status: 200, Message: "XSS 语义检测", SortOrder: 2},
 
 	// ---- 基础兜底（非注入类，CRS 请求侧覆盖较弱） ----
 	{RuleID: "10001", Name: "敏感文件泄露拦截", Group: "leak", Phase: "access", Severity: 2, Enabled: true,
