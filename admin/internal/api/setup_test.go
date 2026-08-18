@@ -43,8 +43,13 @@ func TestSetup_SaveRedisAndGuide(t *testing.T) {
 	r := newTestRouter(t, db, mgr)
 	token := doLogin(t, r)
 
-	// 未配置时 guide → 400
+	// 未登录访问 guide → 401（guide 含 Redis 明文密码，必须登录可见）
 	w := doReq(r, httptest.NewRequest(http.MethodGet, "/api/setup/guide", nil))
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("guide unauth: %d", w.Code)
+	}
+	// 已登录但未配置 Redis → 400
+	w = doReq(r, authedReq(http.MethodGet, "/api/setup/guide", token, nil))
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("guide pre: %d", w.Code)
 	}
@@ -75,7 +80,7 @@ func TestSetup_SaveRedisAndGuide(t *testing.T) {
 	}
 
 	// 指引 200 且含安装命令与下载地址
-	w = doReq(r, httptest.NewRequest(http.MethodGet, "/api/setup/guide", nil))
+	w = doReq(r, authedReq(http.MethodGet, "/api/setup/guide", token, nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("guide: %d", w.Code)
 	}

@@ -32,7 +32,11 @@ func newTestDB(t *testing.T) *gorm.DB {
 	}
 	if err := db.AutoMigrate(&model.User{}, &model.Rule{},
 		&model.Event{}, &model.Setup{}, &model.IpListSubscription{},
-		&model.TrafficLog{}); err != nil {
+		&model.TrafficLog{}, &model.ChallengeLog{}, &model.TriggerRule{},
+		&model.CcLog{}, &model.PublishHistory{},
+		&model.AlertChannel{}, &model.AlertRule{}, &model.AuditLog{},
+		&model.BotProfile{}, &model.BotFingerprint{}, &model.BotLog{},
+		&model.Ja4Profile{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(testAdminPass), bcrypt.MinCost)
