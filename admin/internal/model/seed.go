@@ -116,9 +116,12 @@ package model
 // v28: blazehttp 全量测试第2轮（v29，误报 5.03%）修复：65945 移除 %252f 分支
 //
 //	（Google Analytics uafvl=Not.A%252FBrand Sec-CH-UA 标准 URL 编码+微信 pass_ticket
-//	含 %252F 致 466 次误报，仅保留路径穿越强特征 .%252e/%252e%252e/%c0%ae/%c0%af）；
-//	65942-2 改 SCORE+2 弱特征（base64 解码后 \uXXXX 连串在正常序列化数据常见，116 次误报）
-const SeedVersion = "28"
+//	含 %252F 致 466 次误报，仅保留路径穿越强特征 .%252e/%252e%252e/%c0%ae/%c0%af）
+//
+// v29: 65942-2 恢复 BLOCK（v28 曾降级 SCORE 致 53 个编码混淆恶意样本漏报——DVWA
+//
+//	hex 转义 XSS 与 base64 混淆载荷均靠其拦截；实际误报仅 ~6 个，恢复后检出率回升）
+const SeedVersion = "29"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
