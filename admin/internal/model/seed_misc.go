@@ -21,7 +21,7 @@ var SeedRulesMisc = []Rule{
 		Transforms: "[]", Vars: "[{\"type\":\"URI\"},{\"type\":\"REQUEST_URI\"}]",
 		Actions: "{\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"路径穿越编码绕过 (Struts2/WebLogic)\"}", Status: 403, Message: `路径穿越编码绕过 (Struts2/WebLogic)`, SortOrder: 2100},
 	{RuleID: `65941`, Name: `命令序列直接执行 (分隔符+命令词)`, Group: `rce`, Phase: "access", Severity: 3, Enabled: true,
-		Operator: `REGEX`, Pattern: "(?i)(?:^|[;&|`\n\r])\\s*(?:whoami|id|cat|ls|pwd|uname|ifconfig|netstat|wget|curl|nc|bash|sh|python|perl|php|rm|mv|cp|chmod|chown|kill|pkill|systemctl|service|apt|yum|base64|xxd)\\b",
+		Operator: `REGEX`, Pattern: "(?i)(?:[;&|`\n\r])\\s*(?:whoami|id|cat|ls|pwd|uname|ifconfig|netstat|wget|curl|nc|bash|sh|python|perl|php|rm|mv|cp|chmod|chown|kill|pkill|systemctl|service|apt|yum|base64|xxd)\\b",
 		Transforms: "[]", Vars: "[{\"type\":\"URI_ARGS\"},{\"type\":\"POST_ARGS\"},{\"type\":\"BODY\"}]",
 		Actions: "{\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"命令序列直接执行 (分隔符+命令词)\"}", Status: 403, Message: `命令序列直接执行 (分隔符+命令词)`, SortOrder: 2101},
 }

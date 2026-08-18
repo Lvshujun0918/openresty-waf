@@ -88,7 +88,14 @@ package model
 //	932235 RCE 匹配参数值内 =passwd 均改 SCORE+2；新增 65941 命令序列强特征
 //	BLOCK 规则（分隔符+命令词）替代 932235 拦截 ";whoami" 类攻击；
 //	940001 libinjection SQLi 保留 BLOCK（核心语义检测，JS 错误上报误判 1/138 可接受）
-const SeedVersion = "24"
+// v25: blazehttp 实测第 6 轮误报修复：941160/941320 XSS HTML 注入宽正则改
+//	SCORE+2（正常文本讨论 "<script ...>" 误判，真实 XSS 攻击由 libinjection
+//	语义 940002/941100/941101 叠加计分拦截）；942270 分值 2→1 与其他弱特征一致
+//	（英文句子跨词命中 union select from）；65941 去掉 ^ 锚点只保留分隔符前缀
+//	（参数值以 php/sh 等命令词开头误报，如 tag=php、area=sh）；删除 seed_crs.go
+//	重复的 CRS 版 940002（与 seed.go baseRules 940002 重复入库，BLOCK 版残留导致
+//	XSS 语义检测绕过 SCORE 机制直接拦截）
+const SeedVersion = "25"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
