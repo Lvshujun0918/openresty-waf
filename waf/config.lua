@@ -275,6 +275,11 @@ local group_names = {
     upload      = "非法文件上传",
     fingerprint = "设备指纹异常",
     response    = "响应内容异常",
+    cve         = "CVE 漏洞攻击",
+    hpp         = "参数污染攻击",
+    api         = "API 安全风险",
+    obfuscation = "编码混淆绕过",
+    dlp         = "敏感数据泄露",
 }
 
 -- 按命中分组选择拦截页面：pages 中有该分组的自定义 HTML 则使用，

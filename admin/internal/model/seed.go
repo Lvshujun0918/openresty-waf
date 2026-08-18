@@ -10,7 +10,11 @@ package model
 //     编码混淆 27013、DLP 26010-26014、爬虫/客户端指纹 28001-28004
 // v8: 修复 921170 误报（原 pattern=. 匹配所有参数键）：改为链式规则，
 //     仅 GET/HEAD 且请求体存在时记录
-const SeedVersion = "9"
+// v9: 新增 CVE/HW 指纹规则集（seed_cve.go，94 条）：
+//     逆向雷池(SafeLine) libfusion2.so 内置规则库转译，覆盖 ThinkPHP/Struts2/
+//     Spring/Drupal/Dedecms/Solr/Weblogic/用友/泛微/Druid/Shiro 等历史 CVE 指纹，
+//     risk=3 默认 BLOCK，risk=1/2 默认 LOG_ONLY
+const SeedVersion = "10"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -20,13 +24,15 @@ var LegacySeedIDs = []string{
 }
 
 // SeedRules 内置规则种子：libinjection 语义检测 + 基础兜底 + OWASP CRS 转译规则
-// （seed_crs.go）。首次启动时导入 Rule 表；导入后可在管理后台增删改，发布后热更新。
+// （seed_crs.go）+ CVE/HW 指纹规则（seed_cve.go）。首次启动时导入 Rule 表；
+// 导入后可在管理后台增删改，发布后热更新。
 //
 // 检测分层：
 //   1. libinjection 语义规则（SQLi/XSS 词法分析，抗编码/注释绕过，需 libinjection.so）
 //   2. OWASP CRS 转译规则（约 180 条正则/语义规则，覆盖 OWASP Top 10）
-//   3. 基础兜底（敏感文件泄露、扫描器 UA）
-var SeedRules = append(baseRules, SeedRulesCRS...)
+//   3. CVE/HW 指纹规则（94 条历史漏洞指纹，逆向雷池检测引擎转译）
+//   4. 基础兜底（敏感文件泄露、扫描器 UA）
+var SeedRules = append(append(baseRules, SeedRulesCRS...), SeedRulesCVE...)
 
 // baseRules 基础兜底规则
 var baseRules = []Rule{
