@@ -11,7 +11,6 @@
 
 local config  = require "config"
 local storage = require "storage"
-local builtin = require "ruleset.builtin"
 
 local _M = {}
 
@@ -27,7 +26,7 @@ local function log(level, msg)
 end
 
 -- 版本号合法性：必须是纯数字（后台 INCR 生成）且严格大于当前版本。
--- 当前版本为内置集（builtin-x.y.z，非数字）时接受首个数字版本。
+-- 当前版本为空（规则集未就绪，非数字）时接受首个数字版本。
 -- 拒绝非法/回退版本：防 Redis 版本键被误写导致规则降级或旧版本回放。
 function _M.version_newer(current, incoming)
     local iv = tonumber(incoming)
@@ -113,7 +112,7 @@ local function refresh_rules()
         return
     end
     if not version then
-        return  -- Redis 中尚无规则，保持内置集
+        return  -- Redis 中尚无规则，保持空规则集（access 阶段 fail-closed 拦截）
     end
 
     local current = storage.get_shared(config.dict.rules, VERSION_KEY)
@@ -320,7 +319,7 @@ local function refresh_from_redis(premature)
     refresh_bot_profiles()
 end
 
--- init 阶段：加载配置与内置规则
+-- init 阶段：加载配置（规则集完全由 Redis 下发，此处不加载任何内置规则）
 function _M.init()
     publish_config()
 
@@ -330,20 +329,18 @@ function _M.init()
         ip_region.init()
     end)
 
-    local ok, err = storage.set_shared(config.dict.rules, RULES_KEY,
-                                      storage.encode(builtin))
-    if not ok then
-        log(ngx.ERR, "加载内置规则集失败: " .. tostring(err))
-        return
-    end
-    storage.set_shared(config.dict.rules, VERSION_KEY, builtin.version)
+    -- 初始空规则集：Redis 尚未下发规则时引擎无可执行规则，
+    -- access 阶段检测到空规则集即 fail-closed 拦截（无规则 = 无保护）。
+    storage.set_shared(config.dict.rules, RULES_KEY,
+                       storage.encode({ version = "", rules = {} }))
+    storage.set_shared(config.dict.rules, VERSION_KEY, "")
 
     -- 初始空触发规则集（后台发布后热更新覆盖）
     storage.set_shared(config.dict.rules, TRIGGER_RULES_KEY,
                        storage.encode({ version = "", rules = {} }))
     storage.set_shared(config.dict.rules, TRIGGER_VERSION_KEY, "")
 
-    log(ngx.INFO, "WAF 初始化完成，内置规则集: " .. tostring(builtin.version))
+    log(ngx.INFO, "WAF 初始化完成（规则集待 Redis 下发）")
 end
 
 -- init_worker 阶段：启动规则热更新轮询 + 心跳 + 实时统计聚合

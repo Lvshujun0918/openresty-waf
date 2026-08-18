@@ -230,6 +230,8 @@ local ruleset_cache = { version = false, value = nil }
 local config_cache  = { version = false, value = nil }
 
 -- 读取当前生效规则集（共享内存，按版本号缓存）
+-- 规则集未就绪（Redis 尚未下发 / 初始化空集）时返回空规则集，
+-- 由 access 层按 fail-closed 语义处理，杜绝 nil 索引报错。
 function _M.get_ruleset()
     local config = require "config"
     local storage = require "storage"
@@ -239,6 +241,9 @@ function _M.get_ruleset()
     end
     local body = storage.get_shared(config.dict.rules, "active_ruleset")
     local ruleset = storage.decode(body)
+    if type(ruleset) ~= "table" or type(ruleset.rules) ~= "table" then
+        ruleset = { version = "", rules = {} }
+    end
     ruleset_cache.version = version
     ruleset_cache.value = ruleset
     return ruleset

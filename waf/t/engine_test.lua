@@ -340,6 +340,29 @@ t.test("get_ruleset: 版本未变返回缓存，版本变化重新解码", funct
     t.eq(#c.rules, 1)
 end)
 
+-- 规则集未就绪（shared dict 无 active_ruleset / 数据非法）：
+-- 返回空规则集供 access 层 fail-closed，杜绝 nil 索引报错
+t.test("get_ruleset: 无 active_ruleset 返回空规则集", function()
+    ngx_reset()
+    local storage = require "storage"
+    storage.set_shared("waf_rule", "ruleset_version", nil)
+    storage.set_shared("waf_rule", "active_ruleset", nil)
+    local rs = engine.get_ruleset()
+    t.notnil(rs)
+    t.eq(#rs.rules, 0)
+    t.eq(rs.version, "")
+    -- get_phase_rules 不抛错且返回空列表
+    local pr = engine.get_phase_rules("access")
+    t.notnil(pr)
+    t.eq(#pr, 0)
+    -- 非法数据同样回退空规则集
+    storage.set_shared("waf_rule", "ruleset_version", "bad")
+    storage.set_shared("waf_rule", "active_ruleset", "not-json")
+    local rs2 = engine.get_ruleset()
+    t.notnil(rs2)
+    t.eq(#rs2.rules, 0)
+end)
+
 t.test("get_active_config: 版本未变返回缓存，无下发配置回退默认", function()
     ngx_reset()
     local storage = require "storage"

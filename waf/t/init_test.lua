@@ -10,8 +10,8 @@ t.test("version_newer: 数字版本严格递增", function()
     t.no(init.version_newer("5", "3"))
 end)
 
-t.test("version_newer: 当前为内置集（非数字）时接受首个数字版本", function()
-    t.ok(init.version_newer("builtin-0.6.0", "1"))
+t.test("version_newer: 当前为空（规则集未就绪）时接受首个数字版本", function()
+    t.ok(init.version_newer(nil, "1"))
     t.ok(init.version_newer("", "1"))
 end)
 

@@ -376,6 +376,21 @@ local function protection_flow()
 
     -- 2. 规则引擎（URL / Args / Cookie / Header / Body 等规则；按 phase 预过滤复用）
     local phase_rules = engine.get_phase_rules("access")
+    if not phase_rules or #phase_rules == 0 then
+        -- 规则集为空（Redis 未下发 / 初始化空集 / 加载失败）：
+        -- fail-closed 拦截——无规则即无保护，不允许裸奔放行。
+        -- 与 fail-open 的"运行异常放行"不同，这是状态缺失的保守策略。
+        ngx.log(ngx.ERR, "[waf] 规则集为空（Redis 未下发规则），fail-closed 拦截: "
+            .. tostring(ngx.var.request_uri))
+        if ctx.mode == "active" then
+            ctx.matched[#ctx.matched + 1] = {
+                id = "RULES-EMPTY", group = "trigger", severity = 3,
+                msg = "规则集为空，fail-closed 拦截（请检查后台规则发布状态）",
+            }
+            block(cfg, ctx)
+        end
+        return
+    end
     if phase_rules and #phase_rules > 0 then
         -- 豁免：URL/UA 白名单命中 或 exclude_paths 前缀 或 命中 exempt 触发规则
         -- （host/UA/请求头/IP 条件）时跳过规则检测
