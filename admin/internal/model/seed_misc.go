@@ -43,9 +43,9 @@ var SeedRulesMisc = []Rule{
 		Operator: `REGEX`, Pattern: "\\.\\.;",
 		Transforms: "[]", Vars: "[{\"type\":\"URI\"},{\"type\":\"REQUEST_URI\"}]",
 		Actions: "{\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"分号路径穿越 (..;)\"}", Status: 403, Message: `分号路径穿越 (..;)`, SortOrder: 2203},
-	// 双重编码路径遍历（.%252e / %252e%252e 等，url_decode 一次后仍含 %XX）
+	// 双重编码路径遍历（.%252e / %252e%252e / %c0%ae 等原始形态；url_decode 后 .%252e 变 .%2e 字面，故直接匹配原始形态）
 	{RuleID: `65945`, Name: `双重编码路径遍历`, Group: `lfi`, Phase: "access", Severity: 3, Enabled: true,
-		Operator: `REGEX`, Pattern: "(?i)(\\.%252e|%252e%252e|%25c0%25ae|%c0%ae|%252f|%c0%af)",
-		Transforms: "[\"url_decode\"]", Vars: "[{\"type\":\"REQUEST_URI\"}]",
+		Operator: `REGEX`, Pattern: "(?i)(\\.%252e|%252e%252e|%252f|%c0%ae|%c0%af)",
+		Transforms: "[]", Vars: "[{\"type\":\"REQUEST_URI\"}]",
 		Actions: "{\"disrupt\":\"BLOCK\",\"status\":403,\"msg\":\"双重编码路径遍历\"}", Status: 403, Message: `双重编码路径遍历`, SortOrder: 2204},
 }
