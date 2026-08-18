@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import { NButton, NCard, NForm, NFormItem, NInput, NInputNumber, NRadio, NRadioGroup, NSelect, NSpace, NSwitch, NTag } from 'naive-ui';
+import { NButton, NCard, NForm, NFormItem, NInput, NInputNumber, NRadio, NRadioGroup, NSpace, NSwitch, NTag } from 'naive-ui';
 import { fetchConfig, fetchConfigVersions, saveConfig } from '@/service/api';
 
 const saving = ref(false);
@@ -9,11 +9,8 @@ const versions = ref({ engine_version: '', rule_version: '', config_version: '' 
 const cfg = reactive({
   mode: 'active',
   detection: { exclude_paths: [] as string[], geo: true, paranoia_level: 1, watchdog_ms: 10, response_body_buffer: 8192 },
-  log: { enabled: true, backend: 'redis', dir: '/var/log/waf', format: 'json', level: 'info', redis_key: 'waf:event:list' },
   upload: { enabled: true, spooled_scan_bytes: 524288 },
-  block: { status: 403 },
   cc: { rate_count: 100, rate_seconds: 60, ban_duration: 300 },
-  traffic_log: { enabled: false, retention_days: 7 },
   auto_ban: { enabled: true, threshold: 10, window: 60, duration: 600 }
 });
 const excludeText = ref('');
@@ -23,7 +20,6 @@ const trustedText = ref('');
 const ipHeaderText = ref('');
 const uploadExtText = ref('');
 const uploadMimeText = ref('');
-const blockHtmlText = ref('');
 // 证据脱敏 / 响应安全头
 const maskEnabled = ref(true);
 const maskFieldsText = ref('');
@@ -55,8 +51,6 @@ async function load() {
   const skip = (det.skip_static as Record<string, unknown>) ?? {};
   const log = (rawConfig.log as Record<string, unknown>) ?? {};
   const cc = (rawConfig.cc as Record<string, unknown>) ?? {};
-  const block = (rawConfig.block as Record<string, unknown>) ?? {};
-  const tl = (rawConfig.traffic_log as Record<string, unknown>) ?? {};
   const ab = (rawConfig.auto_ban as Record<string, unknown>) ?? {};
   const rate = parseRate(cc.rate);
   Object.assign(cfg, {
@@ -68,29 +62,14 @@ async function load() {
       watchdog_ms: Number(det.watchdog_ms) || 0,
       response_body_buffer: Number(det.response_body_buffer) || 8192
     },
-    log: {
-      enabled: log.enabled !== false,
-      backend: log.backend || 'redis',
-      dir: String(log.dir || '/var/log/waf'),
-      format: String(log.format || 'json'),
-      level: String(log.level || 'info'),
-      redis_key: String(log.redis_key || 'waf:event:list')
-    },
     upload: {
       enabled: ((rawConfig.upload as Record<string, unknown>) ?? {}).enabled !== false,
       spooled_scan_bytes: Number(((rawConfig.upload as Record<string, unknown>) ?? {}).spooled_scan_bytes) || 524288
-    },
-    block: {
-      status: Number(block.status) || 403
     },
     cc: {
       rate_count: rate.count,
       rate_seconds: rate.seconds,
       ban_duration: Number(cc.ban_duration) || 300
-    },
-    traffic_log: {
-      enabled: tl.enabled === true,
-      retention_days: Number(tl.retention_days) || 7
     },
     auto_ban: {
       enabled: ab.enabled !== false,
@@ -118,7 +97,6 @@ async function load() {
   const up = (rawConfig.upload as Record<string, unknown>) ?? {};
   uploadExtText.value = asList(up.deny_ext).join('\n');
   uploadMimeText.value = asList(up.deny_mime).join('\n');
-  blockHtmlText.value = String(block.html || '');
   loaded.value = true;
 }
 
@@ -142,11 +120,8 @@ async function save() {
     const uploadExt = lines(uploadExtText.value);
     const uploadMime = lines(uploadMimeText.value);
     const rawDet = (rawConfig.detection as Record<string, unknown>) ?? {};
-    const rawLog = (rawConfig.log as Record<string, unknown>) ?? {};
     const rawUp = (rawConfig.upload as Record<string, unknown>) ?? {};
-    const rawBlock = (rawConfig.block as Record<string, unknown>) ?? {};
     const rawCc = (rawConfig.cc as Record<string, unknown>) ?? {};
-    const rawTl = (rawConfig.traffic_log as Record<string, unknown>) ?? {};
     const rawAb = (rawConfig.auto_ban as Record<string, unknown>) ?? {};
     const next = {
       ...rawConfig,
@@ -180,15 +155,6 @@ async function save() {
           remove: lines(rhRemoveText.value)
         }
       },
-      log: {
-        ...rawLog,
-        enabled: cfg.log.enabled,
-        backend: cfg.log.backend,
-        dir: cfg.log.dir,
-        format: cfg.log.format,
-        level: cfg.log.level,
-        redis_key: cfg.log.redis_key
-      },
       upload: {
         ...rawUp,
         enabled: cfg.upload.enabled,
@@ -196,20 +162,10 @@ async function save() {
         deny_ext: uploadExt,
         deny_mime: uploadMime
       },
-      block: {
-        ...rawBlock,
-        status: cfg.block.status,
-        html: blockHtmlText.value
-      },
       cc: {
         ...rawCc,
         rate: `${cfg.cc.rate_count}/${cfg.cc.rate_seconds}`,
         ban_duration: cfg.cc.ban_duration
-      },
-      traffic_log: {
-        ...rawTl,
-        enabled: cfg.traffic_log.enabled,
-        retention_days: cfg.traffic_log.retention_days
       },
       auto_ban: {
         ...rawAb,
@@ -429,21 +385,6 @@ onMounted(loadVersions);
       </NForm>
     </NCard>
 
-    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="拦截响应">
-      <NForm label-placement="left" label-width="140">
-        <NFormItem label="状态码">
-          <NInputNumber v-model:value="cfg.block.status" :min="400" :max="599" class="w-32" />
-          <span class="text-xs text-[rgb(125,125,125)] ml-2">命中拦截时返回的 HTTP 状态码（默认 403）</span>
-        </NFormItem>
-        <NFormItem label="拦截页面 HTML">
-          <div class="w-full">
-            <NInput v-model:value="blockHtmlText" type="textarea" :rows="6" placeholder="自定义拦截页面 HTML，留空使用引擎内置页面" />
-            <p class="mt-1 text-xs text-[rgb(125,125,125)]">留空时使用内置拦截页</p>
-          </div>
-        </NFormItem>
-      </NForm>
-    </NCard>
-
     <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="CC 防刷（全局缺省）">
       <NForm label-placement="left" label-width="140">
         <NFormItem label="频率阈值">
@@ -460,57 +401,6 @@ onMounted(loadVersions);
           <span class="text-xs text-[rgb(125,125,125)] ml-2">超限后封禁该 IP 的秒数</span>
         </NFormItem>
         <p class="text-xs text-[rgb(125,125,125)]">全局缺省值；在「触发规则」页创建 CC 规则可对特定域名/路径单独配置阈值与维度</p>
-      </NForm>
-    </NCard>
-
-    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="日志">
-      <NForm label-placement="left" label-width="140">
-        <NFormItem label="攻击日志">
-          <NSwitch v-model:value="cfg.log.enabled" />
-        </NFormItem>
-        <NFormItem label="后端">
-          <NRadioGroup v-model:value="cfg.log.backend">
-            <NSpace>
-              <NRadio value="redis" label="Redis（后台消费展示，推荐）" />
-              <NRadio value="file" label="本地文件" />
-            </NSpace>
-          </NRadioGroup>
-        </NFormItem>
-        <NFormItem v-if="cfg.log.backend === 'file'" label="文件目录">
-          <NInput v-model:value="cfg.log.dir" class="w-80" placeholder="/var/log/waf" />
-          <span class="text-xs text-[rgb(125,125,125)] ml-2">按天分文件 waf_YYYYMMDD.log</span>
-        </NFormItem>
-        <NFormItem v-if="cfg.log.backend === 'redis'" label="事件队列键">
-          <NInput v-model:value="cfg.log.redis_key" class="w-80" placeholder="waf:event:list" />
-        </NFormItem>
-        <NFormItem label="格式">
-          <NRadioGroup v-model:value="cfg.log.format">
-            <NSpace>
-              <NRadio value="json" label="JSON" />
-              <NRadio value="plain" label="纯文本" />
-            </NSpace>
-          </NRadioGroup>
-        </NFormItem>
-        <NFormItem label="级别">
-          <NSelect
-            v-model:value="cfg.log.level"
-            :options="['debug', 'info', 'warn', 'error'].map(v => ({ label: v, value: v }))"
-            class="w-32"
-          />
-        </NFormItem>
-      </NForm>
-    </NCard>
-
-    <NCard v-if="loaded" :bordered="false" class="card-wrapper" title="全量流量记录">
-      <NForm label-placement="left" label-width="140">
-        <NFormItem label="记录全量流量">
-          <NSwitch v-model:value="cfg.traffic_log.enabled" />
-          <span class="text-xs text-[rgb(125,125,125)] ml-2">每个请求上报一条记录（含命中标记），用于「流量」页检索分析</span>
-        </NFormItem>
-        <NFormItem label="保留天数">
-          <NInputNumber v-model:value="cfg.traffic_log.retention_days" :min="1" :max="365" class="w-32" />
-          <span class="text-xs text-[rgb(125,125,125)] ml-2">后台按此天数自动清理过期流量记录</span>
-        </NFormItem>
       </NForm>
     </NCard>
 

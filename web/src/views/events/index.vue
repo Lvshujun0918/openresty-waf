@@ -10,11 +10,14 @@ import {
   NModal,
   NPagination,
   NPopconfirm,
+  NRadio,
+  NRadioGroup,
   NSelect,
   NSpace,
+  NSwitch,
   NTag
 } from 'naive-ui';
-import { banEvent, consumeEvents, exemptEvent, exportEventsCsv, fetchEventDetail, fetchEvents, markFalsePositive, replayRequest } from '@/service/api';
+import { banEvent, consumeEvents, exemptEvent, exportEventsCsv, fetchConfig, fetchEventDetail, fetchEvents, markFalsePositive, replayRequest, saveConfig } from '@/service/api';
 import Ja4Identify from '@/components/custom/Ja4Identify.vue';
 
 const groupMeta: Record<string, { label: string; color: string }> = {
@@ -40,6 +43,42 @@ const events = ref<Api.Waf.EventItem[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const query = reactive({ page: 1, page_size: 20, group: '', action: '', client_ip: '', host: '' });
+
+// —— 日志配置 ——
+const logCfg = reactive({
+  enabled: true,
+  backend: 'redis',
+  dir: '/var/log/waf',
+  format: 'json',
+  level: 'info',
+  redis_key: 'waf:event:list'
+});
+const logSaving = ref(false);
+let rawLogConfig: Record<string, unknown> = {};
+
+async function loadLogConfig() {
+  const res = await fetchConfig();
+  rawLogConfig = res.data?.config ?? {};
+  const log = (rawLogConfig.log as Record<string, unknown>) ?? {};
+  Object.assign(logCfg, {
+    enabled: log.enabled !== false,
+    backend: log.backend || 'redis',
+    dir: String(log.dir || '/var/log/waf'),
+    format: String(log.format || 'json'),
+    level: String(log.level || 'info'),
+    redis_key: String(log.redis_key || 'waf:event:list')
+  });
+}
+
+async function saveLogConfig() {
+  logSaving.value = true;
+  try {
+    await saveConfig({ ...rawLogConfig, log: { ...logCfg } });
+    window.$message?.success('日志配置已保存并下发，引擎 5 秒内热更新生效');
+  } finally {
+    logSaving.value = false;
+  }
+}
 
 function fmtTime(t: string) {
   if (!t) return '-';
@@ -343,6 +382,7 @@ const headerColumns = [
 ];
 
 onMounted(load);
+onMounted(loadLogConfig);
 </script>
 
 <template>
@@ -398,6 +438,49 @@ onMounted(load);
           @update:page="load"
         />
       </div>
+    </NCard>
+
+    <!-- 日志配置 -->
+    <NCard :bordered="false" class="card-wrapper" title="日志配置">
+      <NForm label-placement="left" label-width="140">
+        <NFormItem label="攻击日志">
+          <NSwitch v-model:value="logCfg.enabled" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">关闭后引擎不再产生攻击事件</span>
+        </NFormItem>
+        <NFormItem label="后端">
+          <NRadioGroup v-model:value="logCfg.backend">
+            <NSpace>
+              <NRadio value="redis" label="Redis（后台消费展示，推荐）" />
+              <NRadio value="file" label="本地文件" />
+            </NSpace>
+          </NRadioGroup>
+        </NFormItem>
+        <NFormItem v-if="logCfg.backend === 'file'" label="文件目录">
+          <NInput v-model:value="logCfg.dir" class="w-80" placeholder="/var/log/waf" />
+          <span class="text-xs text-[rgb(125,125,125)] ml-2">按天分文件 waf_YYYYMMDD.log</span>
+        </NFormItem>
+        <NFormItem v-if="logCfg.backend === 'redis'" label="事件队列键">
+          <NInput v-model:value="logCfg.redis_key" class="w-80" placeholder="waf:event:list" />
+        </NFormItem>
+        <NFormItem label="格式">
+          <NRadioGroup v-model:value="logCfg.format">
+            <NSpace>
+              <NRadio value="json" label="JSON" />
+              <NRadio value="plain" label="纯文本" />
+            </NSpace>
+          </NRadioGroup>
+        </NFormItem>
+        <NFormItem label="级别">
+          <NSelect
+            v-model:value="logCfg.level"
+            :options="['debug', 'info', 'warn', 'error'].map(v => ({ label: v, value: v }))"
+            class="w-32"
+          />
+        </NFormItem>
+        <NFormItem label=" ">
+          <NButton type="primary" :loading="logSaving" @click="saveLogConfig">保存日志配置</NButton>
+        </NFormItem>
+      </NForm>
     </NCard>
 
     <!-- 事件详情弹窗 -->
