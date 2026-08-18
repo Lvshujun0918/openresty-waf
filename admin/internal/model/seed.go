@@ -44,7 +44,10 @@ package model
 //     遥测/JSON 请求体误报）；score_warn 3→5、score_threshold 5→8 降低 SCORE 叠加误报
 // v21: 25009 路径反斜杠/双重编码拦截码 400→403（blazehttp 判定基准统一）；
 //     27013 base64 载荷改 SCORE+2（base64 解码后正常参数误判）
-const SeedVersion = "21"
+// v22: 全部 SCORE 弱特征规则 value 2→1（30 条：seed_crs.go 29 条 + 27013），
+//     942230 条件 SQL 注入改 SCORE+1（blazehttp 实测正常请求同时命中 4-8 条 +2
+//     规则轻易叠加到阈值 8 误报，降为 +1 需 8 条同时命中才阻断）
+const SeedVersion = "22"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -159,7 +162,7 @@ var baseRules = []Rule{
 	{RuleID: "27013", Name: "base64 载荷攻击", Group: "obfuscation", Phase: "access", Severity: 1, Enabled: true,
 		Operator: "REGEX", Pattern: `\b(union|select|sleep|information_schema)\b|<script|javascript:`,
 		Transforms: `["base64_decode","to_lowercase"]`, Vars: `[{"type":"URI_ARGS"},{"type":"POST_ARGS"},{"type":"BODY"}]`,
-		Actions: `{"disrupt":"SCORE","value":2,"msg":"编码混淆：base64 载荷攻击（累积计分，需多特征叠加）"}`, Status: 200, Message: "编码混淆：base64 载荷攻击", SortOrder: 18},
+		Actions: `{"disrupt":"SCORE","value":1,"msg":"编码混淆：base64 载荷攻击（累积计分，需多特征叠加）"}`, Status: 200, Message: "编码混淆：base64 载荷攻击", SortOrder: 18},
 
 	// ---- DLP 敏感数据防泄露（默认仅监控） ----
 	{RuleID: "26010", Name: "响应体泄露身份证", Group: "dlp", Phase: "body_filter", Severity: 3, Enabled: true,
