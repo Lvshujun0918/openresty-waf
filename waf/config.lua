@@ -19,9 +19,10 @@ _M.mode = "active"
 
 -- 异常分阈值（SCORE 动作累计，参考雷池 1.5/3.0 两级风险分级）：
 --   score_warn = 5        达到记录警告事件（不阻断）
---   score_threshold = 8   达到阻断
+--   score_threshold = 10  达到阻断（弱特征规则均 +1，需 10 条同时命中才拦截，
+--                         避免正常遥测流量命中多条宽正则叠加误报）
 _M.score_warn = 5
-_M.score_threshold = 8
+_M.score_threshold = 10
 
 -- WAF 挂载路径前缀（用于生成拦截页面中的提示，可留空）
 _M.base_path = "/waf"

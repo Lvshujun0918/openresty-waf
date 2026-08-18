@@ -47,7 +47,10 @@ package model
 // v22: 全部 SCORE 弱特征规则 value 2→1（30 条：seed_crs.go 29 条 + 27013），
 //     942230 条件 SQL 注入改 SCORE+1（blazehttp 实测正常请求同时命中 4-8 条 +2
 //     规则轻易叠加到阈值 8 误报，降为 +1 需 8 条同时命中才阻断）
-const SeedVersion = "22"
+// v23: 942260 SQL 认证绕过/932281 brace expansion 改 SCORE+1（blazehttp 实测
+//     英文句子 "select a few items from" 与 JSON body 花括号内逗号误报）；
+//     score_threshold 8→10（URL 编码 JSON 遥测体仍可同时命中 8 条 +1 规则）
+const SeedVersion = "23"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
