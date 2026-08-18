@@ -27,7 +27,10 @@ package model
 // v13: 新增加密 Webshell 流量特征规则（seed_webshell.go，4 条）：
 //     逆向雷池 webshell 检测模块（解密后语义检测）提炼为高置信流量指纹，
 //     覆盖冰蝎 3.x AES 流量特征/哥斯拉 PHP 马/罕见脚本后缀
-const SeedVersion = "14"
+// v14: 新增 SCORE 弱特征评分规则集（seed_score.go，19 条）：
+//     逆向雷池 SQLChop 评分制（线性分类器+阈值分级 1.5/3.0）落地为弱特征累加评分，
+//     单特征命中 +1 分（LOG 可见），累计达到 score_warn(3) 告警、score_threshold(5) 阻断
+const SeedVersion = "15"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -39,7 +42,7 @@ var LegacySeedIDs = []string{
 // SeedRules 内置规则种子：libinjection 语义检测 + 基础兜底 + OWASP CRS 转译规则
 // （seed_crs.go）+ CVE/HW 指纹规则（seed_cve.go）+ 反序列化检测（seed_deser.go）
 // + 多条件漏洞指纹链式规则（seed_multi.go）+ 杂项补充（seed_misc.go）
-// + 加密 Webshell 流量特征（seed_webshell.go）。
+// + 加密 Webshell 流量特征（seed_webshell.go）+ SCORE 弱特征评分（seed_score.go）。
 // 首次启动时导入 Rule 表；导入后可在管理后台增删改，发布后热更新。
 //
 // 检测分层：
@@ -50,8 +53,9 @@ var LegacySeedIDs = []string{
 //   5. 多条件漏洞指纹（162 条链式 AND 规则，路径+请求体/方法/参数/头组合，逆向雷池 HW 规则库）
 //   6. 杂项补充（Log4j JNDI/Python 危险函数/Java 注入/路径穿越编码绕过）
 //   7. 加密 Webshell 流量特征（冰蝎 3.x/哥斯拉/罕见脚本后缀）
-//   8. 基础兜底（敏感文件泄露、扫描器 UA）
-var SeedRules = append(append(append(append(append(append(baseRules, SeedRulesCRS...), SeedRulesCVE...), SeedRulesDeser...), SeedRulesMulti...), SeedRulesMisc...), SeedRulesWebshell...)
+//   8. SCORE 弱特征评分（19 条弱特征累加评分，参考雷池 SQLChop 阈值分级思想）
+//   9. 基础兜底（敏感文件泄露、扫描器 UA）
+var SeedRules = append(append(append(append(append(append(append(baseRules, SeedRulesCRS...), SeedRulesCVE...), SeedRulesDeser...), SeedRulesMulti...), SeedRulesMisc...), SeedRulesWebshell...), SeedRulesScore...)
 
 // baseRules 基础兜底规则
 var baseRules = []Rule{

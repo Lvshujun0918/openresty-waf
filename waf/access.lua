@@ -76,6 +76,7 @@ local function new_ctx(cfg)
         mode            = cfg.mode or "active",
         score           = 0,
         score_threshold = cfg.score_threshold or 5,
+        score_warn      = cfg.score_warn or 3,
         matched         = {},
         client_ip       = storage.get_client_ip(),
         start_time      = ngx.now(),

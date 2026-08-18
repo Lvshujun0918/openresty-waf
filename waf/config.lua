@@ -17,6 +17,12 @@ _M.version = "0.6.0"
 --   "off"     放行模式（旁路，不执行检测）
 _M.mode = "active"
 
+-- 异常分阈值（SCORE 动作累计，参考雷池 1.5/3.0 两级风险分级）：
+--   score_warn = 3        达到记录警告事件（不阻断）
+--   score_threshold = 5   达到阻断
+_M.score_warn = 3
+_M.score_threshold = 5
+
 -- WAF 挂载路径前缀（用于生成拦截页面中的提示，可留空）
 _M.base_path = "/waf"
 

@@ -60,6 +60,7 @@ local function apply_action(waf_ctx, rule, hits)
     local action = rule.actions or {}
     local disrupt = action.disrupt
     if disrupt == "SCORE" then
+        -- 仅累加异常分（命中记录由 run() 主流程统一处理）
         waf_ctx.score = (waf_ctx.score or 0) + (tonumber(action.value) or 1)
     elseif disrupt and disrupt ~= "LOG_ONLY" then
         -- 其余动作（BLOCK/DROP/ALLOW/ACCEPT/REDIRECT）收集后仲裁
@@ -181,9 +182,20 @@ function _M.run(ruleset, phase, waf_ctx)
         end
     end
 
-    -- 异常分阈值阻断（响应阶段不 ngx.exit，改为改状态码/替换响应体）
+    -- 异常分分级：score >= score_warn（默认 3）记录警告事件不阻断；
+    -- score >= score_threshold（默认 5）阻断。参考雷池 1.5/3.0 两级风险分级。
     local threshold = waf_ctx.score_threshold or 5
-    if waf_ctx.score >= threshold and waf_ctx.mode ~= "detect" then
+    local warn = waf_ctx.score_warn or 3
+    if waf_ctx.score >= warn and waf_ctx.score < threshold then
+        -- 记 LOG_ONLY 警告事件（matched 已有 SCORE 命中记录，确保日志可见）
+        local group = (waf_ctx.matched and waf_ctx.matched[1] and waf_ctx.matched[1].group) or ""
+        if not waf_ctx.score_warned then
+            waf_ctx.score_warned = true
+            waf_ctx.matched[#waf_ctx.matched + 1] = {
+                id = "SCORE-WARN", group = group, msg = "异常分累计 " .. waf_ctx.score .. " 达到警告阈值", severity = 1,
+            }
+        end
+    elseif waf_ctx.score >= threshold and waf_ctx.mode ~= "detect" then
         local cfg = _M.get_active_config()
         local group = (waf_ctx.matched and waf_ctx.matched[1] and waf_ctx.matched[1].group) or ""
         local html = config.render_block_html(config.block_page(cfg, group), waf_ctx, group)
