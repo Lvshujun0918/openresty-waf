@@ -30,7 +30,7 @@ package model
 // v14: 新增 SCORE 弱特征评分规则集（seed_score.go，19 条）：
 //     逆向雷池 SQLChop 评分制（线性分类器+阈值分级 1.5/3.0）落地为弱特征累加评分，
 //     单特征命中 +1 分（LOG 可见），累计达到 score_warn(3) 告警、score_threshold(5) 阻断
-const SeedVersion = "15"
+const SeedVersion = "17"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -71,7 +71,7 @@ var baseRules = []Rule{
 
 	// ---- 基础兜底（非注入类，CRS 请求侧覆盖较弱） ----
 	{RuleID: "10001", Name: "敏感文件泄露拦截", Group: "leak", Phase: "access", Severity: 2, Enabled: true,
-		Operator: "REGEX", Pattern: `\.(git|svn|hg)(/|$)|(^|/)(\.env|\.bash_history|\.DS_Store|config\.php\.bak|web\.config\.bak)(/|$)|\.(sql|bak|tar\.gz|zip|log)$`,
+		Operator: "REGEX", Pattern: `\.(git|svn|hg)(/|$)|(^|/)(\.env|\.bash_history|\.DS_Store|config\.php\.bak|web\.config\.bak)(/|$)`,
 		Transforms: `["url_decode","to_lowercase"]`, Vars: `[{"type":"URI"}]`,
 		Actions: `{"disrupt":"BLOCK","status":403,"msg":"敏感文件泄露拦截"}`, Status: 403, Message: "敏感文件泄露拦截", SortOrder: 3},
 	{RuleID: "10002", Name: "扫描器 UA 拦截", Group: "scanner", Phase: "access", Severity: 2, Enabled: true,
