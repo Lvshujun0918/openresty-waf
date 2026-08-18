@@ -40,7 +40,9 @@ package model
 // v19: 5 条高误报 CRS 规则改 SCORE+2（941330/941340 IE XSS Filters 宽正则、
 //     932239 UA/Referer 命令注入宽正则、942400 and 数字比较、942300 MySQL 注释/条件），
 //     blazehttp 实测 bilibili/微信上报等正常流量误报修复
-const SeedVersion = "19"
+// v20: 920460 异常转义字符/942550 JSON-Based SQLi 改 SCORE+2（宽正则对正常
+//     遥测/JSON 请求体误报）；score_warn 3→5、score_threshold 5→8 降低 SCORE 叠加误报
+const SeedVersion = "20"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
