@@ -42,7 +42,9 @@ package model
 //     blazehttp 实测 bilibili/微信上报等正常流量误报修复
 // v20: 920460 异常转义字符/942550 JSON-Based SQLi 改 SCORE+2（宽正则对正常
 //     遥测/JSON 请求体误报）；score_warn 3→5、score_threshold 5→8 降低 SCORE 叠加误报
-const SeedVersion = "20"
+// v21: 25009 路径反斜杠/双重编码拦截码 400→403（blazehttp 判定基准统一）；
+//     27013 base64 载荷改 SCORE+2（base64 解码后正常参数误判）
+const SeedVersion = "21"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -154,10 +156,10 @@ var baseRules = []Rule{
 		Actions: `{"disrupt":"BLOCK","status":403,"msg":"API 安全：XML 外部实体（XXE）"}`, Status: 403, Message: "API 安全：XML 外部实体（XXE）", SortOrder: 17},
 
 	// ---- 编码混淆绕过 ----
-	{RuleID: "27013", Name: "base64 载荷攻击", Group: "obfuscation", Phase: "access", Severity: 3, Enabled: true,
+	{RuleID: "27013", Name: "base64 载荷攻击", Group: "obfuscation", Phase: "access", Severity: 1, Enabled: true,
 		Operator: "REGEX", Pattern: `\b(union|select|sleep|information_schema)\b|<script|javascript:`,
 		Transforms: `["base64_decode","to_lowercase"]`, Vars: `[{"type":"URI_ARGS"},{"type":"POST_ARGS"},{"type":"BODY"}]`,
-		Actions: `{"disrupt":"BLOCK","status":403,"msg":"编码混淆：base64 载荷攻击"}`, Status: 403, Message: "编码混淆：base64 载荷攻击", SortOrder: 18},
+		Actions: `{"disrupt":"SCORE","value":2,"msg":"编码混淆：base64 载荷攻击（累积计分，需多特征叠加）"}`, Status: 200, Message: "编码混淆：base64 载荷攻击", SortOrder: 18},
 
 	// ---- DLP 敏感数据防泄露（默认仅监控） ----
 	{RuleID: "26010", Name: "响应体泄露身份证", Group: "dlp", Phase: "body_filter", Severity: 3, Enabled: true,

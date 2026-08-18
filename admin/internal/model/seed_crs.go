@@ -750,7 +750,7 @@ var SeedRulesCRS = []Rule{
 	{RuleID: `25009`, Name: `Path backslash or double-encoded traversal`, Group: `protocol`, Phase: "access", Severity: 2, Enabled: true,
 		Operator: `REGEX`, Pattern: `\\|%2[fF]%2[fF]|%252[fF]`,
 		Transforms: `["url_decode"]`, Vars: `[{"type":"REQUEST_URI"}]`,
-		Actions: `{"disrupt":"BLOCK","status":400,"msg":"URI 含反斜杠或双重编码路径"}`, Status: 400, Message: `URI 含反斜杠或双重编码路径`, SortOrder: 55},
+		Actions: `{"disrupt":"BLOCK","status":403,"msg":"URI 含反斜杠或双重编码路径"}`, Status: 403, Message: `URI 含反斜杠或双重编码路径`, SortOrder: 55},
 	{RuleID: `27011`, Name: `GraphQL introspection probe`, Group: `api`, Phase: "access", Severity: 3, Enabled: true,
 		Operator: `REGEX`, Pattern: `(?i)(__schema|__type)\b`,
 		Transforms: `["url_decode"]`, Vars: `[{"type":"BODY"},{"type":"URI_ARGS"}]`,
