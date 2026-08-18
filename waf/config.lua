@@ -280,6 +280,7 @@ local group_names = {
     api         = "API 安全风险",
     obfuscation = "编码混淆绕过",
     dlp         = "敏感数据泄露",
+    deser       = "反序列化攻击",
 }
 
 -- 按命中分组选择拦截页面：pages 中有该分组的自定义 HTML 则使用，

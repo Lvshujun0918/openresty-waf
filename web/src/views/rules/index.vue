@@ -56,7 +56,8 @@ const groupMeta: Record<string, string> = {
   cc: 'CC 防护',
   trigger: '触发规则',
   upload: '文件上传',
-  fingerprint: '指纹识别'
+  fingerprint: '指纹识别',
+  deser: '反序列化'
 };
 const phaseMeta: Record<string, string> = {
   access: '请求阶段',
