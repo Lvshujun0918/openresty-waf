@@ -25,7 +25,17 @@ const groupMeta: Record<string, { label: string; color: string }> = {
   protocol: { label: '协议异常', color: '#2563eb' },
   leak: { label: '信息泄露', color: '#eab308' },
   scanner: { label: '扫描器', color: '#ec4899' },
-  custom: { label: '自定义规则', color: '#64748b' }
+  custom: { label: '自定义规则', color: '#64748b' },
+  cve: { label: 'CVE 漏洞', color: '#ef4444' },
+  hpp: { label: '参数污染', color: '#8b5cf6' },
+  api: { label: 'API 安全', color: '#0ea5e9' },
+  obfuscation: { label: '编码混淆', color: '#f43f5e' },
+  dlp: { label: '敏感数据', color: '#f59e0b' },
+  crawler: { label: '爬虫指纹', color: '#22c55e' },
+  cc: { label: 'CC 防护', color: '#6366f1' },
+  upload: { label: '文件上传', color: '#fb923c' },
+  fingerprint: { label: '指纹识别', color: '#94a3b8' },
+  trigger: { label: '触发规则', color: '#84cc16' }
 };
 
 const modeMeta: Record<string, { label: string; type: 'success' | 'warning' | 'default' }> = {

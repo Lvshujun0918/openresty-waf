@@ -46,7 +46,17 @@ const groupMeta: Record<string, string> = {
   leak: '信息泄露',
   scanner: '扫描器',
   response: '响应检测',
-  custom: '自定义'
+  custom: '自定义',
+  cve: 'CVE 漏洞攻击',
+  hpp: '参数污染',
+  api: 'API 安全',
+  obfuscation: '编码混淆',
+  dlp: '敏感数据泄露',
+  crawler: '爬虫指纹',
+  cc: 'CC 防护',
+  trigger: '触发规则',
+  upload: '文件上传',
+  fingerprint: '指纹识别'
 };
 const phaseMeta: Record<string, string> = {
   access: '请求阶段',
