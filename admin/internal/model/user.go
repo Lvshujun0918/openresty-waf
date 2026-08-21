@@ -7,6 +7,7 @@ type User struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
 	Username     string    `gorm:"uniqueIndex;size:64;not null" json:"username"`
 	PasswordHash string    `gorm:"size:128;not null" json:"-"`
+	Role         string    `gorm:"size:16;not null;default:super" json:"role"` // super | ops | viewer
 	TotpSecret   string    `gorm:"size:64" json:"-"`      // TOTP 密钥（base32，确认后启用）
 	TotpEnabled  bool      `gorm:"default:false" json:"totp_enabled"`
 	FailedLogins int       `gorm:"default:0" json:"-"`    // 连续失败次数（防爆破）

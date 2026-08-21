@@ -71,6 +71,7 @@ func (h *AuthHandler) KickSession(c *gin.Context) {
 func (h *AuthHandler) Me(c *gin.Context) {
 	username, _ := c.Get("username")
 	userID, _ := c.Get("user_id")
+	role, _ := c.Get("role")
 	totpEnabled := false
 	if id, ok := userID.(uint); ok {
 		enabled, err := h.svc.TOTPStatus(id)
@@ -79,7 +80,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"id": userID, "username": username, "totp_enabled": totpEnabled,
+		"id": userID, "username": username, "role": role, "totp_enabled": totpEnabled,
 	})
 }
 
@@ -158,6 +159,7 @@ func AuthMiddleware(svc *service.AuthService, tokens *service.ApiTokenService) g
 			}
 			c.Set("user_id", uint(0))
 			c.Set("username", "token:"+name)
+			c.Set("role", service.RoleSuper) // API Token 为超管签发的自动化凭证，等同 super
 			c.Set("api_token", true)
 			c.Next()
 			return
@@ -175,6 +177,7 @@ func AuthMiddleware(svc *service.AuthService, tokens *service.ApiTokenService) g
 		}
 		c.Set("user_id", claims.UserID)
 		c.Set("username", claims.Username)
+		c.Set("role", service.NormalizeRole(claims.Role)) // 旧令牌无 role 字段回退 super
 		c.Next()
 	}
 }

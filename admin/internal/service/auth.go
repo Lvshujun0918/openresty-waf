@@ -27,7 +27,8 @@ import (
 type Claims struct {
 	UserID   uint   `json:"user_id"`
 	Username string `json:"username"`
-	JTI      string `json:"jti"` // 会话 ID（Redis 记录，用于会话管理/强制下线）
+	Role     string `json:"role"` // super | ops | viewer（RBAC）
+	JTI      string `json:"jti"`  // 会话 ID（Redis 记录，用于会话管理/强制下线）
 	jwt.RegisteredClaims
 }
 
@@ -210,6 +211,7 @@ func (s *AuthService) GenerateTokenWithMeta(user model.User, clientIP, ua string
 	claims := Claims{
 		UserID:   user.ID,
 		Username: user.Username,
+		Role:     NormalizeRole(user.Role),
 		JTI:      newJTI(),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expire)),

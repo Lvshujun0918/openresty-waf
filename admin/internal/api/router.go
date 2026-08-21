@@ -63,11 +63,21 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 		authed := api.Group("", AuthMiddleware(authSvc, apiTokenSvc))
 		authed.Use(CSRFMiddleware())
 		authed.Use(AuditMiddleware(auditSvc))
+		// RBAC：按路径模块校验角色写权限（system 模块读写均限 super）
+		authed.Use(RBACMiddleware())
+		userHandler := NewUserHandler(db)
 		{
-			// API Token 管理（脚本/CI 非交互调用凭证）
-			authed.GET("/tokens", apiTokenHandler.List)
-			authed.POST("/tokens", apiTokenHandler.Create)
-			authed.DELETE("/tokens/:id", apiTokenHandler.Revoke)
+			// 用户管理（仅 super）
+			superOnly := authed.Group("", RequireSuper())
+			superOnly.GET("/users", userHandler.List)
+			superOnly.POST("/users", userHandler.Create)
+			superOnly.PUT("/users/:id", userHandler.Update)
+			superOnly.DELETE("/users/:id", userHandler.Delete)
+
+			// API Token 管理（脚本/CI 非交互调用凭证，仅 super）
+			superOnly.GET("/tokens", apiTokenHandler.List)
+			superOnly.POST("/tokens", apiTokenHandler.Create)
+			superOnly.DELETE("/tokens/:id", apiTokenHandler.Revoke)
 
 			authed.GET("/auth/me", authHandler.Me)
 			authed.POST("/auth/totp/setup", authHandler.TotpSetup)
