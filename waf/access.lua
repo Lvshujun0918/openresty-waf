@@ -8,6 +8,7 @@ local engine    = require "rule_engine.engine"
 local storage   = require "storage"
 local operators = require "rule_engine.operators"
 local auto_ban  = require "detectors.auto_ban"
+local hit_cache = require "hit_cache"
 local config    = require "config"
 
 -- 每请求唯一 ID：worker pid + 毫秒时间戳 + 连接序号 + 请求内自增
@@ -416,21 +417,42 @@ local function protection_flow()
                 ngx.var.uri, cfg.detection and cfg.detection.skip_static)
         end
         if not exempt and not skip_static then
-            -- 注入惰性证据捕获：engine.run 内部 BLOCK 动作会直接 ngx.exit(403)，
-            -- 因此捕获只能在规则命中时由引擎回调触发（record_hit），否则永远执行不到。
-            ctx.capture_evidence = capture_evidence
-            -- fail-open：规则引擎任何运行错误都不影响业务，记录错误后放行。
-            -- ngx.exit 以 Lua 错误形式抛出：配合 _exited 标记区分「正常拦截」与「异常」。
-            local ok2, result = pcall(engine.run, { rules = phase_rules }, "access", ctx)
-            if ok2 then
-                if result == "blocked" or result == "accepted" then
-                    return
+            -- 命中缓存：同请求指纹（规则版本+模式+方法+host+IP+URI+请求头）短时复用
+            -- 规则引擎判定，重复请求跳过扫描；名单/触发规则/CC/人机验证照常执行。
+            local cached = hit_cache.lookup(cfg, ctx)
+            if cached and cached.blocked then
+                pcall(capture_evidence, ctx)
+                ctx.matched[#ctx.matched + 1] = cached.matched
+                if ctx.mode == "active" then
+                    block(cfg, ctx)
                 end
-            elseif ctx._exited then
-                return  -- 拦截响应已发送
-            else
-                ngx.log(ngx.ERR, "[waf] 规则引擎执行异常，fail-open 放行: " .. tostring(result))
+                -- detect 模式：仅记录（log 阶段落盘）
+                return
             end
+            if not cached then
+                -- 注入惰性证据捕获：engine.run 内部 BLOCK 动作会直接 ngx.exit(403)，
+                -- 因此捕获只能在规则命中时由引擎回调触发（record_hit），否则永远执行不到。
+                ctx.capture_evidence = capture_evidence
+                -- fail-open：规则引擎任何运行错误都不影响业务，记录错误后放行。
+                -- ngx.exit 以 Lua 错误形式抛出：配合 _exited 标记区分「正常拦截」与「异常」。
+                local ok2, result = pcall(engine.run, { rules = phase_rules }, "access", ctx)
+                if ok2 then
+                    if result == "blocked" or result == "accepted" then
+                        if result == "blocked" then
+                            hit_cache.store(cfg, ctx, true, hit_cache.primary_matched(ctx))
+                        end
+                        return
+                    end
+                    -- 干净放行：缓存判定结果，后续同指纹请求直接跳过扫描
+                    hit_cache.store(cfg, ctx, false)
+                elseif ctx._exited then
+                    hit_cache.store(cfg, ctx, true, hit_cache.primary_matched(ctx))
+                    return  -- 拦截响应已发送
+                else
+                    ngx.log(ngx.ERR, "[waf] 规则引擎执行异常，fail-open 放行: " .. tostring(result))
+                end
+            end
+            -- （cached 且未拦截：缓存判定为放行，跳过规则扫描继续后续检测）
             -- watchdog：规则引擎/上传检测超时则跳过后续检测强制放行
             if watchdog_exceeded() then
                 ngx.log(ngx.ERR, "[waf] 检测耗时超过 watchdog 阈值，强制放行")
