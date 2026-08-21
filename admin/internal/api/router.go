@@ -58,6 +58,7 @@ type apiDeps struct {
 	dashboardHandler   *DashboardHandler
 	challengeHandler   *ChallengeHandler
 	ccLogHandler       *CcLogHandler
+	errorLogHandler    *ErrorLogHandler
 	triggerRuleHandler *TriggerRuleHandler
 	banHandler         *BanHandler
 	healthHandler      *HealthHandler
@@ -89,6 +90,7 @@ func newDeps(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *apiDep
 		dashboardHandler:   NewDashboardHandler(db),
 		challengeHandler:   NewChallengeHandler(db, mgr, cfg),
 		ccLogHandler:       NewCcLogHandler(db, mgr, cfg),
+		errorLogHandler:    NewErrorLogHandler(db, mgr, cfg),
 		triggerRuleHandler: NewTriggerRuleHandler(db, mgr, cfg),
 		banHandler:         NewBanHandler(db, mgr, cfg),
 		healthHandler:      NewHealthHandler(mgr, cfg),
@@ -270,6 +272,11 @@ func registerAPIRoutes(api *gin.RouterGroup, d *apiDeps) {
 			// CC 触发事件
 			authed.GET("/cc-logs", d.ccLogHandler.List)
 			authed.POST("/cc-logs/consume", d.ccLogHandler.Consume)
+			// 报错汇总（引擎 ERR/WARN 上报）
+			authed.GET("/errors", d.errorLogHandler.List)
+			authed.GET("/errors/stats", d.errorLogHandler.Stats)
+			authed.POST("/errors/consume", d.errorLogHandler.Consume)
+			authed.DELETE("/errors", d.errorLogHandler.Clear)
 
 			// 触发规则（host/UA/请求头/IP 等条件筛选）
 			authed.GET("/trigger-rules", d.triggerRuleHandler.List)

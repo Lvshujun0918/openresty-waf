@@ -162,6 +162,21 @@ func main() {
 		}
 	}()
 
+	// 引擎报错汇总：定时消费 Redis 队列落库（每 3 秒，「报错汇总」页展示）
+	errorLogSvc := service.NewErrorLogService(db, mgr, cfg)
+	go func() {
+		ticker := time.NewTicker(3 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if mgr.GetClient() == nil {
+				continue
+			}
+			if _, err := errorLogSvc.Consume(200); err != nil {
+				log.Printf("消费报错汇总失败: %v", err)
+			}
+		}
+	}()
+
 	// 远程 IP 列表订阅定时同步（每分钟检查到期订阅）
 	ipListSvc := service.NewIpListService(db, mgr, cfg)
 	go func() {
