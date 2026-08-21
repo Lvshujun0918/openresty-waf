@@ -47,7 +47,7 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'alerts',
       i18nKey: 'route.alerts',
       icon: 'mdi:bell-ring-outline',
-      order: 11
+      order: 6
     }
   },
   {
@@ -56,10 +56,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.api-tokens',
     meta: {
       title: 'api-tokens',
-      i18nKey: 'route.api-tokens',
-      icon: 'mdi:key-variant',
-      order: 9.2,
-      roles: ['super']
+      i18nKey: 'route.api-tokens'
     }
   },
   {
@@ -68,9 +65,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.audit-logs',
     meta: {
       title: 'audit-logs',
-      i18nKey: 'route.audit-logs',
-      icon: 'mdi:clipboard-text-clock-outline',
-      order: 13
+      i18nKey: 'route.audit-logs'
     }
   },
   {
@@ -79,9 +74,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.bans',
     meta: {
       title: 'bans',
-      i18nKey: 'route.bans',
-      icon: 'mdi:do-not-disturb',
-      order: 8
+      i18nKey: 'route.bans'
     }
   },
   {
@@ -90,9 +83,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.block-pages',
     meta: {
       title: 'block-pages',
-      i18nKey: 'route.block-pages',
-      icon: 'mdi:file-document-alert-outline',
-      order: 9.1
+      i18nKey: 'route.block-pages'
     }
   },
   {
@@ -101,9 +92,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.bots',
     meta: {
       title: 'bots',
-      i18nKey: 'route.bots',
-      icon: 'mdi:robot-outline',
-      order: 4
+      i18nKey: 'route.bots'
     }
   },
   {
@@ -112,9 +101,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.config',
     meta: {
       title: 'config',
-      i18nKey: 'route.config',
-      icon: 'mdi:cog',
-      order: 9
+      i18nKey: 'route.config'
     }
   },
   {
@@ -129,25 +116,21 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
-    name: 'events',
-    path: '/events',
-    component: 'layout.base$view.events',
-    meta: {
-      title: 'events',
-      i18nKey: 'route.events',
-      icon: 'mdi:shield-alert',
-      order: 3
-    }
-  },
-  {
     name: 'error-logs',
     path: '/error-logs',
     component: 'layout.base$view.error-logs',
     meta: {
       title: 'error-logs',
-      i18nKey: 'route.error-logs',
-      icon: 'mdi:alert-circle-outline',
-      order: 7.5
+      i18nKey: 'route.error-logs'
+    }
+  },
+  {
+    name: 'events',
+    path: '/events',
+    component: 'layout.base$view.events',
+    meta: {
+      title: 'events',
+      i18nKey: 'route.events'
     }
   },
   {
@@ -158,7 +141,7 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'guide',
       i18nKey: 'route.guide',
       icon: 'mdi:book-open-variant',
-      order: 10
+      order: 8
     }
   },
   {
@@ -192,9 +175,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.ip-lists',
     meta: {
       title: 'ip-lists',
-      i18nKey: 'route.ip-lists',
-      icon: 'mdi:account-group',
-      order: 8
+      i18nKey: 'route.ip-lists'
     }
   },
   {
@@ -215,9 +196,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.monitor',
     meta: {
       title: 'monitor',
-      i18nKey: 'route.monitor',
-      icon: 'mdi:chart-line',
-      order: 2
+      i18nKey: 'route.monitor'
     }
   },
   {
@@ -226,9 +205,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.rule-perf',
     meta: {
       title: 'rule-perf',
-      i18nKey: 'route.rule-perf',
-      icon: 'mdi:speedometer',
-      order: 9.3
+      i18nKey: 'route.rule-perf'
     }
   },
   {
@@ -237,9 +214,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.rule-subs',
     meta: {
       title: 'rule-subs',
-      i18nKey: 'route.rule-subs',
-      icon: 'mdi:cloud-download-outline',
-      order: 5.5
+      i18nKey: 'route.rule-subs'
     }
   },
   {
@@ -248,9 +223,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.rules',
     meta: {
       title: 'rules',
-      i18nKey: 'route.rules',
-      icon: 'mdi:shield-check-outline',
-      order: 5
+      i18nKey: 'route.rules'
     }
   },
   {
@@ -259,9 +232,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.security',
     meta: {
       title: 'security',
-      i18nKey: 'route.security',
-      icon: 'mdi:shield-account-outline',
-      order: 9
+      i18nKey: 'route.security'
     }
   },
   {
@@ -270,9 +241,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.traffic',
     meta: {
       title: 'traffic',
-      i18nKey: 'route.traffic',
-      icon: 'mdi:chart-timeline-variant',
-      order: 4
+      i18nKey: 'route.traffic'
     }
   },
   {
@@ -281,9 +250,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.trigger-records',
     meta: {
       title: 'trigger-records',
-      i18nKey: 'route.trigger-records',
-      icon: 'mdi:history',
-      order: 7
+      i18nKey: 'route.trigger-records'
     }
   },
   {
@@ -292,9 +259,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.trigger-rules',
     meta: {
       title: 'trigger-rules',
-      i18nKey: 'route.trigger-rules',
-      icon: 'mdi:filter-variant',
-      order: 6
+      i18nKey: 'route.trigger-rules'
     }
   },
   {
@@ -303,10 +268,7 @@ export const generatedRoutes: GeneratedRoute[] = [
     component: 'layout.base$view.users',
     meta: {
       title: 'users',
-      i18nKey: 'route.users',
-      icon: 'mdi:account-multiple',
-      order: 9.4,
-      roles: ['super']
+      i18nKey: 'route.users'
     }
   }
 ];
