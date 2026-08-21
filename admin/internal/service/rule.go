@@ -374,6 +374,7 @@ var validOperators = map[string]bool{
 	"REGEX": true, "PM": true, "EQUALS": true, "CONTAINS": true, "CIDR": true,
 	"STARTS_WITH": true, "ENDS_WITH": true, "EXISTS": true,
 	"LIBINJECTION_SQLI": true, "LIBINJECTION_XSS": true,
+	"SEMANTIC_ANOMALY": true,
 }
 
 // maxPatternLen 规则 pattern 长度上限（字节）：容纳长 CRS 正则（可达 10KB+），

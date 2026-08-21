@@ -309,6 +309,9 @@ func Match(r model.Rule, req TestRequest) MatchResult {
 	if r.Operator == "LIBINJECTION_SQLI" || r.Operator == "LIBINJECTION_XSS" {
 		return MatchResult{Matched: false, Note: "libinjection 语义规则需在引擎真实流量验证"}
 	}
+	if r.Operator == "SEMANTIC_ANOMALY" {
+		return MatchResult{Matched: false, Note: "语义结构评分规则需在引擎真实流量验证"}
+	}
 	var varsSpec []map[string]interface{}
 	_ = json.Unmarshal([]byte(r.Vars), &varsSpec)
 	var transforms []string

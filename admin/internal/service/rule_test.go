@@ -259,7 +259,7 @@ func TestRuleService_validateRule(t *testing.T) {
 		t.Error("expected error for unknown operator")
 	}
 	// 合法运算符通过（含语义运算符）
-	for _, op := range []string{"REGEX", "PM", "CIDR", "EXISTS", "LIBINJECTION_SQLI", "LIBINJECTION_XSS"} {
+	for _, op := range []string{"REGEX", "PM", "CIDR", "EXISTS", "LIBINJECTION_SQLI", "LIBINJECTION_XSS", "SEMANTIC_ANOMALY"} {
 		if err := s.validateRule(&model.Rule{RuleID: "1", Operator: op, Pattern: "a"}); err != nil {
 			t.Errorf("operator %s should pass: %v", op, err)
 		}

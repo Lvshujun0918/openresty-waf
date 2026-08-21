@@ -121,7 +121,13 @@ package model
 // v29: 65942-2 恢复 BLOCK（v28 曾降级 SCORE 致 53 个编码混淆恶意样本漏报——DVWA
 //
 //	hex 转义 XSS 与 base64 混淆载荷均靠其拦截；实际误报仅 ~6 个，恢复后检出率回升）
-const SeedVersion = "29"
+//
+// v30: 新增轻量语义分析规则集（seed_semantic.go，2 条）：waf/semantic.lua 纯 Lua
+//
+//	token 化 + 结构异常度评分（0-100），SEMANTIC_ANOMALY 运算符接入 SCORE 弱特征，
+//	阈值 35 计 +1 / 阈值 60 计 +2；抗注释插入/引号变形等正则难覆盖的结构模式，
+//	作为 libinjection 强特征之下的第二层语义网
+const SeedVersion = "30"
 
 // LegacySeedIDs v1 内置种子规则 ID（旧部署迁移时删除用）
 var LegacySeedIDs = []string{
@@ -133,7 +139,8 @@ var LegacySeedIDs = []string{
 // SeedRules 内置规则种子：libinjection 语义检测 + 基础兜底 + OWASP CRS 转译规则
 // （seed_crs.go）+ CVE/HW 指纹规则（seed_cve.go）+ 反序列化检测（seed_deser.go）
 // + 多条件漏洞指纹链式规则（seed_multi.go）+ 杂项补充（seed_misc.go）
-// + 加密 Webshell 流量特征（seed_webshell.go）+ SCORE 弱特征评分（seed_score.go）。
+// + 加密 Webshell 流量特征（seed_webshell.go）+ SCORE 弱特征评分（seed_score.go）
+// + 轻量语义分析（seed_semantic.go）。
 // 首次启动时导入 Rule 表；导入后可在管理后台增删改，发布后热更新。
 //
 // 检测分层：
@@ -145,8 +152,9 @@ var LegacySeedIDs = []string{
 //  6. 杂项补充（Log4j JNDI/Python 危险函数/Java 注入/路径穿越编码绕过）
 //  7. 加密 Webshell 流量特征（冰蝎 3.x/哥斯拉/罕见脚本后缀）
 //  8. SCORE 弱特征评分（19 条弱特征累加评分，参考雷池 SQLChop 阈值分级思想）
-//  9. 基础兜底（敏感文件泄露、扫描器 UA）
-var SeedRules = append(append(append(append(append(append(append(baseRules, SeedRulesCRS...), SeedRulesCVE...), SeedRulesDeser...), SeedRulesMulti...), SeedRulesMisc...), SeedRulesWebshell...), SeedRulesScore...)
+//  9. 轻量语义分析（token 化结构异常度评分，SEMANTIC_ANOMALY 弱特征两层阈值）
+//  10. 基础兜底（敏感文件泄露、扫描器 UA）
+var SeedRules = append(append(append(append(append(append(append(append(baseRules, SeedRulesCRS...), SeedRulesCVE...), SeedRulesDeser...), SeedRulesMulti...), SeedRulesMisc...), SeedRulesWebshell...), SeedRulesScore...), SeedRulesSemantic...)
 
 // baseRules 基础兜底规则
 var baseRules = []Rule{
