@@ -58,6 +58,9 @@ type Rule struct {
 	EventKey   string // 攻击事件队列键（WAF log.lua redis 后端 LPUSH）
 	TriggerRulesKey   string // 触发规则集键（host/UA/请求头/IP 等条件筛选）
 	TriggerVersionKey string // 触发规则版本键，自增触发热更新
+	CanaryRulesetKey  string // 灰度规则集 JSON 键（灰度期间部分流量使用）
+	CanaryVersionKey  string // 灰度版本号键，自增触发引擎加载灰度集
+	CanaryCfgKey      string // 灰度配置键（JSON：percent 百分比 / ips IP 名单）
 }
 
 func Load() *Config {
@@ -77,6 +80,9 @@ func Load() *Config {
 			EventKey:     getEnv("WAF_EVENT_KEY", "waf:event:list"),
 			TriggerRulesKey:   getEnv("WAF_TRIGGER_RULES_KEY", "waf:trigger:rules"),
 			TriggerVersionKey: getEnv("WAF_TRIGGER_VERSION_KEY", "waf:trigger:version"),
+			CanaryRulesetKey:  getEnv("WAF_RULE_CANARY_RULESET_KEY", "waf:rule:canary"),
+			CanaryVersionKey:  getEnv("WAF_RULE_CANARY_VERSION_KEY", "waf:rule:canary_version"),
+			CanaryCfgKey:      getEnv("WAF_RULE_CANARY_CFG_KEY", "waf:rule:canary_cfg"),
 		},
 		WAF: WAF{
 			DistDir: getEnv("WAF_DIST_DIR", "/opt/waf-dist"),

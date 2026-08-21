@@ -10,6 +10,8 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/redis/go-redis/v9"
+
 	"openresty-waf/admin/internal/config"
 	"openresty-waf/admin/internal/model"
 	"openresty-waf/admin/internal/ruletest"
@@ -185,6 +187,115 @@ func (s *RuleService) Rollback(id uint) error {
 	}
 	s.saveHistory("rules", fmt.Sprintf("%d", v), h.Content, h.RuleCount)
 	return nil
+}
+
+// canaryPublishScript 原子下发灰度规则集+配置并自增灰度版本号：
+//
+//	KEYS[1]=灰度规则集键，KEYS[2]=灰度配置键，KEYS[3]=灰度版本键
+//	ARGV[1]=规则集 JSON，ARGV[2]=配置 JSON（percent/ips）
+const canaryPublishScript = `
+redis.call('SET', KEYS[1], ARGV[1])
+redis.call('SET', KEYS[2], ARGV[2])
+return redis.call('INCR', KEYS[3])`
+
+// CanaryCfg 灰度发布配置：percent 为按 IP 哈希分桶的灰度百分比（0-100），
+// ips 为强制进入灰度的 IP 名单（优先于百分比判定）。
+type CanaryCfg struct {
+	Percent int      `json:"percent"`
+	IPs     []string `json:"ips"`
+}
+
+// PublishCanary 发布灰度规则集：与稳定集内容相同（当前启用规则快照），
+// 但写入独立键并由引擎按 percent/IP 名单选择性加载。
+func (s *RuleService) PublishCanary(percent int, ips []string) (*Ruleset, error) {
+	if percent < 0 || percent > 100 {
+		return nil, errors.New("灰度比例必须在 0-100 之间")
+	}
+	rdb := s.mgr.GetClient()
+	if rdb == nil {
+		return nil, errors.New("Redis 未配置，请先在引导页完成 Redis 配置")
+	}
+	rs, err := s.BuildRuleset()
+	if err != nil {
+		return nil, err
+	}
+	body, err := json.Marshal(rs)
+	if err != nil {
+		return nil, err
+	}
+	cfgBody, err := json.Marshal(CanaryCfg{Percent: percent, IPs: ips})
+	if err != nil {
+		return nil, err
+	}
+	v, err := rdb.Eval(s.ctx, canaryPublishScript,
+		[]string{s.cfg.Rule.CanaryRulesetKey, s.cfg.Rule.CanaryCfgKey, s.cfg.Rule.CanaryVersionKey},
+		string(body), string(cfgBody)).Int64()
+	if err != nil {
+		return nil, err
+	}
+	rs.Version = fmt.Sprintf("%d", v)
+	s.saveHistory("canary", rs.Version, string(body), len(rs.Rules))
+	return rs, nil
+}
+
+// PromoteCanary 全量发布：将最新灰度历史内容发到稳定键，并清除全部灰度键。
+func (s *RuleService) PromoteCanary() error {
+	rdb := s.mgr.GetClient()
+	if rdb == nil {
+		return errors.New("Redis 未配置，请先在引导页完成 Redis 配置")
+	}
+	var h model.PublishHistory
+	if err := s.db.Where("kind = ?", "canary").Order("id desc").First(&h).Error; err != nil {
+		return errors.New("没有可晋升的灰度发布记录")
+	}
+	v, err := rdb.Eval(s.ctx, publishScript,
+		[]string{s.cfg.Rule.RulesetKey, s.cfg.Rule.VersionKey}, h.Content).Int64()
+	if err != nil {
+		return err
+	}
+	if err := s.clearCanaryKeys(rdb); err != nil {
+		return err
+	}
+	s.saveHistory("rules", fmt.Sprintf("%d", v), h.Content, h.RuleCount)
+	return nil
+}
+
+// AbortCanary 终止灰度：清除灰度键，全部流量回退稳定规则集。
+func (s *RuleService) AbortCanary() error {
+	rdb := s.mgr.GetClient()
+	if rdb == nil {
+		return errors.New("Redis 未配置，请先在引导页完成 Redis 配置")
+	}
+	return s.clearCanaryKeys(rdb)
+}
+
+// clearCanaryKeys 删除灰度三键（引擎轮询发现版本键消失即自动清理本地灰度态）
+func (s *RuleService) clearCanaryKeys(rdb redis.UniversalClient) error {
+	return rdb.Del(s.ctx,
+		s.cfg.Rule.CanaryRulesetKey, s.cfg.Rule.CanaryCfgKey, s.cfg.Rule.CanaryVersionKey).Err()
+}
+
+// CanaryStatus 查询灰度状态（active=灰度版本键存在）
+func (s *RuleService) CanaryStatus() (map[string]interface{}, error) {
+	res := map[string]interface{}{"active": false}
+	rdb := s.mgr.GetClient()
+	if rdb == nil {
+		return res, nil
+	}
+	v, err := rdb.Get(s.ctx, s.cfg.Rule.CanaryVersionKey).Result()
+	if err != nil {
+		return res, nil // 键不存在或 Redis 异常均视为未开启灰度
+	}
+	res["active"] = true
+	res["version"] = v
+	if cfgBody, err := rdb.Get(s.ctx, s.cfg.Rule.CanaryCfgKey).Bytes(); err == nil {
+		var cfg CanaryCfg
+		if json.Unmarshal(cfgBody, &cfg) == nil {
+			res["percent"] = cfg.Percent
+			res["ips"] = cfg.IPs
+		}
+	}
+	return res, nil
 }
 
 // GetByRuleID 按规则 ID 查询单条规则（规则测试用）

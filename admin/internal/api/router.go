@@ -104,6 +104,11 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.GET("/rules/export", ruleHandler.Export)
 			authed.POST("/rules/import", ruleHandler.Import)
 			authed.GET("/rules/stats", ruleHandler.HitStats)
+			// 规则灰度发布（按百分比/IP 名单下发新规则集）
+			authed.POST("/rules/publish/canary", ruleHandler.PublishCanary)
+			authed.POST("/rules/publish/promote", ruleHandler.PromoteCanary)
+			authed.DELETE("/rules/publish/canary", ruleHandler.AbortCanary)
+			authed.GET("/rules/canary/status", ruleHandler.CanaryStatus)
 			// 规则耗时画像（引擎 rule_perf.lua 上报 → 后台聚合）
 			authed.GET("/rules/perf", rulePerfHandler.List)
 			authed.POST("/rules/perf/consume", rulePerfHandler.Consume)

@@ -214,3 +214,52 @@ func (h *RuleHandler) HitStats(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"items": stats})
 }
+
+// PublishCanary POST /api/rules/publish/canary  body: {"percent": 10, "ips": ["1.2.3.4"]}
+func (h *RuleHandler) PublishCanary(c *gin.Context) {
+	var req struct {
+		Percent int      `json:"percent"`
+		IPs     []string `json:"ips"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误: " + err.Error()})
+		return
+	}
+	rs, err := h.svc.PublishCanary(req.Percent, req.IPs)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "灰度发布失败: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"status": "ok", "version": rs.Version, "rule_count": len(rs.Rules),
+		"percent": req.Percent, "ips": req.IPs,
+	})
+}
+
+// PromoteCanary POST /api/rules/publish/promote  灰度转全量（晋升后清除灰度键）
+func (h *RuleHandler) PromoteCanary(c *gin.Context) {
+	if err := h.svc.PromoteCanary(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "晋升失败: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// AbortCanary DELETE /api/rules/publish/canary  终止灰度，全部流量回退稳定集
+func (h *RuleHandler) AbortCanary(c *gin.Context) {
+	if err := h.svc.AbortCanary(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "终止灰度失败: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// CanaryStatus GET /api/rules/canary/status  查询灰度状态
+func (h *RuleHandler) CanaryStatus(c *gin.Context) {
+	res, err := h.svc.CanaryStatus()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
