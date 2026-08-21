@@ -47,7 +47,9 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 
 	api := r.Group("/api")
 	{
-		api.POST("/auth/login", authHandler.Login)
+		// 登录接口 IP 维度限流：令牌桶限速 + 失败锁定（与账号维度防爆破互补）
+		loginLimiter := NewLoginRateLimiter()
+		api.POST("/auth/login", loginLimiter.Middleware(), authHandler.Login)
 
 		// 引导相关（公开：状态/组件/脚本下载——引擎机安装无需面板凭据；
 		// guide 含 Redis 明文密码，必须登录后可见，见下方 authed 组）
