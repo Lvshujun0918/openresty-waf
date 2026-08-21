@@ -24,6 +24,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 		&model.CcLog{}, &model.PublishHistory{},
 		&model.AlertChannel{}, &model.AlertRule{}, &model.AuditLog{},
 		&model.BotProfile{}, &model.BotFingerprint{}, &model.BotLog{},
+		&model.ApiToken{},
 		&model.Ja4Profile{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

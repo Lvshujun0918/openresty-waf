@@ -142,8 +142,27 @@ func (h *AuthHandler) TotpDisable(c *gin.Context) {
 }
 
 // AuthMiddleware JWT 鉴权中间件
-func AuthMiddleware(svc *service.AuthService) gin.HandlerFunc {
+const apiTokenHeader = "X-API-Token"
+
+// AuthMiddleware 双通道认证：
+//  1. X-API-Token 头 → ApiTokenService 校验（脚本/CI 调用，无 Cookie/CSRF）；
+//     username 记为 "token:<名称>" 便于审计追踪。
+//  2. Authorization: Bearer <JWT> → 常规会话认证。
+func AuthMiddleware(svc *service.AuthService, tokens *service.ApiTokenService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if plain := c.GetHeader(apiTokenHeader); plain != "" {
+			name, err := tokens.Verify(plain)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "API Token 无效或已吊销"})
+				return
+			}
+			c.Set("user_id", uint(0))
+			c.Set("username", "token:"+name)
+			c.Set("api_token", true)
+			c.Next()
+			return
+		}
+
 		auth := c.GetHeader("Authorization")
 		if !strings.HasPrefix(auth, "Bearer ") {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "未登录"})

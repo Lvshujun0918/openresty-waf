@@ -40,6 +40,8 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	botHandler := NewBotHandler(db, mgr, cfg)
 	ja4Handler := NewJa4Handler(db, mgr, cfg)
 	backupHandler := NewBackupHandler(db, cfg)
+	apiTokenSvc := service.NewApiTokenService(db)
+	apiTokenHandler := NewApiTokenHandler(db)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -57,10 +59,15 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 		api.GET("/setup/waf.tar.gz", setupHandler.DownloadWAF)
 		api.GET("/setup/install.sh", setupHandler.InstallScript)
 
-		authed := api.Group("", AuthMiddleware(authSvc))
+		authed := api.Group("", AuthMiddleware(authSvc, apiTokenSvc))
 		authed.Use(CSRFMiddleware())
 		authed.Use(AuditMiddleware(auditSvc))
 		{
+			// API Token 管理（脚本/CI 非交互调用凭证）
+			authed.GET("/tokens", apiTokenHandler.List)
+			authed.POST("/tokens", apiTokenHandler.Create)
+			authed.DELETE("/tokens/:id", apiTokenHandler.Revoke)
+
 			authed.GET("/auth/me", authHandler.Me)
 			authed.POST("/auth/totp/setup", authHandler.TotpSetup)
 			authed.POST("/auth/totp/confirm", authHandler.TotpConfirm)

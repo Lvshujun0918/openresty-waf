@@ -91,10 +91,15 @@ func SetCSRFCookie(c *gin.Context) {
 	c.SetCookie(csrfCookieName, generateCSRFToken(), 7*86400, "/", "", false, false)
 }
 
-// CSRFMiddleware 校验写请求的 X-CSRF-Token 与 Cookie 一致（GET/HEAD 放行）
+// CSRFMiddleware 校验写请求的 X-CSRF-Token 与 Cookie 一致（GET/HEAD 放行）。
+// API Token 认证的请求（api_token 标记）无浏览器上下文，天然免疫 CSRF，直接放行。
 func CSRFMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
+			c.Next()
+			return
+		}
+		if c.GetBool("api_token") {
 			c.Next()
 			return
 		}
