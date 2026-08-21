@@ -1,0 +1,30 @@
+# blazehttp 检测质量门禁（仅手动触发，永不自动运行）
+name: waf-benchmark
+
+on:
+  workflow_dispatch:
+
+jobs:
+  blazehttp-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: 运行 blazehttp 检测质量门禁
+        env:
+          MIN_DETECTION: '80'
+          MAX_FP: '2'
+        run: bash scripts/blazehttp-gate.sh
+
+      - name: 上传基准报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blazehttp-report
+          path: /tmp/blazehttp-report.txt
+          if-no-files-found: ignore
