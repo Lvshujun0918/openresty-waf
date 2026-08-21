@@ -239,6 +239,7 @@ const local: App.I18n.Schema = {
     'trigger-records': 'Trigger Records',
     'ip-lists': 'Subscriptions',
     alerts: 'Alerts',
+    'api-tokens': 'API Tokens',
     bots: 'Bots',
     'audit-logs': 'Audit Logs',
     bans: 'IP Bans',

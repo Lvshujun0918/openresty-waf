@@ -21,6 +21,7 @@ declare module "@elegant-router/types" {
     "404": "/404";
     "500": "/500";
     "alerts": "/alerts";
+    "api-tokens": "/api-tokens";
     "audit-logs": "/audit-logs";
     "bans": "/bans";
     "block-pages": "/block-pages";
@@ -74,6 +75,7 @@ declare module "@elegant-router/types" {
     | "404"
     | "500"
     | "alerts"
+    | "api-tokens"
     | "audit-logs"
     | "bans"
     | "block-pages"
@@ -114,6 +116,7 @@ declare module "@elegant-router/types" {
     | "iframe-page"
     | "login"
     | "alerts"
+    | "api-tokens"
     | "audit-logs"
     | "bans"
     | "block-pages"

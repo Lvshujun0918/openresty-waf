@@ -278,6 +278,16 @@ declare namespace Api {
       created_at: string;
     }
 
+    /** API Token（不含哈希，明文仅创建时返回一次） */
+    interface ApiToken {
+      id: number;
+      name: string;
+      prefix: string;
+      last_used_at: string | null;
+      revoked_at: string | null;
+      created_at: string;
+    }
+
     /** 登录会话 */
     interface Session {
       jti: string;

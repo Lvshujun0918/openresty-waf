@@ -51,6 +51,17 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'api-tokens',
+    path: '/api-tokens',
+    component: 'layout.base$view.api-tokens',
+    meta: {
+      title: 'api-tokens',
+      i18nKey: 'route.api-tokens',
+      icon: 'mdi:key-variant',
+      order: 9.2
+    }
+  },
+  {
     name: 'audit-logs',
     path: '/audit-logs',
     component: 'layout.base$view.audit-logs',
