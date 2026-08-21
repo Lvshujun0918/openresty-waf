@@ -2,10 +2,14 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -229,8 +233,26 @@ func main() {
 	}()
 
 	r := api.NewRouter(cfg, db, mgr)
-	log.Printf("WAF 管理后台启动，监听 %s", cfg.Server.Addr)
-	if err := r.Run(cfg.Server.Addr); err != nil {
-		log.Fatalf("服务启动失败: %v", err)
+
+	// 优雅关闭：docker stop / kill 发送 SIGTERM 后，停止接收新连接并等待在途请求完成，
+	// 避免重启瞬间请求被硬切断；未消费的 Redis 事件队列天然持久，重启后继续消费。
+	srv := &http.Server{Addr: cfg.Server.Addr, Handler: r}
+	go func() {
+		log.Printf("WAF 管理后台启动，监听 %s", cfg.Server.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("服务启动失败: %v", err)
+		}
+	}()
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+	log.Printf("收到退出信号，开始优雅关闭…")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("优雅关闭超时（仍有在途请求未完成）: %v", err)
+	} else {
+		log.Printf("WAF 管理后台已优雅退出")
 	}
 }
