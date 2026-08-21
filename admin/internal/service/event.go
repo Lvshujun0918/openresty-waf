@@ -28,6 +28,16 @@ func NewEventService(db *gorm.DB, mgr *RedisManager, cfg *config.Config) *EventS
 	return &EventService{db: db, mgr: mgr, cfg: cfg, ctx: context.Background()}
 }
 
+// Cleanup 清理 retentionDays 天前的攻击事件，返回删除条数（定时轮转防表膨胀）
+func (s *EventService) Cleanup(retentionDays int) (int64, error) {
+	if retentionDays < 1 {
+		retentionDays = 30
+	}
+	cutoff := time.Now().Add(-time.Duration(retentionDays) * 24 * time.Hour)
+	res := s.db.Where("time < ?", cutoff).Delete(&model.Event{})
+	return res.RowsAffected, res.Error
+}
+
 // Consume 从 Redis 队列批量消费事件并写入 DB，返回本次消费条数。
 // 批量 RPop + 批量插入（CreateInBatches），攻击风暴下避免逐条往返与逐条写库；
 // 坏数据跳过，单个失败不中断。

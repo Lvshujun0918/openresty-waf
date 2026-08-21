@@ -2,6 +2,7 @@ package service
 
 import (
 	"log"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -15,6 +16,16 @@ type AuditService struct {
 
 func NewAuditService(db *gorm.DB) *AuditService {
 	return &AuditService{db: db}
+}
+
+// Cleanup 清理 retentionDays 天前的审计日志，返回删除条数（定时轮转防表膨胀）
+func (s *AuditService) Cleanup(retentionDays int) (int64, error) {
+	if retentionDays < 1 {
+		retentionDays = 90
+	}
+	cutoff := time.Now().Add(-time.Duration(retentionDays) * 24 * time.Hour)
+	res := s.db.Where("created_at < ?", cutoff).Delete(&model.AuditLog{})
+	return res.RowsAffected, res.Error
 }
 
 // Record 记录一条审计日志（异步不阻塞业务；失败仅告警，不影响主流程）

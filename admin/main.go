@@ -160,7 +160,7 @@ func main() {
 		}
 	}()
 
-	// 全量流量记录：定时消费队列实时落库 + 按配置保留天数自动清理过期记录
+	// 全量流量记录：定时消费队列实时落库
 	trafficSvc := service.NewTrafficService(db, mgr, cfg)
 	wafCfgSvc := service.NewWafConfigService(db, mgr, cfg)
 	go func() {
@@ -175,6 +175,9 @@ func main() {
 			}
 		}
 	}()
+	// 数据保留轮转（每 6 小时）：按配置保留天数清理 流量记录/攻击事件/审计日志，
+	// 防止高频写入表无限膨胀；保留天数从 WAF 配置对应 section 读取，缺省兜底。
+	auditSvc := service.NewAuditService(db)
 	go func() {
 		ticker := time.NewTicker(6 * time.Hour)
 		defer ticker.Stop()
@@ -182,18 +185,33 @@ func main() {
 			if mgr.GetClient() == nil {
 				continue
 			}
-			days := 7
-			if cfgMap, err := wafCfgSvc.Get(); err == nil {
-				if tl, ok := cfgMap["traffic_log"].(map[string]interface{}); ok {
-					if v, ok := tl["retention_days"].(float64); ok && v > 0 {
+			cfgMap := map[string]interface{}{}
+			if m, err := wafCfgSvc.Get(); err == nil {
+				cfgMap = m
+			}
+			jobs := []struct {
+				name    string
+				section string
+				defDays int
+				run     func(days int) (int64, error)
+			}{
+				{"流量记录", "traffic_log", 7, trafficSvc.Cleanup},
+				{"攻击事件", "event_log", 30, eventSvc.Cleanup},
+				{"审计日志", "audit_log", 90, auditSvc.Cleanup},
+			}
+			for _, j := range jobs {
+				days := j.defDays
+				if sec, ok := cfgMap[j.section].(map[string]interface{}); ok {
+					if v, ok := sec["retention_days"].(float64); ok && v > 0 {
 						days = int(v)
 					}
 				}
-			}
-			if n, err := trafficSvc.Cleanup(days); err != nil {
-				log.Printf("清理流量记录失败: %v", err)
-			} else if n > 0 {
-				log.Printf("已清理 %d 天前的流量记录 %d 条", days, n)
+				n, err := j.run(days)
+				if err != nil {
+					log.Printf("清理%s失败: %v", j.name, err)
+				} else if n > 0 {
+					log.Printf("已清理 %d 天前的%s %d 条", days, j.name, n)
+				}
 			}
 		}
 	}()
