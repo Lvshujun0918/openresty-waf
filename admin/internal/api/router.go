@@ -23,6 +23,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	authHandler := NewAuthHandler(db, mgr, cfg)
 	authSvc := service.NewAuthService(db, mgr, cfg)
 	ruleHandler := NewRuleHandler(db, mgr, cfg)
+	rulePerfHandler := NewRulePerfHandler(db, mgr, cfg)
 	eventHandler := NewEventHandler(db, mgr, cfg)
 	setupHandler := NewSetupHandler(db, mgr, cfg)
 	configHandler := NewConfigHandler(db, mgr, cfg)
@@ -93,6 +94,10 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.GET("/rules/export", ruleHandler.Export)
 			authed.POST("/rules/import", ruleHandler.Import)
 			authed.GET("/rules/stats", ruleHandler.HitStats)
+			// 规则耗时画像（引擎 rule_perf.lua 上报 → 后台聚合）
+			authed.GET("/rules/perf", rulePerfHandler.List)
+			authed.POST("/rules/perf/consume", rulePerfHandler.Consume)
+			authed.DELETE("/rules/perf", rulePerfHandler.Reset)
 
 			// IP 列表订阅（远程威胁情报 IP 列表）
 			authed.GET("/ip-list-subs", ipListHandler.List)

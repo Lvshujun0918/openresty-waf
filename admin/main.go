@@ -147,6 +147,21 @@ func main() {
 		}
 	}()
 
+	// 规则耗时画像：定时消费引擎上报快照累计落库（每 60 秒，与引擎上报周期匹配）
+	rulePerfSvc := service.NewRulePerfService(db, mgr, cfg)
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			if mgr.GetClient() == nil {
+				continue
+			}
+			if _, err := rulePerfSvc.Consume(100); err != nil {
+				log.Printf("消费规则耗时画像失败: %v", err)
+			}
+		}
+	}()
+
 	// 远程 IP 列表订阅定时同步（每分钟检查到期订阅）
 	ipListSvc := service.NewIpListService(db, mgr, cfg)
 	go func() {
