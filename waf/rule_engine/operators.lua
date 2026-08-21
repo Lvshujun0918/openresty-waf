@@ -230,6 +230,26 @@ local operators = {
         end
         return m.is_xss(value)
     end,
+
+    -- 轻量语义分析：token 化 + 结构异常度评分（纯 Lua，无 .so 依赖）
+    -- pattern 为分数阈值（0-100），任一值评分达到阈值即命中。
+    -- 典型用法：SCORE 弱特征规则（阈值 35 计 +1 / 阈值 60 计 +2），
+    -- 与 libinjection 强特征（BLOCK）形成两层语义网。
+    SEMANTIC_ANOMALY = function(value, pattern)
+        local sem = require "semantic"
+        local util = require "rule_engine.util"
+        local threshold = tonumber(pattern)
+        if not threshold then return false end
+        local ok, vals = util.try_parse_json(value)
+        if not ok then vals = { value } end
+        for _, v in ipairs(vals) do
+            if v ~= nil and v ~= "" then
+                local score = sem.anomaly(tostring(v))
+                if score >= threshold then return true end
+            end
+        end
+        return false
+    end,
 }
 
 -- 求值：name 为运算符名；compiled 为 REGEX 预编译对象（可选）
