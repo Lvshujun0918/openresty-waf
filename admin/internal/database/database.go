@@ -30,7 +30,7 @@ func Init(cfg *config.Config) *gorm.DB {
 	}
 
 	if err := db.AutoMigrate(&model.User{}, &model.Rule{},
-		&model.Event{}, &model.Setup{}, &model.IpListSubscription{},
+		&model.Event{}, &model.Setup{}, &model.IpListSubscription{}, &model.RuleSubscription{},
 		&model.TrafficLog{}, &model.ChallengeLog{}, &model.TriggerRule{},
 		&model.CcLog{}, &model.PublishHistory{},
 		&model.AlertChannel{}, &model.AlertRule{}, &model.AuditLog{},

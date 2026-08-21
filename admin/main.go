@@ -175,6 +175,19 @@ func main() {
 		}
 	}()
 
+	// 远程规则订阅源定时同步（每分钟检查到期订阅）
+	ruleSubSvc := service.NewRuleSubService(db, mgr, cfg)
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			if mgr.GetClient() == nil {
+				continue
+			}
+			ruleSubSvc.SyncAll()
+		}
+	}()
+
 	// 全量流量记录：定时消费队列实时落库
 	trafficSvc := service.NewTrafficService(db, mgr, cfg)
 	wafCfgSvc := service.NewWafConfigService(db, mgr, cfg)

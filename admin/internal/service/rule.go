@@ -316,6 +316,8 @@ func (s *RuleService) ExportRules() ([]model.Rule, error) {
 	for i := range rules {
 		rules[i].ID = 0
 		rules[i].IsSeed = false
+		rules[i].Source = "local"
+		rules[i].SubID = 0
 		rules[i].CreatedAt = time.Time{}
 		rules[i].UpdatedAt = time.Time{}
 	}
@@ -328,6 +330,8 @@ func (s *RuleService) ImportRules(rules []model.Rule) (imported, skipped int, er
 	for _, r := range rules {
 		r.ID = 0
 		r.IsSeed = false
+		r.Source = "local"
+		r.SubID = 0
 		r.CreatedAt = time.Time{}
 		r.UpdatedAt = time.Time{}
 		if r.RuleID == "" {

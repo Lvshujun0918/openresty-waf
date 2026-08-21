@@ -91,7 +91,8 @@ func ModuleForPath(path string) string {
 		path == "setup/redis":
 		return PermSystem
 	// 规则与触发规则
-	case strings.HasPrefix(path, "rules"), strings.HasPrefix(path, "trigger-rules"):
+	case strings.HasPrefix(path, "rules"), strings.HasPrefix(path, "trigger-rules"),
+		strings.HasPrefix(path, "rule-subs"):
 		return PermRules
 	// 名单/封禁/事件处置/Bot/JA4
 	case strings.HasPrefix(path, "ip-list-subs"), strings.HasPrefix(path, "bans"),

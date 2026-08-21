@@ -51,6 +51,8 @@ type Rule struct {
 	Message    string    `gorm:"size:255" json:"message"`     // 便捷字段，Actions 中的提示
 	SortOrder  int       `gorm:"default:0" json:"sort_order"`
 	IsSeed     bool      `gorm:"default:false" json:"is_seed"` // 内置种子标记（升级时自动替换）
+	Source     string    `gorm:"size:16;default:local" json:"source"` // local | subscription（规则订阅源同步产生）
+	SubID      uint      `gorm:"index;default:0" json:"sub_id"`       // 来源订阅 ID（source=subscription 时有效）
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }

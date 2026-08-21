@@ -53,6 +53,7 @@ type apiDeps struct {
 	setupHandler       *SetupHandler
 	configHandler      *ConfigHandler
 	ipListHandler      *IpListHandler
+	ruleSubHandler     *RuleSubHandler
 	trafficHandler     *TrafficHandler
 	dashboardHandler   *DashboardHandler
 	challengeHandler   *ChallengeHandler
@@ -83,6 +84,7 @@ func newDeps(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *apiDep
 		setupHandler:       NewSetupHandler(db, mgr, cfg),
 		configHandler:      NewConfigHandler(db, mgr, cfg),
 		ipListHandler:      NewIpListHandler(db, mgr, cfg),
+		ruleSubHandler:     NewRuleSubHandler(db, mgr, cfg),
 		trafficHandler:     NewTrafficHandler(db, mgr, cfg),
 		dashboardHandler:   NewDashboardHandler(db),
 		challengeHandler:   NewChallengeHandler(db, mgr, cfg),
@@ -180,6 +182,14 @@ func registerAPIRoutes(api *gin.RouterGroup, d *apiDeps) {
 			authed.DELETE("/ip-list-subs/:id", d.ipListHandler.Delete)
 			authed.PATCH("/ip-list-subs/:id/enabled", d.ipListHandler.SetEnabled)
 			authed.POST("/ip-list-subs/:id/sync", d.ipListHandler.Sync)
+
+			// 规则订阅源（远程规则集同步入库）
+			authed.GET("/rule-subs", d.ruleSubHandler.List)
+			authed.POST("/rule-subs", d.ruleSubHandler.Create)
+			authed.PUT("/rule-subs/:id", d.ruleSubHandler.Update)
+			authed.DELETE("/rule-subs/:id", d.ruleSubHandler.Delete)
+			authed.PATCH("/rule-subs/:id/enabled", d.ruleSubHandler.SetEnabled)
+			authed.POST("/rule-subs/:id/sync", d.ruleSubHandler.Sync)
 
 			// 全量流量记录
 			authed.GET("/traffic", d.trafficHandler.List)
