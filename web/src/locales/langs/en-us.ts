@@ -231,6 +231,7 @@ const local: App.I18n.Schema = {
     'iframe-page': 'Iframe',
     home: 'Home',
     dashboard: 'Dashboard',
+    'error-logs': 'Error Logs',
     events: 'Attack Events',
     traffic: 'Traffic Logs',
     rules: 'Rules',

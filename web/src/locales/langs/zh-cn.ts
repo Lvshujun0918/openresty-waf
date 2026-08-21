@@ -227,6 +227,7 @@ const local: App.I18n.Schema = {
     'iframe-page': '外链页面',
     home: '首页',
     dashboard: '仪表盘',
+    'error-logs': '报错汇总',
     events: '攻击事件',
     traffic: '流量日志',
     rules: '规则管理',

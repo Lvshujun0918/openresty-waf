@@ -140,6 +140,17 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'error-logs',
+    path: '/error-logs',
+    component: 'layout.base$view.error-logs',
+    meta: {
+      title: 'error-logs',
+      i18nKey: 'route.error-logs',
+      icon: 'mdi:alert-circle-outline',
+      order: 7.5
+    }
+  },
+  {
     name: 'guide',
     path: '/guide',
     component: 'layout.base$view.guide',

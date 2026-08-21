@@ -174,6 +174,7 @@ const routeMap: RouteMap = {
   "bots": "/bots",
   "config": "/config",
   "dashboard": "/dashboard",
+  "error-logs": "/error-logs",
   "events": "/events",
   "guide": "/guide",
   "home": "/home",

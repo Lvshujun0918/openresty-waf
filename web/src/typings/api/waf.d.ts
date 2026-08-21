@@ -324,6 +324,29 @@ declare namespace Api {
       updated_at: string;
     }
 
+    /** 引擎报错汇总行（ERR/WARN 级，由引擎异步上报） */
+    interface ErrorLogRow {
+      id: number;
+      time: string;
+      /** error / warn */
+      level: string;
+      /** 来源模块：access/init/engine/operators/cc/challenge/upload/ja4/log 等 */
+      source: string;
+      message: string;
+      req_id: string;
+      client_ip: string;
+      host: string;
+      uri: string;
+      engine_version: string;
+      created_at: string;
+    }
+
+    /** 近 24 小时报错统计 */
+    interface ErrorStats {
+      error: number;
+      warn: number;
+    }
+
     /** API Token（不含哈希，明文仅创建时返回一次） */
     interface ApiToken {
       id: number;

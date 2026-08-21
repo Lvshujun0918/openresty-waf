@@ -1,4 +1,5 @@
 export * from './auth';
+export * from './errorlog';
 export * from './route';
 export * from './ruleperf';
 export * from './rulesub';

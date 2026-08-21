@@ -28,6 +28,7 @@ declare module "@elegant-router/types" {
     "bots": "/bots";
     "config": "/config";
     "dashboard": "/dashboard";
+    "error-logs": "/error-logs";
     "events": "/events";
     "guide": "/guide";
     "home": "/home";
@@ -85,6 +86,7 @@ declare module "@elegant-router/types" {
     | "bots"
     | "config"
     | "dashboard"
+    | "error-logs"
     | "events"
     | "guide"
     | "home"
@@ -129,6 +131,7 @@ declare module "@elegant-router/types" {
     | "bots"
     | "config"
     | "dashboard"
+    | "error-logs"
     | "events"
     | "guide"
     | "home"
