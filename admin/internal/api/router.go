@@ -39,6 +39,7 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	auditSvc := service.NewAuditService(db)
 	botHandler := NewBotHandler(db, mgr, cfg)
 	ja4Handler := NewJa4Handler(db, mgr, cfg)
+	backupHandler := NewBackupHandler(db, cfg)
 
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
@@ -187,6 +188,9 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 			authed.GET("/config", configHandler.Get)
 			authed.PUT("/config", configHandler.Save)
 			authed.GET("/config/versions", configHandler.Versions)
+
+			// 数据库备份（在线快照下载）
+			authed.GET("/db/backup", backupHandler.Export)
 		}
 	}
 
