@@ -240,6 +240,7 @@ const local: App.I18n.Schema = {
     'ip-lists': 'Subscriptions',
     alerts: 'Alerts',
     'api-tokens': 'API Tokens',
+    'rule-perf': 'Rule Performance',
     bots: 'Bots',
     'audit-logs': 'Audit Logs',
     bans: 'IP Bans',

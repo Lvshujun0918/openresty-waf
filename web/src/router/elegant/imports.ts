@@ -33,6 +33,7 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   home: () => import("@/views/home/index.vue"),
   "ip-lists": () => import("@/views/ip-lists/index.vue"),
   monitor: () => import("@/views/monitor/index.vue"),
+  "rule-perf": () => import("@/views/rule-perf/index.vue"),
   rules: () => import("@/views/rules/index.vue"),
   security: () => import("@/views/security/index.vue"),
   traffic: () => import("@/views/traffic/index.vue"),

@@ -209,6 +209,17 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'rule-perf',
+    path: '/rule-perf',
+    component: 'layout.base$view.rule-perf',
+    meta: {
+      title: 'rule-perf',
+      i18nKey: 'route.rule-perf',
+      icon: 'mdi:speedometer',
+      order: 9.3
+    }
+  },
+  {
     name: 'rules',
     path: '/rules',
     component: 'layout.base$view.rules',

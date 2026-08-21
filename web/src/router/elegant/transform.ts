@@ -181,6 +181,7 @@ const routeMap: RouteMap = {
   "ip-lists": "/ip-lists",
   "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?",
   "monitor": "/monitor",
+  "rule-perf": "/rule-perf",
   "rules": "/rules",
   "security": "/security",
   "traffic": "/traffic",

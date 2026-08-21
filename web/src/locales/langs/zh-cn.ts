@@ -236,6 +236,7 @@ const local: App.I18n.Schema = {
     'ip-lists': '订阅库',
     alerts: '告警通知',
     'api-tokens': 'API Token',
+    'rule-perf': '规则性能',
     bots: '爬虫管理',
     'audit-logs': '操作审计',
     bans: '封禁管理',

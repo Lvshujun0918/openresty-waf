@@ -278,6 +278,28 @@ declare namespace Api {
       created_at: string;
     }
 
+    /** 规则性能画像行（引擎上报的各规则评估耗时统计） */
+    interface RulePerfRow {
+      rule_id: string;
+      /** 联查的规则名称（规则已删除时为空字符串） */
+      name: string;
+      /** 联查的规则分组（规则已删除时为空字符串） */
+      group: string;
+      /** 联查的规则命中提示信息 */
+      message: string;
+      /** 联查的规则启用状态（规则已删除时为 false） */
+      enabled: boolean;
+      /** 累计评估次数 */
+      hits: number;
+      /** 平均耗时（微秒） */
+      avg_us: number;
+      /** 最大耗时（微秒） */
+      max_us: number;
+      /** 累计耗时（微秒） */
+      total_us: number;
+      updated_at: string;
+    }
+
     /** API Token（不含哈希，明文仅创建时返回一次） */
     interface ApiToken {
       id: number;
