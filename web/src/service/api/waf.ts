@@ -88,6 +88,30 @@ export function rollbackRules(id: number) {
   return request<{ status: string }>({ url: `/rules/rollback/${id}`, method: 'post' });
 }
 
+/** 灰度发布状态 */
+export function fetchCanaryStatus() {
+  return request<Api.Waf.CanaryStatus>({ url: '/rules/canary/status' });
+}
+
+/** 发起灰度发布（按百分比/IP 名单下发新规则集） */
+export function publishCanary(percent: number, ips: string[]) {
+  return request<{ status: string; version: string; rule_count: number; percent: number; ips: string[] }>({
+    url: '/rules/publish/canary',
+    method: 'post',
+    data: { percent, ips }
+  });
+}
+
+/** 灰度转全量（晋升后清除灰度键） */
+export function promoteCanary() {
+  return request<{ status: string }>({ url: '/rules/publish/promote', method: 'post' });
+}
+
+/** 终止灰度，全部流量回退稳定规则集 */
+export function abortCanary() {
+  return request<{ status: string }>({ url: '/rules/publish/canary', method: 'delete' });
+}
+
 /** 导出全部规则（返回 JSON 数组，前端生成文件下载） */
 export function exportRules() {
   return request<Api.Waf.Rule[]>({ url: '/rules/export' });

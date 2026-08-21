@@ -218,6 +218,14 @@ declare namespace Api {
       created_at: string;
     }
 
+    /** 规则灰度发布状态 */
+    interface CanaryStatus {
+      active: boolean;
+      version?: string;
+      percent?: number;
+      ips?: string[];
+    }
+
     /** 封禁条目 */
     interface BanEntry {
       ip: string;

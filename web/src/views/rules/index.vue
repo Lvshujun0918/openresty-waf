@@ -17,12 +17,16 @@ import {
   NInputNumber
 } from 'naive-ui';
 import {
+  abortCanary,
   createRule,
   deleteRule,
   exportRules,
+  fetchCanaryStatus,
   fetchPublishHistory,
   fetchRules,
   importRules,
+  promoteCanary,
+  publishCanary,
   publishRules,
   rollbackRules,
   setRuleEnabled,
@@ -222,6 +226,63 @@ async function doRollback(row: Api.Waf.PublishHistory) {
     await load();
   } finally {
     rollingBackId.value = null;
+  }
+}
+
+// —— 规则灰度发布 ——
+const canaryStatus = ref<Api.Waf.CanaryStatus | null>(null);
+const canaryOpen = ref(false);
+const canarySubmitting = ref(false);
+const canaryPromoting = ref(false);
+const canaryAborting = ref(false);
+const canaryForm = reactive({ percent: 10, ips: [] as string[] });
+
+async function loadCanaryStatus() {
+  const res = await fetchCanaryStatus().catch(() => ({ data: null }));
+  canaryStatus.value = res.data ?? null;
+}
+
+function openCanary() {
+  Object.assign(canaryForm, { percent: 10, ips: [] as string[] });
+  canaryOpen.value = true;
+}
+
+async function doPublishCanary() {
+  const percent = Math.round(canaryForm.percent);
+  if (Number.isNaN(percent) || percent < 0 || percent > 100) {
+    window.$message?.warning('灰度比例必须在 0-100 之间');
+    return;
+  }
+  canarySubmitting.value = true;
+  try {
+    const res = await publishCanary(percent, canaryForm.ips);
+    window.$message?.success(`灰度版本 #${res.data?.version} 已发布，命中流量将使用新规则集`);
+    canaryOpen.value = false;
+    await loadCanaryStatus();
+  } finally {
+    canarySubmitting.value = false;
+  }
+}
+
+async function doPromoteCanary() {
+  canaryPromoting.value = true;
+  try {
+    await promoteCanary();
+    window.$message?.success('已全量发布，全部流量回稳到正式规则集');
+    await loadCanaryStatus();
+  } finally {
+    canaryPromoting.value = false;
+  }
+}
+
+async function doAbortCanary() {
+  canaryAborting.value = true;
+  try {
+    await abortCanary();
+    window.$message?.success('已终止灰度，全部流量回退稳定规则集');
+    await loadCanaryStatus();
+  } finally {
+    canaryAborting.value = false;
   }
 }
 
@@ -535,6 +596,7 @@ async function loadRuleStats() {
 onMounted(() => {
   load();
   loadRuleStats();
+  loadCanaryStatus();
 });
 </script>
 
@@ -542,6 +604,28 @@ onMounted(() => {
   <div class="space-y-4">
     <NAlert v-if="highFpRules.length" type="warning" :bordered="false" class="card-wrapper" title="高误报规则提醒">
       以下规则误报率 ≥20%（命中 ≥3 次）：{{ highFpRules.map(r => r.rule_id + '（' + (r.fp_rate ?? 0).toFixed(0) + '%）').join('、') }} —— 建议复查规则或对相关路径配置豁免
+    </NAlert>
+    <NAlert v-if="canaryStatus?.active" type="warning" :bordered="false" class="card-wrapper" title="灰度发布进行中">
+      <div class="flex flex-wrap items-center gap-3">
+        <span>
+          版本 <span class="font-mono">#{{ canaryStatus.version }}</span> · 比例 {{ canaryStatus.percent }}% ·
+          IP 名单 {{ canaryStatus.ips?.length ? canaryStatus.ips.join('、') : '无' }}
+        </span>
+        <NSpace size="small">
+          <NPopconfirm @positive-click="doPromoteCanary">
+            <template #trigger>
+              <NButton size="small" type="primary" :loading="canaryPromoting">全量发布</NButton>
+            </template>
+            将灰度版本晋升为正式规则集并结束灰度？
+          </NPopconfirm>
+          <NPopconfirm @positive-click="doAbortCanary">
+            <template #trigger>
+              <NButton size="small" type="error" :loading="canaryAborting">终止灰度</NButton>
+            </template>
+            终止后全部流量立即回退稳定规则集？
+          </NPopconfirm>
+        </NSpace>
+      </div>
     </NAlert>
     <div class="flex items-center justify-between">
       <div>
@@ -552,6 +636,7 @@ onMounted(() => {
         <NButton secondary @click="doExport">导出</NButton>
         <NButton secondary @click="triggerImport">导入</NButton>
         <NButton secondary @click="historyOpen = true; loadHistory()">发布历史</NButton>
+        <NButton secondary type="info" @click="openCanary">灰度发布</NButton>
         <NButton secondary type="warning" @click="doPublish">发布到引擎</NButton>
         <NButton type="primary" @click="openCreate">新建规则</NButton>
         <input ref="importInputRef" type="file" accept=".json,application/json" class="hidden" @change="onImportFile" />
@@ -689,6 +774,30 @@ onMounted(() => {
     <NModal v-model:show="historyOpen" preset="card" title="发布历史与回滚" class="w-[min(96vw,640px)]">
       <p class="mb-3 text-xs text-[rgb(125,125,125)]">每次发布保存完整规则集快照，回滚后引擎按新版本号热更新（版本单调递增，可在发布历史中持续追踪）</p>
       <NDataTable :columns="historyColumns" :data="history" :loading="historyLoading" :bordered="false" size="small" />
+    </NModal>
+
+    <!-- 灰度发布 -->
+    <NModal v-model:show="canaryOpen" preset="card" title="灰度发布新规则集" class="w-[min(96vw,560px)]">
+      <p class="mb-3 text-xs text-[rgb(125,125,125)]">
+        将当前全部启用规则作为灰度版本下发：命中比例或 IP 名单的流量使用灰度规则集，其余流量继续使用稳定规则集。确认效果后再「全量发布」。
+      </p>
+      <NForm label-placement="left" label-width="96">
+        <NFormItem label="灰度比例">
+          <div class="flex w-full items-center gap-3">
+            <NSlider v-model:value="canaryForm.percent" :min="0" :max="100" :step="1" :format-tooltip="(v: number) => `${v}%`" class="flex-1" />
+            <NInputNumber v-model:value="canaryForm.percent" :min="0" :max="100" size="small" class="w-24" />
+          </div>
+        </NFormItem>
+        <NFormItem label="IP 名单">
+          <NDynamicTags v-model:value="canaryForm.ips" placeholder="输入 IP 后回车添加（名单内 IP 强制走灰度）" />
+        </NFormItem>
+      </NForm>
+      <template #footer>
+        <NSpace justify="end">
+          <NButton @click="canaryOpen = false">取消</NButton>
+          <NButton type="primary" :loading="canarySubmitting" @click="doPublishCanary">发布灰度版本</NButton>
+        </NSpace>
+      </template>
     </NModal>
   </div>
 </template>
