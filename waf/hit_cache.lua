@@ -38,11 +38,13 @@ function _M.cacheable(ctx)
     return true
 end
 
--- 缓存键：ruleset_version | mode | method | host | ip | uri(含 args) | 请求头指纹
-function _M.cache_key(cfg, ctx)
+-- 缓存键：ruleset_version | tag | mode | method | host | ip | uri(含 args) | 请求头指纹
+-- tag 用于灰度规则集隔离（如 c<canary_version>）；稳定集保持空 tag，兼容旧键语义。
+function _M.cache_key(cfg, ctx, tag)
     local version = storage.get_shared(config.dict.rules, "ruleset_version") or ""
     local parts = {
         version,
+        tag or "",
         ctx.mode or "",
         ctx.request.method or "",
         ctx.request.host or "",
@@ -77,11 +79,11 @@ local function bump(dict, key)
 end
 
 -- 查询缓存。返回 nil（未命中/不可缓存）或 { blocked = bool, matched = {...}|nil }
-function _M.lookup(cfg, ctx)
+function _M.lookup(cfg, ctx, tag)
     if not _M.enabled(cfg) or not _M.cacheable(ctx) then return nil end
     local dict = dict_get()
     if not dict then return nil end
-    local v = dict:get(_M.cache_key(cfg, ctx))
+    local v = dict:get(_M.cache_key(cfg, ctx, tag))
     if v == nil then
         bump(dict, "hc:stat:misses")
         return nil
@@ -101,7 +103,7 @@ end
 
 -- 写入缓存。blocked=false 存 "A"；blocked=true 存 "B"+JSON（主命中条目）。
 -- primary_matched 为命中时取 ctx.matched 中 severity 最高条目（由调用方挑选传入）。
-function _M.store(cfg, ctx, blocked, primary_matched)
+function _M.store(cfg, ctx, blocked, primary_matched, tag)
     if not _M.enabled(cfg) or not _M.cacheable(ctx) then return end
     local ttl = 10
     if cfg.hit_cache and tonumber(cfg.hit_cache.ttl) then
@@ -116,7 +118,7 @@ function _M.store(cfg, ctx, blocked, primary_matched)
         if not ok then return end
         value = "B" .. encoded
     end
-    dict:set(_M.cache_key(cfg, ctx), value, ttl)
+    dict:set(_M.cache_key(cfg, ctx, tag), value, ttl)
 end
 
 -- 从 ctx.matched 挑选主命中条目（severity 最高；并列取先出现者）

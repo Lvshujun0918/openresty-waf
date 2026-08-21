@@ -16,6 +16,9 @@ local _M = {}
 
 local RULES_KEY       = "active_ruleset"   -- 当前生效规则集（JSON 字符串）
 local VERSION_KEY     = "ruleset_version"  -- 当前生效版本号
+local CANARY_RULES_KEY   = "canary_ruleset"   -- 当前灰度规则集（JSON 字符串）
+local CANARY_VERSION_KEY = "canary_version"   -- 当前灰度版本号（不存在/空=未启用）
+local CANARY_CFG_KEY     = "canary_cfg"       -- 当前灰度配置（JSON 字符串）
 local CONFIG_KEY      = "active_config"    -- 当前生效配置（JSON 字符串）
 local CFG_VERSION_KEY = "config_version"   -- 配置版本号
 local TRIGGER_RULES_KEY   = "active_trigger_rules"  -- 当前生效触发规则集
@@ -148,6 +151,67 @@ local function refresh_rules()
     end
 end
 
+local function clear_canary()
+    storage.set_shared(config.dict.rules, CANARY_RULES_KEY, nil)
+    storage.set_shared(config.dict.rules, CANARY_CFG_KEY, nil)
+    storage.set_shared(config.dict.rules, CANARY_VERSION_KEY, nil)
+end
+
+-- 从 Redis 拉取灰度规则集并热切换。灰度版本键不存在时清理本地灰度态，
+-- 之后全部请求回到稳定规则集；灰度版本允许重新从 1 开始（Abort 后重新发布）。
+local function refresh_canary()
+    local version, err = storage.redis_get(config.rule_refresh.canary_version_key)
+    if err then
+        log(ngx.WARN, "读取灰度规则版本失败: " .. tostring(err))
+        return
+    end
+    if not version then
+        if storage.get_shared(config.dict.rules, CANARY_VERSION_KEY) then
+            clear_canary()
+            log(ngx.INFO, "灰度规则集已清除")
+        end
+        return
+    end
+
+    local current = storage.get_shared(config.dict.rules, CANARY_VERSION_KEY)
+    if current == version then
+        return
+    end
+
+    local body, err2 = storage.redis_get(config.rule_refresh.canary_ruleset_key)
+    if err2 or not body then
+        log(ngx.WARN, "读取灰度规则集失败: " .. tostring(err2))
+        return
+    end
+    local cfg_body, err3 = storage.redis_get(config.rule_refresh.canary_cfg_key)
+    if err3 or not cfg_body then
+        log(ngx.WARN, "读取灰度配置失败: " .. tostring(err3))
+        return
+    end
+
+    local ruleset = storage.decode(body)
+    if not _M.validate_ruleset(ruleset) then
+        log(ngx.ERR, "Redis 灰度规则集结构非法，拒绝加载（保持当前灰度规则集）")
+        return
+    end
+    local cfg = storage.decode(cfg_body)
+    local percent = cfg and tonumber(cfg.percent)
+    if type(cfg) ~= "table" or percent == nil or percent < 0 or percent > 100 then
+        log(ngx.WARN, "Redis 灰度配置非法，忽略本次更新")
+        return
+    end
+
+    local ok1 = storage.set_shared(config.dict.rules, CANARY_RULES_KEY, body)
+    local ok2 = storage.set_shared(config.dict.rules, CANARY_CFG_KEY, cfg_body)
+    local ok3 = storage.set_shared(config.dict.rules, CANARY_VERSION_KEY, version)
+    if ok1 and ok2 and ok3 then
+        log(ngx.INFO, "灰度规则集已热更新至版本: " .. tostring(version))
+    else
+        log(ngx.WARN, "灰度规则集热更新写入失败: " .. tostring(ok1) .. "/" .. tostring(ok2)
+            .. "/" .. tostring(ok3) .. "，将在下个轮询周期重试")
+    end
+end
+
 -- 从 Redis 拉取后台下发的运行配置并热更新生效配置
 -- 后台配置深合并到当前生效配置（未下发字段保留默认，如 redis 连接）
 local function refresh_config()
@@ -249,6 +313,7 @@ local function heartbeat(premature)
         pid              = ngx.worker.pid(),
         engine_version   = config.version or "",
         ruleset_version  = storage.get_shared(config.dict.rules, VERSION_KEY) or "",
+        canary_version   = storage.get_shared(config.dict.rules, CANARY_VERSION_KEY) or "",
         config_version   = storage.get_shared(config.dict.rules, CFG_VERSION_KEY) or "",
         trigger_version  = storage.get_shared(config.dict.rules, TRIGGER_VERSION_KEY) or "",
     })
@@ -314,6 +379,7 @@ end
 local function refresh_from_redis(premature)
     if premature then return end
     refresh_rules()
+    refresh_canary()
     refresh_config()
     refresh_trigger_rules()
     refresh_bot_profiles()
@@ -334,6 +400,7 @@ function _M.init()
     storage.set_shared(config.dict.rules, RULES_KEY,
                        storage.encode({ version = "", rules = {} }))
     storage.set_shared(config.dict.rules, VERSION_KEY, "")
+    clear_canary()
 
     -- 初始空触发规则集（后台发布后热更新覆盖）
     storage.set_shared(config.dict.rules, TRIGGER_RULES_KEY,

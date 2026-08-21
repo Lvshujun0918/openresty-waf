@@ -242,25 +242,34 @@ end
 -- 版本未变化直接返回缓存表，避免每个请求重复 cjson.decode 整份 JSON。
 -- 注意：返回的表为共享缓存，调用方禁止修改（需改动请先浅拷贝）。
 local ruleset_cache = { version = false, value = nil }
+local canary_ruleset_cache = { version = false, value = nil }
 local config_cache  = { version = false, value = nil }
 
 -- 读取当前生效规则集（共享内存，按版本号缓存）
 -- 规则集未就绪（Redis 尚未下发 / 初始化空集）时返回空规则集，
 -- 由 access 层按 fail-closed 语义处理，杜绝 nil 索引报错。
-function _M.get_ruleset()
+function _M.get_ruleset(src)
     local config = require "config"
     local storage = require "storage"
-    local version = storage.get_shared(config.dict.rules, "ruleset_version")
-    if version == ruleset_cache.version and ruleset_cache.value ~= nil then
-        return ruleset_cache.value
+    local cache = ruleset_cache
+    local version_key = "ruleset_version"
+    local body_key = "active_ruleset"
+    if src == "canary" then
+        cache = canary_ruleset_cache
+        version_key = "canary_version"
+        body_key = "canary_ruleset"
     end
-    local body = storage.get_shared(config.dict.rules, "active_ruleset")
+    local version = storage.get_shared(config.dict.rules, version_key)
+    if version == cache.version and cache.value ~= nil then
+        return cache.value
+    end
+    local body = storage.get_shared(config.dict.rules, body_key)
     local ruleset = storage.decode(body)
     if type(ruleset) ~= "table" or type(ruleset.rules) ~= "table" then
         ruleset = { version = "", rules = {} }
     end
-    ruleset_cache.version = version
-    ruleset_cache.value = ruleset
+    cache.version = version
+    cache.value = ruleset
     return ruleset
 end
 
@@ -269,12 +278,19 @@ end
 -- （如 header_filter 阶段实际生效规则通常只有 1 条）。
 -- 注意：只过滤 phase，保留 disabled 规则在列表中——disabled 规则仍由
 -- run() 的 eligible 判断为不可评估（维持「禁用成员中断链」的原始语义）。
-local phase_cache = {}  -- phase -> { version = ..., rules = {...} }
+local phase_cache = {}         -- phase -> { version = ..., rules = {...} }
+local canary_phase_cache = {}  -- phase -> { version = ..., rules = {...} }
 
-function _M.get_phase_rules(phase)
-    local ruleset = _M.get_ruleset()
-    local version = ruleset_cache.version
-    local e = phase_cache[phase]
+function _M.get_phase_rules(phase, src)
+    local ruleset = _M.get_ruleset(src)
+    local cache = ruleset_cache
+    local pcache = phase_cache
+    if src == "canary" then
+        cache = canary_ruleset_cache
+        pcache = canary_phase_cache
+    end
+    local version = cache.version
+    local e = pcache[phase]
     if e and e.version == version then
         return e.rules
     end
@@ -284,7 +300,7 @@ function _M.get_phase_rules(phase)
             rs[#rs + 1] = r
         end
     end
-    phase_cache[phase] = { version = version, rules = rs }
+    pcache[phase] = { version = version, rules = rs }
     return rs
 end
 

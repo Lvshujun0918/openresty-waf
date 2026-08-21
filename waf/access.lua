@@ -9,6 +9,7 @@ local storage   = require "storage"
 local operators = require "rule_engine.operators"
 local auto_ban  = require "detectors.auto_ban"
 local hit_cache = require "hit_cache"
+local canary    = require "canary"
 local config    = require "config"
 
 -- 每请求唯一 ID：worker pid + 毫秒时间戳 + 连接序号 + 请求内自增
@@ -376,8 +377,8 @@ local function protection_flow()
     end
 
     -- 2. 规则引擎（URL / Args / Cookie / Header / Body 等规则；按 phase 预过滤复用）
-    local phase_rules = engine.get_phase_rules("access")
-    if not phase_rules or #phase_rules == 0 then
+    local stable_phase_rules = engine.get_phase_rules("access")
+    if not stable_phase_rules or #stable_phase_rules == 0 then
         -- 规则集为空（Redis 未下发 / 初始化空集 / 加载失败）：
         -- fail-closed 拦截——无规则即无保护，不允许裸奔放行。
         -- 与 fail-open 的"运行异常放行"不同，这是状态缺失的保守策略。
@@ -391,6 +392,18 @@ local function protection_flow()
             block(cfg, ctx)
         end
         return
+    end
+    local phase_rules = stable_phase_rules
+    local cache_tag = nil
+    local canary_selected, canary_version = canary.select(ctx)
+    if canary_selected then
+        local canary_phase_rules = engine.get_phase_rules("access", "canary")
+        if canary_phase_rules and #canary_phase_rules > 0 then
+            phase_rules = canary_phase_rules
+            cache_tag = "c" .. tostring(canary_version or "")
+        else
+            ngx.log(ngx.WARN, "[waf] 灰度命中但灰度规则集未就绪，回退稳定规则集")
+        end
     end
     if phase_rules and #phase_rules > 0 then
         -- 豁免：URL/UA 白名单命中 或 exclude_paths 前缀 或 命中 exempt 触发规则
@@ -419,7 +432,7 @@ local function protection_flow()
         if not exempt and not skip_static then
             -- 命中缓存：同请求指纹（规则版本+模式+方法+host+IP+URI+请求头）短时复用
             -- 规则引擎判定，重复请求跳过扫描；名单/触发规则/CC/人机验证照常执行。
-            local cached = hit_cache.lookup(cfg, ctx)
+            local cached = hit_cache.lookup(cfg, ctx, cache_tag)
             if cached and cached.blocked then
                 pcall(capture_evidence, ctx)
                 ctx.matched[#ctx.matched + 1] = cached.matched
@@ -439,14 +452,14 @@ local function protection_flow()
                 if ok2 then
                     if result == "blocked" or result == "accepted" then
                         if result == "blocked" then
-                            hit_cache.store(cfg, ctx, true, hit_cache.primary_matched(ctx))
+                            hit_cache.store(cfg, ctx, true, hit_cache.primary_matched(ctx), cache_tag)
                         end
                         return
                     end
                     -- 干净放行：缓存判定结果，后续同指纹请求直接跳过扫描
-                    hit_cache.store(cfg, ctx, false)
+                    hit_cache.store(cfg, ctx, false, nil, cache_tag)
                 elseif ctx._exited then
-                    hit_cache.store(cfg, ctx, true, hit_cache.primary_matched(ctx))
+                    hit_cache.store(cfg, ctx, true, hit_cache.primary_matched(ctx), cache_tag)
                     return  -- 拦截响应已发送
                 else
                     ngx.log(ngx.ERR, "[waf] 规则引擎执行异常，fail-open 放行: " .. tostring(result))
