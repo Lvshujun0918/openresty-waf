@@ -188,7 +188,7 @@ onMounted(refresh);
       />
     </NCard>
 
-    <NModal v-model:show="detail !== undefined && detail !== null" preset="card" title="报错详情" class="w-[640px]">
+    <NModal :show="detail !== null" preset="card" title="报错详情" class="w-[640px]" @update:show="(v: boolean) => { if (!v) detail = null; }">
       <template v-if="detail">
         <div class="space-y-2 text-sm">
           <div class="flex gap-2">
