@@ -39,4 +39,5 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   traffic: () => import("@/views/traffic/index.vue"),
   "trigger-records": () => import("@/views/trigger-records/index.vue"),
   "trigger-rules": () => import("@/views/trigger-rules/index.vue"),
+  users: () => import("@/views/users/index.vue"),
 };

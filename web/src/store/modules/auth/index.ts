@@ -152,11 +152,11 @@ export const useAuthStore = defineStore(SetupStoreId.Auth, () => {
     const { data: info, error } = await fetchGetUserInfo();
 
     if (!error && info) {
-      // 后端返回 { id, username }，映射为框架所需的 UserInfo（静态路由超管）
+      // 后端返回 { id, username, role, totp_enabled }，映射为框架所需的 UserInfo（静态路由按 role 过滤）
       Object.assign(userInfo, {
         userId: info.username || 'admin',
         userName: info.username || 'admin',
-        roles: ['super'],
+        roles: [info.role || 'super'],
         buttons: []
       });
 

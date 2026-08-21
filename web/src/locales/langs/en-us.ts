@@ -247,7 +247,8 @@ const local: App.I18n.Schema = {
     monitor: 'Monitor',
     security: 'Account Security',
     config: 'Settings',
-    guide: 'Guide'
+    guide: 'Guide',
+    users: 'Users'
   },
   page: {
     login: {

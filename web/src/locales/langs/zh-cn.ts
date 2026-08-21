@@ -243,7 +243,8 @@ const local: App.I18n.Schema = {
     monitor: '实时监控',
     security: '账号安全',
     config: '系统配置',
-    guide: '接入指引'
+    guide: '接入指引',
+    users: '用户管理'
   },
   page: {
     login: {

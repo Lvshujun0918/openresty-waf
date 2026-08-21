@@ -58,7 +58,8 @@ export const generatedRoutes: GeneratedRoute[] = [
       title: 'api-tokens',
       i18nKey: 'route.api-tokens',
       icon: 'mdi:key-variant',
-      order: 9.2
+      order: 9.2,
+      roles: ['super']
     }
   },
   {
@@ -272,6 +273,18 @@ export const generatedRoutes: GeneratedRoute[] = [
       i18nKey: 'route.trigger-rules',
       icon: 'mdi:filter-variant',
       order: 6
+    }
+  },
+  {
+    name: 'users',
+    path: '/users',
+    component: 'layout.base$view.users',
+    meta: {
+      title: 'users',
+      i18nKey: 'route.users',
+      icon: 'mdi:account-multiple',
+      order: 9.4,
+      roles: ['super']
     }
   }
 ];

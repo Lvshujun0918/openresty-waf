@@ -41,6 +41,7 @@ declare module "@elegant-router/types" {
     "traffic": "/traffic";
     "trigger-records": "/trigger-records";
     "trigger-rules": "/trigger-rules";
+    "users": "/users";
   };
 
   /**
@@ -96,6 +97,7 @@ declare module "@elegant-router/types" {
     | "traffic"
     | "trigger-records"
     | "trigger-rules"
+    | "users"
   >;
 
   /**
@@ -136,6 +138,7 @@ declare module "@elegant-router/types" {
     | "traffic"
     | "trigger-records"
     | "trigger-rules"
+    | "users"
   >;
 
   /**

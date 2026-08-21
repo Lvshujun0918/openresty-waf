@@ -186,7 +186,8 @@ const routeMap: RouteMap = {
   "security": "/security",
   "traffic": "/traffic",
   "trigger-records": "/trigger-records",
-  "trigger-rules": "/trigger-rules"
+  "trigger-rules": "/trigger-rules",
+  "users": "/users"
 };
 
 /**

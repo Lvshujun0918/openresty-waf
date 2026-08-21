@@ -310,6 +310,17 @@ declare namespace Api {
       created_at: string;
     }
 
+    /** 后台用户（/users，仅超管可见） */
+    interface UserRow {
+      id: number;
+      username: string;
+      /** 角色：super 超管 / ops 运营 / viewer 只读 */
+      role: string;
+      totp_enabled: boolean;
+      created_at: string;
+      updated_at: string;
+    }
+
     /** 登录会话 */
     interface Session {
       jti: string;
