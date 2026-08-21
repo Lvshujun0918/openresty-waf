@@ -16,6 +16,7 @@ local variables  = require "rule_engine.variables"
 local transforms = require "rule_engine.transforms"
 local actions    = require "rule_engine.actions"
 local config     = require "config"
+local rule_perf  = require "rule_perf"
 
 -- 单条规则是否命中
 -- 说明：OpenResty 新版已移除 ngx.re.compile，正则走 ngx.re.find("joi")，
@@ -32,6 +33,20 @@ local function match_rule(rule, waf_ctx)
         end
     end
     return false
+end
+
+-- 带耗时画像的规则评估（config.rule_perf.enabled 控制，默认开启；
+-- 开销为两次时钟读数 + 表累加，约亚微秒级）
+local perf_enabled = config.rule_perf and config.rule_perf.enabled ~= false
+
+local function timed_match(rule, waf_ctx)
+    if not perf_enabled then
+        return match_rule(rule, waf_ctx)
+    end
+    local t0 = rule_perf.now_us()
+    local hit = match_rule(rule, waf_ctx)
+    rule_perf.record(rule.id, rule_perf.now_us() - t0)
+    return hit
 end
 
 -- 记录单条规则命中（日志由 log 阶段统一落盘）
@@ -113,7 +128,7 @@ function _M.run(ruleset, phase, waf_ctx)
             if chain_broken then
                 -- 链已断：跳过后续成员
             elseif chain then
-                if eligible and match_rule(rule, waf_ctx) then
+                if eligible and timed_match(rule, waf_ctx) then
                     if has_disrupt then
                         -- 链尾：记录整条链（此前成员 + 链尾自身）并执行尾规则动作
                         for _, id in ipairs(chain.ids) do
@@ -130,7 +145,7 @@ function _M.run(ruleset, phase, waf_ctx)
                 end
             else
                 -- 链首：正常评估
-                if eligible and match_rule(rule, waf_ctx) then
+                if eligible and timed_match(rule, waf_ctx) then
                     chain = { ids = { rule.id } }
                     if has_disrupt then
                         -- 单成员链（链尾即链首）：直接记录并执行
@@ -143,7 +158,7 @@ function _M.run(ruleset, phase, waf_ctx)
                 end
             end
         else
-            if eligible and match_rule(rule, waf_ctx) then
+            if eligible and timed_match(rule, waf_ctx) then
                 record_hit(waf_ctx, rule)
                 skip = apply_action(waf_ctx, rule, hits)
             end

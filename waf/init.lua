@@ -351,6 +351,8 @@ function _M.init_worker()
     if config.stats and config.stats.enabled ~= false then
         ngx.timer.every(config.stats.flush_interval or 1, flush_stats)
     end
+    -- 规则耗时画像定时上报（rule_perf.lua 内部判断 enabled）
+    require("rule_perf").start_timer()
     if not config.rule_refresh.enabled then
         return
     end
