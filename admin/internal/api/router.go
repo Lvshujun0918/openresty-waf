@@ -26,6 +26,13 @@ func NewRouter(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *gin.
 	registerAPIRoutes(r.Group("/api"), d)
 	registerAPIRoutes(r.Group("/api/v1"), d)
 
+	// OpenAPI 规范输出 + 接口文档页（公开，便于脚本发现接口）
+	openapiHandler := NewOpenAPIHandler(d.cfg)
+	r.GET("/api/openapi.json", openapiHandler.SpecFor(r))
+	r.GET("/api/v1/openapi.json", openapiHandler.SpecFor(r))
+	r.GET("/api/docs", openapiHandler.DocsFor(r))
+	r.GET("/api/v1/docs", openapiHandler.DocsFor(r))
+
 	// 前端静态资源（SPA，从 embed 产物提供）
 	r.GET("/", serveFrontend)
 	r.GET("/assets/*filepath", serveFrontend)
