@@ -21,29 +21,33 @@ declare module "@elegant-router/types" {
     "404": "/404";
     "500": "/500";
     "alerts": "/alerts";
-    "api-tokens": "/api-tokens";
-    "audit-logs": "/audit-logs";
-    "bans": "/bans";
-    "block-pages": "/block-pages";
-    "bots": "/bots";
-    "config": "/config";
+    "blocking": "/blocking";
+    "blocking_bans": "/blocking/bans";
+    "blocking_block-pages": "/blocking/block-pages";
+    "blocking_bots": "/blocking/bots";
+    "blocking_ip-lists": "/blocking/ip-lists";
     "dashboard": "/dashboard";
-    "error-logs": "/error-logs";
-    "events": "/events";
     "guide": "/guide";
     "home": "/home";
     "iframe-page": "/iframe-page/:url";
-    "ip-lists": "/ip-lists";
     "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?";
-    "monitor": "/monitor";
-    "rule-perf": "/rule-perf";
-    "rule-subs": "/rule-subs";
-    "rules": "/rules";
-    "security": "/security";
-    "traffic": "/traffic";
-    "trigger-records": "/trigger-records";
-    "trigger-rules": "/trigger-rules";
-    "users": "/users";
+    "monitoring": "/monitoring";
+    "monitoring_error-logs": "/monitoring/error-logs";
+    "monitoring_events": "/monitoring/events";
+    "monitoring_monitor": "/monitoring/monitor";
+    "monitoring_traffic": "/monitoring/traffic";
+    "protection": "/protection";
+    "protection_rule-perf": "/protection/rule-perf";
+    "protection_rule-subs": "/protection/rule-subs";
+    "protection_rules": "/protection/rules";
+    "protection_trigger-records": "/protection/trigger-records";
+    "protection_trigger-rules": "/protection/trigger-rules";
+    "system": "/system";
+    "system_api-tokens": "/system/api-tokens";
+    "system_audit-logs": "/system/audit-logs";
+    "system_config": "/system/config";
+    "system_security": "/system/security";
+    "system_users": "/system/users";
   };
 
   /**
@@ -79,29 +83,15 @@ declare module "@elegant-router/types" {
     | "404"
     | "500"
     | "alerts"
-    | "api-tokens"
-    | "audit-logs"
-    | "bans"
-    | "block-pages"
-    | "bots"
-    | "config"
+    | "blocking"
     | "dashboard"
-    | "error-logs"
-    | "events"
     | "guide"
     | "home"
     | "iframe-page"
-    | "ip-lists"
     | "login"
-    | "monitor"
-    | "rule-perf"
-    | "rule-subs"
-    | "rules"
-    | "security"
-    | "traffic"
-    | "trigger-records"
-    | "trigger-rules"
-    | "users"
+    | "monitoring"
+    | "protection"
+    | "system"
   >;
 
   /**
@@ -124,27 +114,27 @@ declare module "@elegant-router/types" {
     | "iframe-page"
     | "login"
     | "alerts"
-    | "api-tokens"
-    | "audit-logs"
-    | "bans"
-    | "block-pages"
-    | "bots"
-    | "config"
+    | "blocking_bans"
+    | "blocking_block-pages"
+    | "blocking_bots"
+    | "blocking_ip-lists"
     | "dashboard"
-    | "error-logs"
-    | "events"
     | "guide"
     | "home"
-    | "ip-lists"
-    | "monitor"
-    | "rule-perf"
-    | "rule-subs"
-    | "rules"
-    | "security"
-    | "traffic"
-    | "trigger-records"
-    | "trigger-rules"
-    | "users"
+    | "monitoring_error-logs"
+    | "monitoring_events"
+    | "monitoring_monitor"
+    | "monitoring_traffic"
+    | "protection_rule-perf"
+    | "protection_rule-subs"
+    | "protection_rules"
+    | "protection_trigger-records"
+    | "protection_trigger-rules"
+    | "system_api-tokens"
+    | "system_audit-logs"
+    | "system_config"
+    | "system_security"
+    | "system_users"
   >;
 
   /**

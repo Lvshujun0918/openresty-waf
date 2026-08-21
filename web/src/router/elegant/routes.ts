@@ -9,34 +9,31 @@ export const generatedRoutes: GeneratedRoute[] = [
   {
     name: '403',
     path: '/403',
-    component: 'layout.blank$view.403',
+    component: 'layout.base$view.403',
     meta: {
       title: '403',
       i18nKey: 'route.403',
-      constant: true,
-      hideInMenu: true
+      constant: true
     }
   },
   {
     name: '404',
     path: '/404',
-    component: 'layout.blank$view.404',
+    component: 'layout.base$view.404',
     meta: {
       title: '404',
       i18nKey: 'route.404',
-      constant: true,
-      hideInMenu: true
+      constant: true
     }
   },
   {
     name: '500',
     path: '/500',
-    component: 'layout.blank$view.500',
+    component: 'layout.base$view.500',
     meta: {
       title: '500',
       i18nKey: 'route.500',
-      constant: true,
-      hideInMenu: true
+      constant: true
     }
   },
   {
@@ -51,58 +48,61 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
-    name: 'api-tokens',
-    path: '/api-tokens',
-    component: 'layout.base$view.api-tokens',
+    name: 'blocking',
+    path: '/blocking',
+    component: 'layout.base',
     meta: {
-      title: 'api-tokens',
-      i18nKey: 'route.api-tokens'
-    }
-  },
-  {
-    name: 'audit-logs',
-    path: '/audit-logs',
-    component: 'layout.base$view.audit-logs',
-    meta: {
-      title: 'audit-logs',
-      i18nKey: 'route.audit-logs'
-    }
-  },
-  {
-    name: 'bans',
-    path: '/bans',
-    component: 'layout.base$view.bans',
-    meta: {
-      title: 'bans',
-      i18nKey: 'route.bans'
-    }
-  },
-  {
-    name: 'block-pages',
-    path: '/block-pages',
-    component: 'layout.base$view.block-pages',
-    meta: {
-      title: 'block-pages',
-      i18nKey: 'route.block-pages'
-    }
-  },
-  {
-    name: 'bots',
-    path: '/bots',
-    component: 'layout.base$view.bots',
-    meta: {
-      title: 'bots',
-      i18nKey: 'route.bots'
-    }
-  },
-  {
-    name: 'config',
-    path: '/config',
-    component: 'layout.base$view.config',
-    meta: {
-      title: 'config',
-      i18nKey: 'route.config'
-    }
+      title: 'blocking',
+      i18nKey: 'route.blocking',
+      icon: 'mdi:block-helper',
+      order: 5
+    },
+    children: [
+      {
+        name: 'blocking_bans',
+        path: '/blocking/bans',
+        component: 'view.blocking_bans',
+        meta: {
+          title: 'blocking_bans',
+          i18nKey: 'route.blocking_bans',
+          icon: 'mdi:cancel',
+          order: 1
+        }
+      },
+      {
+        name: 'blocking_block-pages',
+        path: '/blocking/block-pages',
+        component: 'view.blocking_block-pages',
+        meta: {
+          title: 'blocking_block-pages',
+          i18nKey: 'route.blocking_block-pages',
+          icon: 'mdi:file-alert-outline',
+          order: 4
+        }
+      },
+      {
+        name: 'blocking_bots',
+        path: '/blocking/bots',
+        component: 'view.blocking_bots',
+        meta: {
+          title: 'blocking_bots',
+          i18nKey: 'route.blocking_bots',
+          icon: 'mdi:robot-outline',
+          order: 3
+        }
+      },
+      {
+        name: 'blocking_ip-lists',
+        path: '/blocking/ip-lists',
+        component: 'view.blocking_ip-lists',
+        meta: {
+          title: 'blocking_ip-lists',
+          i18nKey: 'route.blocking_ip-lists',
+          icon: 'mdi:ip-network-outline',
+          order: 2
+        }
+      }
+    ]
   },
   {
     name: 'dashboard',
@@ -113,24 +113,6 @@ export const generatedRoutes: GeneratedRoute[] = [
       i18nKey: 'route.dashboard',
       icon: 'mdi:view-dashboard',
       order: 2
-    }
-  },
-  {
-    name: 'error-logs',
-    path: '/error-logs',
-    component: 'layout.base$view.error-logs',
-    meta: {
-      title: 'error-logs',
-      i18nKey: 'route.error-logs'
-    }
-  },
-  {
-    name: 'events',
-    path: '/events',
-    component: 'layout.base$view.events',
-    meta: {
-      title: 'events',
-      i18nKey: 'route.events'
     }
   },
   {
@@ -163,112 +145,213 @@ export const generatedRoutes: GeneratedRoute[] = [
     props: true,
     meta: {
       title: 'iframe-page',
-      i18nKey: 'route.iframe-page',
-      constant: true,
-      hideInMenu: true,
-      keepAlive: true
-    }
-  },
-  {
-    name: 'ip-lists',
-    path: '/ip-lists',
-    component: 'layout.base$view.ip-lists',
-    meta: {
-      title: 'ip-lists',
-      i18nKey: 'route.ip-lists'
+      i18nKey: 'route.iframe-page'
     }
   },
   {
     name: 'login',
     path: '/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?',
-    component: 'layout.blank$view.login',
+    component: 'layout.base$view.login',
     props: true,
     meta: {
       title: 'login',
       i18nKey: 'route.login',
-      constant: true,
-      hideInMenu: true
+      constant: true
     }
   },
   {
-    name: 'monitor',
-    path: '/monitor',
-    component: 'layout.base$view.monitor',
+    name: 'monitoring',
+    path: '/monitoring',
+    component: 'layout.base',
     meta: {
-      title: 'monitor',
-      i18nKey: 'route.monitor'
-    }
+      title: 'monitoring',
+      i18nKey: 'route.monitoring',
+      icon: 'mdi:radar',
+      order: 3
+    },
+    children: [
+      {
+        name: 'monitoring_error-logs',
+        path: '/monitoring/error-logs',
+        component: 'view.monitoring_error-logs',
+        meta: {
+          title: 'monitoring_error-logs',
+          i18nKey: 'route.monitoring_error-logs',
+          icon: 'mdi:alert-circle-outline',
+          order: 4
+        }
+      },
+      {
+        name: 'monitoring_events',
+        path: '/monitoring/events',
+        component: 'view.monitoring_events',
+        meta: {
+          title: 'monitoring_events',
+          i18nKey: 'route.monitoring_events',
+          icon: 'mdi:shield-alert',
+          order: 3
+        }
+      },
+      {
+        name: 'monitoring_monitor',
+        path: '/monitoring/monitor',
+        component: 'view.monitoring_monitor',
+        meta: {
+          title: 'monitoring_monitor',
+          i18nKey: 'route.monitoring_monitor',
+          icon: 'mdi:pulse',
+          order: 1
+        }
+      },
+      {
+        name: 'monitoring_traffic',
+        path: '/monitoring/traffic',
+        component: 'view.monitoring_traffic',
+        meta: {
+          title: 'monitoring_traffic',
+          i18nKey: 'route.monitoring_traffic',
+          icon: 'mdi:swap-vertical',
+          order: 2
+        }
+      }
+    ]
   },
   {
-    name: 'rule-perf',
-    path: '/rule-perf',
-    component: 'layout.base$view.rule-perf',
+    name: 'protection',
+    path: '/protection',
+    component: 'layout.base',
     meta: {
-      title: 'rule-perf',
-      i18nKey: 'route.rule-perf'
-    }
+      title: 'protection',
+      i18nKey: 'route.protection',
+      icon: 'mdi:shield-half-full',
+      order: 4
+    },
+    children: [
+      {
+        name: 'protection_rule-perf',
+        path: '/protection/rule-perf',
+        component: 'view.protection_rule-perf',
+        meta: {
+          title: 'protection_rule-perf',
+          i18nKey: 'route.protection_rule-perf',
+          icon: 'mdi:speedometer',
+          order: 5
+        }
+      },
+      {
+        name: 'protection_rule-subs',
+        path: '/protection/rule-subs',
+        component: 'view.protection_rule-subs',
+        meta: {
+          title: 'protection_rule-subs',
+          i18nKey: 'route.protection_rule-subs',
+          icon: 'mdi:cloud-download-outline',
+          order: 2
+        }
+      },
+      {
+        name: 'protection_rules',
+        path: '/protection/rules',
+        component: 'view.protection_rules',
+        meta: {
+          title: 'protection_rules',
+          i18nKey: 'route.protection_rules',
+          icon: 'mdi:shield-check-outline',
+          order: 1
+        }
+      },
+      {
+        name: 'protection_trigger-records',
+        path: '/protection/trigger-records',
+        component: 'view.protection_trigger-records',
+        meta: {
+          title: 'protection_trigger-records',
+          i18nKey: 'route.protection_trigger-records',
+          icon: 'mdi:history',
+          order: 4
+        }
+      },
+      {
+        name: 'protection_trigger-rules',
+        path: '/protection/trigger-rules',
+        component: 'view.protection_trigger-rules',
+        meta: {
+          title: 'protection_trigger-rules',
+          i18nKey: 'route.protection_trigger-rules',
+          icon: 'mdi:tune',
+          order: 3
+        }
+      }
+    ]
   },
   {
-    name: 'rule-subs',
-    path: '/rule-subs',
-    component: 'layout.base$view.rule-subs',
+    name: 'system',
+    path: '/system',
+    component: 'layout.base',
     meta: {
-      title: 'rule-subs',
-      i18nKey: 'route.rule-subs'
-    }
-  },
-  {
-    name: 'rules',
-    path: '/rules',
-    component: 'layout.base$view.rules',
-    meta: {
-      title: 'rules',
-      i18nKey: 'route.rules'
-    }
-  },
-  {
-    name: 'security',
-    path: '/security',
-    component: 'layout.base$view.security',
-    meta: {
-      title: 'security',
-      i18nKey: 'route.security'
-    }
-  },
-  {
-    name: 'traffic',
-    path: '/traffic',
-    component: 'layout.base$view.traffic',
-    meta: {
-      title: 'traffic',
-      i18nKey: 'route.traffic'
-    }
-  },
-  {
-    name: 'trigger-records',
-    path: '/trigger-records',
-    component: 'layout.base$view.trigger-records',
-    meta: {
-      title: 'trigger-records',
-      i18nKey: 'route.trigger-records'
-    }
-  },
-  {
-    name: 'trigger-rules',
-    path: '/trigger-rules',
-    component: 'layout.base$view.trigger-rules',
-    meta: {
-      title: 'trigger-rules',
-      i18nKey: 'route.trigger-rules'
-    }
-  },
-  {
-    name: 'users',
-    path: '/users',
-    component: 'layout.base$view.users',
-    meta: {
-      title: 'users',
-      i18nKey: 'route.users'
-    }
+      title: 'system',
+      i18nKey: 'route.system',
+      icon: 'mdi:cog-outline',
+      order: 7
+    },
+    children: [
+      {
+        name: 'system_api-tokens',
+        path: '/system/api-tokens',
+        component: 'view.system_api-tokens',
+        meta: {
+          title: 'system_api-tokens',
+          i18nKey: 'route.system_api-tokens',
+          icon: 'mdi:key-variant',
+          order: 5,
+          roles: ['super']
+        }
+      },
+      {
+        name: 'system_audit-logs',
+        path: '/system/audit-logs',
+        component: 'view.system_audit-logs',
+        meta: {
+          title: 'system_audit-logs',
+          i18nKey: 'route.system_audit-logs',
+          icon: 'mdi:clipboard-text-outline',
+          order: 3
+        }
+      },
+      {
+        name: 'system_config',
+        path: '/system/config',
+        component: 'view.system_config',
+        meta: {
+          title: 'system_config',
+          i18nKey: 'route.system_config',
+          icon: 'mdi:application-cog-outline',
+          order: 2
+        }
+      },
+      {
+        name: 'system_security',
+        path: '/system/security',
+        component: 'view.system_security',
+        meta: {
+          title: 'system_security',
+          i18nKey: 'route.system_security',
+          icon: 'mdi:shield-key-outline',
+          order: 1
+        }
+      },
+      {
+        name: 'system_users',
+        path: '/system/users',
+        component: 'view.system_users',
+        meta: {
+          title: 'system_users',
+          i18nKey: 'route.system_users',
+          icon: 'mdi:account-multiple',
+          order: 4,
+          roles: ['super']
+        }
+      }
+    ]
   }
 ];
