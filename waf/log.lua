@@ -11,6 +11,7 @@
 local storage = require "storage"
 local config  = require "config"
 local cjson   = require "cjson.safe"
+local errlog  = require "errlog"
 
 -- 查询 IP 归属（数据可用时；log 阶段微秒级，失败返回 nil 优雅降级）
 local function lookup_geo(ip)
@@ -102,7 +103,7 @@ local function write_file(cfg, line)
         local path = dir .. "/waf_" .. day .. ".log"
         local f, err = io.open(path, "a")
         if not f then
-            ngx.log(ngx.WARN, "[waf] 打开日志文件失败: ", tostring(err))
+            errlog.warn("log", "打开日志文件失败: " .. tostring(err))
             return
         end
         log_handle, log_day, log_dir = f, day, dir
@@ -115,7 +116,7 @@ local function write_file(cfg, line)
         local path = dir .. "/waf_" .. day .. ".log"
         local f, err = io.open(path, "a")
         if not f then
-            ngx.log(ngx.WARN, "[waf] 重新打开日志文件失败: ", tostring(err))
+            errlog.warn("log", "重新打开日志文件失败: " .. tostring(err))
             return
         end
         log_handle, log_day, log_dir = f, day, dir
@@ -171,7 +172,7 @@ local function flush_pending()
     if #pending > 0 then
         local ok, err = ngx.timer.at(0, push_to_redis, pending)
         if not ok then
-            ngx.log(ngx.ERR, "[waf] 调度事件上报失败: ", tostring(err))
+            errlog.err("log", "调度事件上报失败: " .. tostring(err))
         end
         pending = {}
     end
@@ -280,8 +281,8 @@ if cfg.mode == "active" and ctx and ctx.client_ip then
         return require("detectors.auto_ban").record_hit(cfg, ctx.client_ip)
     end)
     if ok2 and banned then
-        ngx.log(ngx.WARN, "[waf] 高频攻击自动封禁: ", ctx.client_ip)
+        errlog.warn("log", "高频攻击自动封禁: " .. tostring(ctx.client_ip), { client_ip = ctx.client_ip })
     elseif not ok2 then
-        ngx.log(ngx.ERR, "[waf] 自动封禁计数异常: ", tostring(banned))
+        errlog.err("log", "自动封禁计数异常: " .. tostring(banned))
     end
 end

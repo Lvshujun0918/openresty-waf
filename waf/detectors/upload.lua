@@ -8,6 +8,8 @@
 
 local _M = {}
 
+local errlog = require "errlog"
+
 -- 从 Content-Type 头提取 boundary（支持带引号）
 local function get_boundary(content_type)
     if not content_type then return nil end
@@ -66,19 +68,19 @@ end
 local function check_spooled_file(boundary, up)
     local path = ngx.req.get_body_file()
     if not path or path == "" then
-        ngx.log(ngx.WARN, "[waf] 上传请求体过大且无临时文件路径，跳过上传检测")
+        errlog.warn("upload", "上传请求体过大且无临时文件路径，跳过上传检测")
         return nil
     end
     local max_bytes = tonumber(up.spooled_scan_bytes) or 524288
     local f, err = io.open(path, "rb")
     if not f then
-        ngx.log(ngx.WARN, "[waf] 无法打开上传临时文件: ", tostring(err))
+        errlog.warn("upload", "无法打开上传临时文件: " .. tostring(err))
         return nil
     end
     local head = f:read(max_bytes)
     f:close()
     if not head then
-        ngx.log(ngx.WARN, "[waf] 读取上传临时文件失败，跳过上传检测")
+        errlog.warn("upload", "读取上传临时文件失败，跳过上传检测")
         return nil
     end
     -- 文件头解析出文件部分（parse_multipart 对截断 body 兼容：
@@ -97,7 +99,7 @@ function _M.check(waf_ctx, up)
     end
     local boundary = get_boundary(content_type)
     if not boundary then
-        ngx.log(ngx.WARN, "[waf] multipart 缺少 boundary，跳过上传检测")
+        errlog.warn("upload", "multipart 缺少 boundary，跳过上传检测")
         return nil
     end
     ngx.req.read_body()

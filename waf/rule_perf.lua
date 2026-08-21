@@ -10,6 +10,7 @@ local _M = {}
 local config  = require "config"
 local storage = require "storage"
 local cjson   = require "cjson.safe"
+local errlog  = require "errlog"
 
 local now_us
 do
@@ -103,7 +104,7 @@ function _M.start_timer()
     local interval = config.rule_perf.interval or 60
     local ok, err = ngx.timer.every(interval, flush)
     if not ok then
-        ngx.log(ngx.ERR, "[waf] 启动规则耗时上报定时器失败: " .. tostring(err))
+        errlog.err("rule_perf", "启动规则耗时上报定时器失败: " .. tostring(err))
     end
 end
 

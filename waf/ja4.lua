@@ -19,6 +19,8 @@
 
 local _M = {}
 
+local errlog = require "errlog"
+
 -- 版本字符串 → JA4 版本号（lua-resty-core get_supported_versions 返回 "TLSv1.3" 等）
 local VER_MAP = {
     ["TLSv1.3"] = "13",
@@ -204,7 +206,7 @@ function _M.run()
     end
     local ok2, ja4 = pcall(_M.calc, hello)
     if not ok2 or not ja4 then
-        ngx.log(ngx.ERR, "[waf] JA4 计算失败: ", tostring(ja4))
+        errlog.err("ja4", "JA4 计算失败: " .. tostring(ja4))
         return
     end
     local ok3 = pcall(function()
@@ -217,7 +219,7 @@ function _M.run()
         end
     end)
     if not ok3 and not ok4 then
-        ngx.log(ngx.ERR, "[waf] JA4 写入 ctx 与共享内存均失败")
+        errlog.err("ja4", "JA4 写入 ctx 与共享内存均失败")
     end
 end
 

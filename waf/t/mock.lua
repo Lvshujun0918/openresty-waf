@@ -238,11 +238,12 @@ ngx = {
         get_headers = function() return ngx.resp._headers end,
     },
 
-    -- 定时器（记录，不执行）
+    -- 定时器（记录，不执行）；返回值对齐真实 ngx.timer.at（成功返回 true）
     timer = {
         _at = {},
         at = function(delay, fn, ...)
             ngx.timer._at[#ngx.timer._at + 1] = { delay = delay, fn = fn }
+            return true
         end,
     },
 

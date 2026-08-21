@@ -4,6 +4,7 @@
 local _M = {}
 
 local bit = require "bit"
+local errlog = require "errlog"
 local re_find = ngx.re.find
 
 -- libinjection 语义检测（懒加载；.so 缺失时自动降级为不匹配，不影响其他运算符）
@@ -114,20 +115,20 @@ local operators = {
         if value == nil then return false end
         -- 护栏：超长 pattern 直接不匹配（正常规则上限 32KB，与后台校验一致）
         if type(pattern) == "string" and #pattern > 32768 then
-            ngx.log(ngx.WARN, "[waf] 正则 pattern 过长，跳过匹配（长度 ", #pattern, "）")
+            errlog.warn("operators", "正则 pattern 过长，跳过匹配（长度 " .. tostring(#pattern) .. "）")
             return false
         end
         if compiled then
             local from, _, err = compiled:find(tostring(value))
             if err then
-                ngx.log(ngx.WARN, "[waf] 正则执行错误: ", err, " pattern=", pattern)
+                errlog.warn("operators", "正则执行错误: " .. tostring(err) .. " pattern=" .. pattern)
                 return false
             end
             return from ~= nil
         end
         local from, _, err = re_find(tostring(value), pattern, "joiu")
         if err then
-            ngx.log(ngx.WARN, "[waf] 正则编译/执行错误: ", err, " pattern=", pattern)
+            errlog.warn("operators", "正则编译/执行错误: " .. tostring(err) .. " pattern=" .. pattern)
             return false
         end
         return from ~= nil

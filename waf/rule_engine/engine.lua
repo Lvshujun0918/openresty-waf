@@ -12,6 +12,7 @@
 local _M = {}
 
 local operators  = require "rule_engine.operators"
+local errlog     = require "errlog"
 local variables  = require "rule_engine.variables"
 local transforms = require "rule_engine.transforms"
 local actions    = require "rule_engine.actions"
@@ -64,7 +65,7 @@ local function record_hit(waf_ctx, rule)
     if not waf_ctx._evidence_captured and waf_ctx.capture_evidence then
         local ok, err = pcall(waf_ctx.capture_evidence, waf_ctx)
         if not ok then
-            ngx.log(ngx.ERR, "[waf] capture_evidence 异常: " .. tostring(err))
+            errlog.err("engine", "capture_evidence 异常: " .. tostring(err))
         end
     end
 end

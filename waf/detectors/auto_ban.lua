@@ -12,6 +12,7 @@ local _M = {}
 
 local config  = require "config"
 local storage = require "storage"
+local errlog  = require "errlog"
 
 -- 该 IP 是否处于自动封禁期
 function _M.is_banned(cfg, ip)
@@ -65,7 +66,7 @@ function _M.record_hit(cfg, ip)
         local ok, err = storage.set_shared(config.dict.counter, bkey, ban_level(cfg, ab, ip, duration), duration)
         if not ok then
             -- 字典写满降级：封禁键写不进去时仅告警，不影响业务
-            ngx.log(ngx.ERR, "[waf] 自动封禁写入共享内存失败（字典可能已满）: ", tostring(err))
+            errlog.err("auto_ban", "自动封禁写入共享内存失败（字典可能已满）: " .. tostring(err), { client_ip = ip })
         end
         return true
     end

@@ -11,6 +11,7 @@
 
 local config  = require "config"
 local storage = require "storage"
+local errlog  = require "errlog"
 
 local _M = {}
 
@@ -26,6 +27,12 @@ local TRIGGER_VERSION_KEY = "trigger_rules_version" -- 触发规则版本号
 
 local function log(level, msg)
     ngx.log(level, "[waf] ", msg)
+    -- ERR/WARN 级同步上报后台「报错汇总」（INFO 仅本地日志；report 内部自带防洪）
+    if level == ngx.ERR then
+        errlog.report("error", "init", msg)
+    elseif level == ngx.WARN then
+        errlog.report("warn", "init", msg)
+    end
 end
 
 -- 版本号合法性：必须是纯数字（后台 INCR 生成）且严格大于当前版本。

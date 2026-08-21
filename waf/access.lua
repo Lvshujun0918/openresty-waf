@@ -10,7 +10,18 @@ local operators = require "rule_engine.operators"
 local auto_ban  = require "detectors.auto_ban"
 local hit_cache = require "hit_cache"
 local canary    = require "canary"
+local errlog    = require "errlog"
 local config    = require "config"
+
+-- 错误上报附带的请求上下文（报错汇总页定位用）
+local function err_extra(ctx)
+    return {
+        req_id    = ctx and ctx.req_id or "",
+        client_ip = ctx and ctx.client_ip or "",
+        host      = ctx and ctx.request and ctx.request.host or "",
+        uri       = ctx and ctx.request and ctx.request.uri or "",
+    }
+end
 
 -- 每请求唯一 ID：worker pid + 毫秒时间戳 + 连接序号 + 请求内自增
 local req_seq = 0
@@ -284,7 +295,7 @@ local function protection_flow()
     -- 1. IP 黑白名单（检查异常按无命中处理）
     local ok, ip_result = pcall(ip_check, ctx, cfg)
     if not ok then
-        ngx.log(ngx.ERR, "[waf] IP 名单检查异常，fail-open 放行: ", tostring(ip_result))
+        errlog.err("access", "IP 名单检查异常，fail-open 放行: " .. tostring(ip_result), err_extra(ctx))
         ip_result = nil
     end
     if ip_result == "whitelisted" then
@@ -346,7 +357,7 @@ local function protection_flow()
             -- 爬虫记录详情需要请求头/请求体证据（与攻击事件一致）
             pcall(capture_evidence, ctx)
         elseif not okb7 then
-            ngx.log(ngx.ERR, "[waf] 爬虫识别异常: ", tostring(botres))
+            errlog.err("access", "爬虫识别异常: " .. tostring(botres), err_extra(ctx))
         end
     end
 
@@ -361,7 +372,7 @@ local function protection_flow()
         return require("rule_engine.trigger").match_first("block", ctx)
     end)
     if not okb then
-        ngx.log(ngx.ERR, "[waf] block 触发规则检查异常，fail-open 放行: ", tostring(ruleb))
+        errlog.err("access", "block 触发规则检查异常，fail-open 放行: " .. tostring(ruleb), err_extra(ctx))
     elseif ruleb then
         ctx.matched[#ctx.matched + 1] = {
             id = "TRIGGER-BLOCK", group = "trigger", severity = 3,
@@ -382,8 +393,8 @@ local function protection_flow()
         -- 规则集为空（Redis 未下发 / 初始化空集 / 加载失败）：
         -- fail-closed 拦截——无规则即无保护，不允许裸奔放行。
         -- 与 fail-open 的"运行异常放行"不同，这是状态缺失的保守策略。
-        ngx.log(ngx.ERR, "[waf] 规则集为空（Redis 未下发规则），fail-closed 拦截: "
-            .. tostring(ngx.var.request_uri))
+        errlog.err("access", "规则集为空（Redis 未下发规则），fail-closed 拦截: "
+            .. tostring(ngx.var.request_uri), err_extra(ctx))
         if ctx.mode == "active" then
             ctx.matched[#ctx.matched + 1] = {
                 id = "RULES-EMPTY", group = "trigger", severity = 3,
@@ -402,7 +413,7 @@ local function protection_flow()
             phase_rules = canary_phase_rules
             cache_tag = "c" .. tostring(canary_version or "")
         else
-            ngx.log(ngx.WARN, "[waf] 灰度命中但灰度规则集未就绪，回退稳定规则集")
+            errlog.warn("access", "灰度命中但灰度规则集未就绪，回退稳定规则集", err_extra(ctx))
         end
     end
     if phase_rules and #phase_rules > 0 then
@@ -462,13 +473,13 @@ local function protection_flow()
                     hit_cache.store(cfg, ctx, true, hit_cache.primary_matched(ctx), cache_tag)
                     return  -- 拦截响应已发送
                 else
-                    ngx.log(ngx.ERR, "[waf] 规则引擎执行异常，fail-open 放行: " .. tostring(result))
+                    errlog.err("access", "规则引擎执行异常，fail-open 放行: " .. tostring(result), err_extra(ctx))
                 end
             end
             -- （cached 且未拦截：缓存判定为放行，跳过规则扫描继续后续检测）
             -- watchdog：规则引擎/上传检测超时则跳过后续检测强制放行
             if watchdog_exceeded() then
-                ngx.log(ngx.ERR, "[waf] 检测耗时超过 watchdog 阈值，强制放行")
+                errlog.err("access", "检测耗时超过 watchdog 阈值，强制放行", err_extra(ctx))
                 return
             end
             -- 上传检测（multipart 文件名后缀 / Content-Type 黑名单），fail-open。
@@ -485,7 +496,7 @@ local function protection_flow()
                         block(cfg, ctx)
                     end
                 elseif not ok3 then
-                    ngx.log(ngx.ERR, "[waf] 上传检测异常，fail-open 放行: " .. tostring(hit))
+                    errlog.err("access", "上传检测异常，fail-open 放行: " .. tostring(hit), err_extra(ctx))
                 end
             end
         end
@@ -494,7 +505,7 @@ local function protection_flow()
     -- 3. 人机验证触发（fail-open：检查异常视为未命中）
     local ok4, stop = pcall(challenge_section)
     if not ok4 then
-        ngx.log(ngx.ERR, "[waf] 人机验证触发检查异常，fail-open 放行: ", tostring(stop))
+        errlog.err("access", "人机验证触发检查异常，fail-open 放行: " .. tostring(stop), err_extra(ctx))
     elseif stop then
         return
     end
@@ -502,7 +513,7 @@ local function protection_flow()
     -- 4. CC 防刷（fail-open：检查异常视为未命中）
     local ok5, stop5 = pcall(cc_section)
     if not ok5 then
-        ngx.log(ngx.ERR, "[waf] CC 检查异常，fail-open 放行: ", tostring(stop5))
+        errlog.err("access", "CC 检查异常，fail-open 放行: " .. tostring(stop5), err_extra(ctx))
     elseif stop5 then
         return
     end
@@ -515,5 +526,5 @@ if not ok then
     if ctx._exited then
         return  -- 拦截响应已发送
     end
-    ngx.log(ngx.ERR, "[waf] access 阶段检测异常，fail-open 放行: ", tostring(err))
+    errlog.err("access", "access 阶段检测异常，fail-open 放行: " .. tostring(err), err_extra(ctx))
 end

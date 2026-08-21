@@ -7,6 +7,7 @@
 --   body_filter_by_lua_file /opt/waf/body_filter.lua;
 
 local engine = require "rule_engine.engine"
+local errlog = require "errlog"
 
 local ctx = ngx.ctx.waf_ctx
 if not ctx then
@@ -65,7 +66,7 @@ if ngx.arg[2] and not ctx._resp_detected then
         -- fail-open：响应体检测异常不影响业务，记录错误后原样返回
         local ok, result = pcall(engine.run, { rules = phase_rules }, "body_filter", ctx)
         if not ok then
-            ngx.log(ngx.ERR, "[waf] 响应体检测异常，fail-open: ", tostring(result))
+            errlog.err("body_filter", "响应体检测异常，fail-open: " .. tostring(result))
         elseif result == "blocked" and ctx.response_block ~= nil then
             ngx.arg[1] = ctx.response_block
         end

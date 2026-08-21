@@ -9,6 +9,7 @@ local _M = {}
 local config  = require "config"
 local storage = require "storage"
 local cjson   = require "cjson.safe"
+local errlog  = require "errlog"
 
 -- 解析 "count/seconds" 形式阈值，缺省 100/60
 local function parse_rate(rate)
@@ -70,7 +71,7 @@ function _M.record(waf_ctx, cfg, rule_name)
         storage2.redis_lpush("waf:cc:list", cjson.encode(rec))
     end)
     if not ok2 then
-        ngx.log(ngx.ERR, "[waf] 调度 CC 触发事件上报失败: ", tostring(err))
+        errlog.err("cc", "调度 CC 触发事件上报失败: " .. tostring(err))
     end
 end
 
@@ -137,7 +138,7 @@ function _M.check(waf_ctx, cfg, rate, ban_duration, dims)
         end
         if not ok then
             -- 写失败降级：封禁状态写不进去时仍拦截本次请求，并告警
-            ngx.log(ngx.ERR, "[waf] CC 封禁写入失败（" .. (cfg.cc.backend or "shared") .. "）: ", tostring(serr))
+            errlog.err("cc", "CC 封禁写入失败（" .. (cfg.cc.backend or "shared") .. "）: " .. tostring(serr))
         end
         return "banned"
     end

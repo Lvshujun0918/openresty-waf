@@ -17,6 +17,7 @@ local cjson = require "cjson.safe"
 local bit = require "bit"
 local config  = require "config"
 local storage = require "storage"
+local errlog  = require "errlog"
 
 -- ============================================================================
 -- 工作量证明（basic 模式）：JS 与 Lua 两侧同一 FNV-1a 32 位哈希。
@@ -317,7 +318,7 @@ function _M.record(waf_ctx, action)
         storage.redis_lpush("waf:challenge:list", cjson.encode(rec))
     end)
     if not ok2 then
-        ngx.log(ngx.ERR, "[waf] 调度人机验证事件上报失败: ", tostring(err))
+        errlog.err("challenge", "调度人机验证事件上报失败: " .. tostring(err))
     end
 end
 
@@ -365,7 +366,7 @@ function _M.serve_page(waf_ctx, cfg)
         local ikey = "waf:ch:issue:" .. waf_ctx.client_ip
         local n = storage.incr_shared(config.dict.counter, ikey, 1, 0, issue_window)
         if n and n > issue_limit then
-            ngx.log(ngx.WARN, "[waf] 挑战页签发超限，拒绝渲染: ", waf_ctx.client_ip)
+            errlog.warn("challenge", "挑战页签发超限，拒绝渲染: " .. tostring(waf_ctx.client_ip), { client_ip = waf_ctx.client_ip })
             ngx.exit(444)
             return
         end
