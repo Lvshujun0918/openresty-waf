@@ -107,6 +107,22 @@ declare namespace Api {
       updated_at?: string;
     }
 
+    /** 规则订阅源（远程规则集同步入库，格式与 /rules/export 导出一致） */
+    interface RuleSubscription {
+      id: number;
+      name: string;
+      url: string;
+      /** 同步后自动发布规则集（默认 false，需手动发布） */
+      auto_publish: boolean;
+      interval_min: number;
+      enabled: boolean;
+      last_sync_at?: string;
+      last_status?: string;
+      last_count?: number;
+      created_at?: string;
+      updated_at?: string;
+    }
+
     /** 人机验证事件 */
     interface ChallengeItem {
       id: number;

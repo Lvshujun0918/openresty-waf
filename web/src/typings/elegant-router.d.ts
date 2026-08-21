@@ -36,6 +36,7 @@ declare module "@elegant-router/types" {
     "login": "/login/:module(pwd-login|code-login|register|reset-pwd|bind-wechat)?";
     "monitor": "/monitor";
     "rule-perf": "/rule-perf";
+    "rule-subs": "/rule-subs";
     "rules": "/rules";
     "security": "/security";
     "traffic": "/traffic";
@@ -92,6 +93,7 @@ declare module "@elegant-router/types" {
     | "login"
     | "monitor"
     | "rule-perf"
+    | "rule-subs"
     | "rules"
     | "security"
     | "traffic"
@@ -133,6 +135,7 @@ declare module "@elegant-router/types" {
     | "ip-lists"
     | "monitor"
     | "rule-perf"
+    | "rule-subs"
     | "rules"
     | "security"
     | "traffic"

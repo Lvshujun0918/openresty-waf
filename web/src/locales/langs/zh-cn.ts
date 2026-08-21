@@ -237,6 +237,7 @@ const local: App.I18n.Schema = {
     alerts: '告警通知',
     'api-tokens': 'API Token',
     'rule-perf': '规则性能',
+    'rule-subs': '规则订阅源',
     bots: '爬虫管理',
     'audit-logs': '操作审计',
     bans: '封禁管理',

@@ -241,6 +241,7 @@ const local: App.I18n.Schema = {
     alerts: 'Alerts',
     'api-tokens': 'API Tokens',
     'rule-perf': 'Rule Performance',
+    'rule-subs': 'Rule Subscriptions',
     bots: 'Bots',
     'audit-logs': 'Audit Logs',
     bans: 'IP Bans',

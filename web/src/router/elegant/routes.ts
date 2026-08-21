@@ -221,6 +221,17 @@ export const generatedRoutes: GeneratedRoute[] = [
     }
   },
   {
+    name: 'rule-subs',
+    path: '/rule-subs',
+    component: 'layout.base$view.rule-subs',
+    meta: {
+      title: 'rule-subs',
+      i18nKey: 'route.rule-subs',
+      icon: 'mdi:cloud-download-outline',
+      order: 5.5
+    }
+  },
+  {
     name: 'rules',
     path: '/rules',
     component: 'layout.base$view.rules',
