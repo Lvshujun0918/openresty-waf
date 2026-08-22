@@ -203,7 +203,7 @@ declare namespace Api {
     /** 仪表盘聚合统计 */
     interface DashboardStats {
       today: { request: number; attack: number; intercept_24h: number };
-      total: { events: number; traffic: number };
+      total: { events: number; traffic: number; rules: number; rules_enabled: number };
       qps: number;
       attack_trend: { date: string; attack: number }[];
       groups: { group: string; count: number }[];

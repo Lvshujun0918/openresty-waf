@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { fetchRuleStats } from '@/service/api';
-import { computed, h, onMounted, reactive, ref } from 'vue';
+import { h, onMounted, reactive, ref } from 'vue';
 import {
   NButton,
   NCard,
@@ -34,7 +34,6 @@ import {
   updateRule
 } from '@/service/api';
 
-const rules = ref<Api.Waf.Rule[]>([]);
 const loading = ref(false);
 const groupFilter = ref('');
 const searchText = ref('');
@@ -139,24 +138,29 @@ const operatorPlaceholder: Record<string, string> = {
   LIBINJECTION_XSS: '无需填写（词法分析自动识别）'
 };
 
-const filterRules = computed(() => {
-  let out = rules.value;
-  if (groupFilter.value) out = out.filter(r => r.group === groupFilter.value);
-  const kw = searchText.value.trim().toLowerCase();
-  if (kw) {
-    out = out.filter(r => [r.rule_id, r.name, r.message].some(v => (v || '').toLowerCase().includes(kw)));
-  }
-  return out;
-});
+// —— 服务端分页与筛选 ——
+const rules = ref<Api.Waf.Rule[]>([]);
+const total = ref(0);
+const page = ref(1);
+const pageSize = 20;
 
 async function load() {
   loading.value = true;
   try {
-    const res = await fetchRules();
-    rules.value = res.data ?? [];
+    const params: Record<string, string | number> = { page: page.value, page_size: pageSize };
+    if (groupFilter.value) params.group = groupFilter.value;
+    if (searchText.value.trim()) params.keyword = searchText.value.trim();
+    const res = await fetchRules(params);
+    rules.value = res.data?.items ?? [];
+    total.value = res.data?.total ?? 0;
   } finally {
     loading.value = false;
   }
+}
+
+function search() {
+  page.value = 1;
+  load();
 }
 
 async function toggleEnabled(row: Api.Waf.Rule) {
@@ -630,7 +634,7 @@ onMounted(() => {
     <div class="flex items-center justify-between">
       <div>
         <h2 class="text-xl font-semibold">规则管理</h2>
-        <p class="text-sm text-[rgb(125,125,125)]">共 {{ filterRules.length }} 条 · 发布后引擎 5 秒内热更新生效</p>
+        <p class="text-sm text-[rgb(125,125,125)]">共 {{ total }} 条 · 发布后引擎 5 秒内热更新生效</p>
       </div>
       <NSpace>
         <NButton secondary @click="doExport">导出</NButton>
@@ -687,11 +691,25 @@ onMounted(() => {
     <NCard :bordered="false" class="card-wrapper">
       <template #header-extra>
         <NSpace>
-          <NInput v-model:value="searchText" placeholder="搜索编号/名称/说明" clearable class="w-48" />
-          <NSelect v-model:value="groupFilter" :options="groupOptions" clearable placeholder="按攻击类型筛选" class="w-40" />
+          <NInput v-model:value="searchText" placeholder="搜索编号/名称/说明" clearable class="w-48" @keyup.enter="search" @clear="search" />
+          <NSelect v-model:value="groupFilter" :options="groupOptions" clearable placeholder="按攻击类型筛选" class="w-40" @update:value="search" />
         </NSpace>
       </template>
-      <NDataTable :columns="columns" :data="filterRules" :loading="loading" :bordered="false" size="small" />
+      <NDataTable
+        :columns="columns"
+        :data="rules"
+        :loading="loading"
+        :pagination="{
+          page,
+          pageSize,
+          itemCount: total,
+          showSizePicker: false,
+          onChange: (p: number) => { page = p; load(); }
+        }"
+        remote
+        :bordered="false"
+        size="small"
+      />
     </NCard>
 
     <!-- 编辑表单 -->

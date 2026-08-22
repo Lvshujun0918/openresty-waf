@@ -3,7 +3,7 @@ import { computed, h, onMounted, ref } from 'vue';
 import { NCard, NDataTable, NGrid, NGi, NTag } from 'naive-ui';
 import { useEcharts } from '@/hooks/common/echarts';
 import type { ECOption } from '@/hooks/common/echarts';
-import { fetchDashboardStats, fetchEngines, fetchEvents, fetchRules, fetchTopRegions, fetchTrafficTrend } from '@/service/api';
+import { fetchDashboardStats, fetchEngines, fetchEvents, fetchTopRegions, fetchTrafficTrend } from '@/service/api';
 
 const mode = ref('active');
 const ruleCount = ref(0);
@@ -222,20 +222,18 @@ const eventColumns = [
 async function load() {
   loading.value = true;
   try {
-    const [st, tr, ev, rules, en, rg] = await Promise.all([
+    const [st, tr, ev, en, rg] = await Promise.all([
       fetchDashboardStats(14),
       fetchTrafficTrend(14).catch(() => ({ data: { items: [] as { date: string; total: number }[] } })),
       fetchEvents({ page: 1, page_size: 6 }).catch(() => ({ data: { items: [] as Api.Waf.EventItem[] } })),
-      fetchRules().catch(() => ({ data: [] as Api.Waf.Rule[] })),
       fetchEngines().catch(() => ({ data: { engines: [] as Api.Waf.EngineStatus[] } })),
       fetchTopRegions('province', 8).catch(() => ({ data: { items: [] as { region: string; count: number }[] } }))
     ]);
     stats.value = st.data;
     reqTrend.value = tr.data?.items ?? [];
     recentEvents.value = ev.data?.items ?? [];
-    const rulesList = rules.data ?? [];
-    ruleCount.value = rulesList.length;
-    enabledCount.value = rulesList.filter(r => r.enabled).length;
+    ruleCount.value = st.data?.total?.rules ?? 0;
+    enabledCount.value = st.data?.total?.rules_enabled ?? 0;
     const engines = en.data?.engines ?? [];
     engineTotal.value = engines.length;
     engineOnline.value = engines.filter(e => e.online).length;

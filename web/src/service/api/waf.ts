@@ -48,9 +48,9 @@ export function cleanupTraffic(days: number) {
   return request<{ status: string; deleted: number }>({ url: '/traffic/cleanup', method: 'post', params: { days } });
 }
 
-/** 规则列表 */
+/** 规则列表（分页） */
 export function fetchRules(params: Record<string, string | number> = {}) {
-  return request<Api.Waf.Rule[]>({ url: '/rules', params });
+  return request<Api.Waf.PageResult<Api.Waf.Rule>>({ url: '/rules', params });
 }
 
 /** 新建规则 */
