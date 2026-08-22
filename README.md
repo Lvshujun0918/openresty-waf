@@ -609,6 +609,8 @@ ab -n 50000 -c 100 -k "http://<HOST_IP>:8083/?id=1%20union%20select%201"
 - HPP 参数污染变量（URI_ARGS_DUP / POST_ARGS_DUP）+ 参数/请求头计数变量（ARGS_COUNT / HEADERS_COUNT）。
 - CIDR 运算符支持 IPv6（:: 压缩与 IPv4 尾段映射，纯 Lua 128 位逐字比较）。
 - 超大上传落盘流式检测：body 超 client_body_buffer_size 落临时文件时读取前缀 `spooled_scan_bytes`（默认 512KB）继续后缀/类型检测，堵住绕过。
+- multipart 文本检测排除文件字段：POST_ARGS/BODY/POST_ARGS_DUP 对 multipart/form-data 仅提取文本字段，跳过文件二进制，消除 libinjection/CRLF/PHP 标签等文本检测器对正常图片/文件上传的误报。
+- 上传木马内容探测：图片扩展名文件全程（头+尾各半采样，`content_scan_limit` 默认 1MB）扫描脚本标签（图片马），脚本标签上下文的危险函数组合命中 Webshell（PHP `system/eval/base64_decode`、ASP `Execute`、JSP `Runtime.exec` 等）。
 - API 安全规则组（敏感端点/GraphQL 内省/XXE）+ 编码混淆规则（base64 载荷）。
 - DLP 响应检测规则组（身份证/银行卡/手机号/私钥/云密钥，默认 LOG_ONLY），响应体缓冲上限可配置。
 - 慢速攻击双层防护：接入模板下发超时/缓冲参数 + 加固方案（见「慢速攻击与连接层加固」章节）。
