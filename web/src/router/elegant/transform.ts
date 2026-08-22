@@ -181,6 +181,7 @@ const routeMap: RouteMap = {
   "monitoring_error-logs": "/monitoring/error-logs",
   "monitoring_events": "/monitoring/events",
   "monitoring_monitor": "/monitoring/monitor",
+  "monitoring_stats": "/monitoring/stats",
   "monitoring_traffic": "/monitoring/traffic",
   "protection": "/protection",
   "protection_rule-perf": "/protection/rule-perf",

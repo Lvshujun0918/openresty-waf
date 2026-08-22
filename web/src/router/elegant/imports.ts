@@ -31,6 +31,7 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   "monitoring_error-logs": () => import("@/views/monitoring/error-logs/index.vue"),
   monitoring_events: () => import("@/views/monitoring/events/index.vue"),
   monitoring_monitor: () => import("@/views/monitoring/monitor/index.vue"),
+  monitoring_stats: () => import("@/views/monitoring/stats/index.vue"),
   monitoring_traffic: () => import("@/views/monitoring/traffic/index.vue"),
   "protection_rule-perf": () => import("@/views/protection/rule-perf/index.vue"),
   "protection_rule-subs": () => import("@/views/protection/rule-subs/index.vue"),
