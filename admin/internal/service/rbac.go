@@ -105,10 +105,10 @@ func ModuleForPath(path string) string {
 	// 运行配置
 	case path == "config" || strings.HasPrefix(path, "config/"):
 		return PermConfig
-	// 数据管道维护（流量/人机验证/CC/报错汇总消费与清理、实时监控）
+	// 数据管道维护（流量/人机验证/CC/报错汇总消费与清理、实时监控、统计报告）
 	case strings.HasPrefix(path, "traffic"), strings.HasPrefix(path, "challenges"),
 		strings.HasPrefix(path, "cc-logs"), strings.HasPrefix(path, "errors"),
-		strings.HasPrefix(path, "monitor"):
+		strings.HasPrefix(path, "monitor"), strings.HasPrefix(path, "stats"):
 		return PermMonitor
 	}
 	return ""

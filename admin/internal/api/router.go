@@ -59,6 +59,7 @@ type apiDeps struct {
 	challengeHandler   *ChallengeHandler
 	ccLogHandler       *CcLogHandler
 	errorLogHandler    *ErrorLogHandler
+	statsHandler       *StatsHandler
 	triggerRuleHandler *TriggerRuleHandler
 	banHandler         *BanHandler
 	healthHandler      *HealthHandler
@@ -91,6 +92,7 @@ func newDeps(cfg *config.Config, db *gorm.DB, mgr *service.RedisManager) *apiDep
 		challengeHandler:   NewChallengeHandler(db, mgr, cfg),
 		ccLogHandler:       NewCcLogHandler(db, mgr, cfg),
 		errorLogHandler:    NewErrorLogHandler(db, mgr, cfg),
+		statsHandler:       NewStatsHandler(db),
 		triggerRuleHandler: NewTriggerRuleHandler(db, mgr, cfg),
 		banHandler:         NewBanHandler(db, mgr, cfg),
 		healthHandler:      NewHealthHandler(mgr, cfg),
@@ -200,6 +202,9 @@ func registerAPIRoutes(api *gin.RouterGroup, d *apiDeps) {
 			authed.GET("/traffic/stats", d.trafficHandler.Stats)
 			authed.GET("/traffic/trend", d.trafficHandler.Trend)
 			authed.GET("/traffic/export", d.trafficHandler.Export)
+
+			// 流量统计报告
+			authed.GET("/stats/traffic", d.statsHandler.Traffic)
 
 			// 攻击事件
 			authed.GET("/events", d.eventHandler.List)
