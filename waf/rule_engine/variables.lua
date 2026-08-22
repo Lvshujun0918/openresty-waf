@@ -37,6 +37,62 @@ local function push_specific(args, specific, out)
     end
 end
 
+-- multipart/form-data：提取文本字段（跳过文件字段）。
+-- 防止二进制文件体被文本检测器误报（libinjection / CR/LF / ?! 等字节特征）。
+-- include_keys 时同时收集键名；specific 非空时仅提取该字段。
+-- 复用 detectors.upload.parse_parts（已含文本字段 name/value 与文件 data）。
+local function collect_multipart_fields(content_type, body, specific, include_keys, out)
+    local boundary = content_type and content_type:match('boundary="?([^";%s]+)"?')
+    if not boundary or boundary == "" then return end
+    local up = require "detectors.upload"
+    local parts = up.parse_parts(body, boundary)
+    for _, part in ipairs(parts) do
+        -- 仅文本字段（无 filename）；文件字段跳过
+        if part.name and not part.filename then
+            if specific and specific ~= "" then
+                if part.name == specific then
+                    push(out, part.value)
+                end
+            else
+                push(out, part.value)
+                if include_keys then
+                    push(out, part.name)
+                end
+            end
+        end
+    end
+end
+
+-- multipart/form-data：重复文本字段名与全部值（HPP）
+local function collect_multipart_dup(content_type, body, out)
+    local boundary = content_type and content_type:match('boundary="?([^";%s]+)"?')
+    if not boundary or boundary == "" then return end
+    local up = require "detectors.upload"
+    local parts = up.parse_parts(body, boundary)
+    local seen = {}
+    local order = {}
+    local field_vals = {}
+    for _, part in ipairs(parts) do
+        if part.name and not part.filename then
+            field_vals[part.name] = field_vals[part.name] or {}
+            local list = field_vals[part.name]
+            list[#list + 1] = part.value
+            if not seen[part.name] then
+                seen[part.name] = true
+                order[#order + 1] = part.name
+            end
+        end
+    end
+    for _, k in ipairs(order) do
+        if #field_vals[k] > 1 then
+            push(out, k)
+            for _, item in ipairs(field_vals[k]) do
+                push(out, item)
+            end
+        end
+    end
+end
+
 -- 实际提取逻辑（无缓存）
 local function collect_raw(var, ctx)
     local typ = var.type
@@ -97,54 +153,66 @@ local function collect_raw(var, ctx)
     elseif typ == "POST_ARGS" then
         ngx.req.read_body()
         local body = ngx.req.get_body_data()
-        -- JSON body 结构化：解析为字段值后检测，避免 JSON 语法（引号/冒号）被误判
-        local json_vals
         local ct = ngx.var.content_type or ""
-        if body and ct:find("application/json", 1, true) then
-            local util = require "rule_engine.util"
-            local ok, vals = util.try_parse_json(body, include_keys)
-            if ok then
-                json_vals = vals
+        -- multipart：排除文件字段，仅检测文本字段（防二进制误报）
+        if body and ct:find("multipart/form-data", 1, true) then
+            collect_multipart_fields(ct, body, specific, include_keys, out)
+        else
+            -- JSON body 结构化：解析为字段值后检测，避免 JSON 语法（引号/冒号）被误判
+            local json_vals
+            if body and ct:find("application/json", 1, true) then
+                local util = require "rule_engine.util"
+                local ok, vals = util.try_parse_json(body, include_keys)
+                if ok then
+                    json_vals = vals
+                end
             end
-        end
-        -- XML/SOAP body 结构化：标签/属性/文本展平，避免 XML 标记被误判
-        local xml_vals
-        if body and (ct:find("xml", 1, true) or ct:find("soap", 1, true)) then
-            local util = require "rule_engine.util"
-            xml_vals = util.try_parse_xml(body)
-        end
-        if json_vals then
-            if not (specific and specific ~= "") then
-                for _, v in ipairs(json_vals) do
+            -- XML/SOAP body 结构化：标签/属性/文本展平，避免 XML 标记被误判
+            local xml_vals
+            if body and (ct:find("xml", 1, true) or ct:find("soap", 1, true)) then
+                local util = require "rule_engine.util"
+                xml_vals = util.try_parse_xml(body)
+            end
+            if json_vals then
+                if not (specific and specific ~= "") then
+                    for _, v in ipairs(json_vals) do
+                        push(out, v)
+                    end
+                else
+                    -- specific 场景：JSON 展平值不含字段名映射，回退默认解析
+                    local args = ngx.req.get_post_args()
+                    push_specific(args, specific, out)
+                end
+            elseif xml_vals then
+                for _, v in ipairs(xml_vals) do
                     push(out, v)
                 end
             else
-                -- specific 场景：JSON 展平值不含字段名映射，回退默认解析
                 local args = ngx.req.get_post_args()
-                push_specific(args, specific, out)
-            end
-        elseif xml_vals then
-            for _, v in ipairs(xml_vals) do
-                push(out, v)
-            end
-        else
-            local args = ngx.req.get_post_args()
-            if specific and specific ~= "" then
-                push_specific(args, specific, out)
-            else
-                collect_args(args, out, include_keys)
+                if specific and specific ~= "" then
+                    push_specific(args, specific, out)
+                else
+                    collect_args(args, out, include_keys)
+                end
             end
         end
 
     elseif typ == "POST_ARGS_DUP" then
         -- HPP：POST 表单重复参数名及其全部值
         ngx.req.read_body()
-        local args = ngx.req.get_post_args()
-        for k, v in pairs(args or {}) do
-            if type(v) == "table" and #v > 1 then
-                push(out, k)
-                for _, item in ipairs(v) do
-                    push(out, item)
+        local body = ngx.req.get_body_data()
+        local ct = ngx.var.content_type or ""
+        if body and ct:find("multipart/form-data", 1, true) then
+            -- multipart：仅文本字段重复名（排除文件 part）
+            collect_multipart_dup(ct, body, out)
+        else
+            local args = ngx.req.get_post_args()
+            for k, v in pairs(args or {}) do
+                if type(v) == "table" and #v > 1 then
+                    push(out, k)
+                    for _, item in ipairs(v) do
+                        push(out, item)
+                    end
                 end
             end
         end
@@ -185,7 +253,14 @@ local function collect_raw(var, ctx)
 
     elseif typ == "BODY" then
         ngx.req.read_body()
-        push(out, ngx.req.get_body_data())
+        local body = ngx.req.get_body_data()
+        local ct = ngx.var.content_type or ""
+        if body and ct:find("multipart/form-data", 1, true) then
+            -- multipart：仅文本字段值（排除文件二进制，防 libinjection/字节特征误报）
+            collect_multipart_fields(ct, body, nil, false, out)
+        else
+            push(out, body)
+        end
 
     elseif typ == "RESPONSE_STATUS" then
         push(out, tostring(ngx.status))

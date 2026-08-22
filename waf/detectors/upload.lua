@@ -16,10 +16,12 @@ local function get_boundary(content_type)
     return content_type:match('boundary="?([^";%s]+)"?')
 end
 
--- 解析 multipart body → 文件部分列表 { filename, content_type, head }
--- head 保留文件内容前 128 字节（文件头魔数/脚本标签检测，覆盖长 MIME 头）。
+-- 解析 multipart body → 全部部分列表。
+-- 文件 part：{ filename, content_type, head, data }——head 保留文件内容前 128 字节
+-- （文件头魔数/脚本标签检测，覆盖长 MIME 头）；data 为完整内容（供图片马/Webshell 内容探测）。
+-- 文本字段 part：{ name, value }。
 -- 部分之间由 \r\n--boundary 分隔；结束分隔行为 --boundary--。
-function _M.parse_multipart(body, boundary)
+function _M.parse_parts(body, boundary)
     local parts = {}
     if not body or not boundary or boundary == "" then return parts end
     local delim = "--" .. boundary
@@ -32,6 +34,8 @@ function _M.parse_multipart(body, boundary)
         if not header_end then break end
         -- MIME 头字段名不区分大小写（匹配键用小写字符类），保留文件名原大小写
         local headers = body:sub(head_start, header_end - 1)
+        local name = headers:match('[Nn][Aa][Mm][Ee]="([^"]*)"')
+            or headers:match('[Nn][Aa][Mm][Ee]=([^;%s]+)')
         local filename = headers:match('[Ff][Ii][Ll][Ee][Nn][Aa][Mm][Ee]="([^"]*)"')
             or headers:match('[Ff][Ii][Ll][Ee][Nn][Aa][Mm][Ee]=([^;%s]+)')
         local content_type = headers:match('[Cc][Oo][Nn][Tt][Ee][Nn][Tt]%-[Tt][Yy][Pp][Ee]:%s*([^\r\n]+)')
@@ -40,16 +44,34 @@ function _M.parse_multipart(body, boundary)
         local next_delim = body:find("\r\n" .. delim, data_start, true)
         local data = next_delim and body:sub(data_start, next_delim - 1)
             or body:sub(data_start)
-        if filename and filename ~= "" then
+        -- 文本字段值以 \r\n 结束（分隔行前），剥掉尾部 CRLF 还原原始值
+        if not filename or filename == "" then
+            data = data:gsub("\r\n$", "")
+            if name and name ~= "" then
+                parts[#parts + 1] = { name = name, value = data }
+            end
+        else
             parts[#parts + 1] = {
                 filename = filename,
                 content_type = content_type or nil,
                 head = data:sub(1, 128),
+                data = data,
             }
         end
         start = next_delim and body:find(delim, next_delim + 2, true) or nil
     end
     return parts
+end
+
+-- 解析 multipart body → 文件部分列表（兼容旧接口：仅含文件 part，含 head/data）
+function _M.parse_multipart(body, boundary)
+    local files = {}
+    for _, part in ipairs(_M.parse_parts(body, boundary)) do
+        if part.filename then
+            files[#files + 1] = part
+        end
+    end
+    return files
 end
 
 -- 值是否命中黑名单（忽略大小写）
@@ -112,8 +134,8 @@ function _M.check(waf_ctx, up)
     return _M.scan_body(body, boundary, up)
 end
 
--- 脚本/可执行文件内容特征（文件头 64 字节内匹配，Webshell 检测）。
--- 宽松匹配 PHP/ASP/JSP 标签与 shebang；XML 声明不误伤。
+-- 内容特征扫描（Webshell/可执行文件魔数，绕过后缀与类型伪装）
+-- 文件头 script 特征：宽松匹配 PHP/ASP/JSP 标签与 shebang；XML 声明不误伤。
 local CONTENT_FEATURES = {
     { pattern = "<%?php",     desc = "PHP 脚本标签" },
     { pattern = "<%?%s*=",    desc = "PHP 短标签" },
