@@ -8,6 +8,12 @@ import type { RouteKey } from '@elegant-router/types';
  * 因此本表在路由改名后首次生成时生效，写入后由 merge 持久保留。
  */
 const ROUTE_META_MAP: Partial<Record<RouteKey, Partial<RouteMeta>>> = {
+  // 常量/隐藏页不进菜单（上游默认手写 hideInMenu，纯再生成的场景由本表兜底）
+  login: { hideInMenu: true },
+  '403': { hideInMenu: true },
+  '404': { hideInMenu: true },
+  '500': { hideInMenu: true },
+  'iframe-page': { hideInMenu: true },
   home: { icon: 'mdi:monitor-dashboard', order: 1, hideInMenu: true },
   dashboard: { icon: 'mdi:view-dashboard', order: 2 },
   // 安全监测
