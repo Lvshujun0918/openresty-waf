@@ -145,6 +145,48 @@ local CONTENT_FEATURES = {
     { pattern = "^MZ",        desc = "PE 可执行文件" },
 }
 
+-- 图片扩展名（图片马判定：图片文件内嵌脚本代码）
+local IMAGE_EXT = {
+    "png", "jpg", "jpeg", "gif", "bmp", "webp",
+}
+
+-- webshell 危险函数特征：脚本标签上下文内的代码执行函数（低误报组合）。
+-- pattern 需同时含脚本标签开启符与危险函数，避免纯文本/正常代码命中。
+local WEBSHELL_FEATURES = {
+    -- PHP：<?php ...(system|exec|shell_exec|passthru|assert|base64_decode|eval)...(
+    { pattern = "<%?php[^>]*%f[%w_](?:system|exec|shell_exec|passthru|assert|base64_decode|eval)%s*%(", desc = "PHP 代码执行" },
+    -- PHP 变体：<?= 或短标签 + eval/base64_decode（一句话马常见形态）
+    { pattern = "<%?=[^>]*%f[%w_](?:eval|base64_decode)%s*%(", desc = "PHP 短标签代码执行" },
+    -- ASP：<% ...(Execute|ExecuteGlobal|Eval|CreateObject("WScript.Shell")...(
+    { pattern = "<%%%f[%w_]%s*(?:Execute|ExecuteGlobal|Eval)%s*%(", desc = "ASP 代码执行" },
+    -- JSP：<% ...Runtime.getRuntime().exec / javax.script 等
+    { pattern = "<%%[^>]*%f[%w_]Runtime%s*%.%s*getRuntime%s*%(%s*%)%s*%.%s*exec", desc = "JSP 命令执行" },
+    -- 图片马兜底：任意脚本标签开启符出现在图片魔数之后（由调用方先判图片）
+    { pattern = "<%?php", desc = "内嵌 PHP 代码" },
+}
+
+-- 单个文件是否图片扩展（小写比较）
+local function is_image_ext(filename)
+    local ext = filename:match("%.([^%.]+)$")
+    if not ext then return false end
+    ext = ext:lower()
+    for _, img in ipairs(IMAGE_EXT) do
+        if ext == img then return true end
+    end
+    return false
+end
+
+-- 内容扫描区间：文件太大时取头部 + 尾部各 half 字节（图片马代码常在文件尾）
+local function scan_region(data, limit)
+    if not limit or limit <= 0 then limit = 1048576 end
+    local n = #data
+    if n <= limit then return data end
+    local half = math.floor(limit / 2)
+    local head = data:sub(1, half)
+    local tail = data:sub(-half)
+    return head .. "\0" .. tail
+end
+
 -- 单个文件部分检测（后缀黑名单 + Content-Type 黑名单 + 内容特征）
 local function scan_part(part, up)
     -- 1. 文件名后缀黑名单（对伪装 Content-Type 的上传有效）
@@ -159,10 +201,36 @@ local function scan_part(part, up)
     end
     -- 3. 内容特征扫描（Webshell/可执行文件魔数，绕过后缀与类型伪装）
     if up.content_scan ~= false and part.head and #part.head > 0 then
+        -- 3a. 文件头特征（脚本标签 / shebang / PE 魔数）
         for _, feat in ipairs(CONTENT_FEATURES) do
             local ok, m = pcall(ngx.re.find, part.head, feat.pattern, "joi")
             if ok and m then
                 return "文件上传：内容含" .. feat.desc .. "（" .. part.filename .. "）"
+            end
+        end
+        -- 3b. 图片马检测：图片扩展且在文件全程（头+尾采样）发现脚本代码
+        if is_image_ext(part.filename) and part.data and #part.data > 0 then
+            local region = scan_region(part.data, up.content_scan_limit)
+            for _, feat in ipairs(CONTENT_FEATURES) do
+                -- 图片文件头的图片魔数属于正常内容，只查脚本特征
+                if feat.pattern ~= "^MZ" then
+                    local ok, m = pcall(ngx.re.find, region, feat.pattern, "joi")
+                    if ok and m then
+                        return "文件上传：疑似图片马（图片内嵌" .. feat.desc .. "）（"
+                            .. part.filename .. "）"
+                    end
+                end
+            end
+        end
+        -- 3c. Webshell 危险函数组合（脚本标签 + 代码执行函数）
+        if up.webshell_scan ~= false and part.data and #part.data > 0 then
+            local region = scan_region(part.data, up.content_scan_limit)
+            for _, feat in ipairs(WEBSHELL_FEATURES) do
+                local ok, m = pcall(ngx.re.find, region, feat.pattern, "joi")
+                if ok and m then
+                    return "文件上传：疑似Webshell（" .. feat.desc .. "）（"
+                        .. part.filename .. "）"
+                end
             end
         end
     end

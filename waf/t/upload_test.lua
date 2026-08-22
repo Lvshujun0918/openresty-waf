@@ -192,3 +192,122 @@ t.test("upload: PHP 内容特征命中", function()
     t.notnil(hit)
     t.ok(hit:find("PHP", 1, true), "内容特征: " .. tostring(hit))
 end)
+
+-- ============ parse_parts：文本字段 + 文件部分 ============
+
+t.test("parse_parts: 文本字段与文件部分共存", function()
+    local body = "--" .. B .. "\r\n"
+        .. 'Content-Disposition: form-data; name="title"\r\n\r\n'
+        .. "标题\r\n"
+        .. "--" .. B .. "\r\n"
+        .. 'Content-Disposition: form-data; name="file"; filename="a.png"\r\n\r\n'
+        .. "\x89PNGdata\r\n"
+        .. "--" .. B .. "--\r\n"
+    local parts = upload.parse_parts(body, B)
+    t.eq(#parts, 2)
+    t.eq(parts[1].name, "title")
+    t.eq(parts[1].value, "标题")
+    t.isnil(parts[1].filename, "文本字段无 filename")
+    t.eq(parts[2].filename, "a.png")
+    t.eq(parts[2].data, "\x89PNGdata")
+end)
+
+t.test("parse_parts: 文本字段值剥离尾部 CRLF", function()
+    local body = "--" .. B .. "\r\n"
+        .. 'Content-Disposition: form-data; name="d"\r\n\r\n'
+        .. "plain\r\n"
+        .. "--" .. B .. "--\r\n"
+    local parts = upload.parse_parts(body, B)
+    t.eq(#parts, 1)
+    t.eq(parts[1].value, "plain")
+end)
+
+t.test("parse_parts: 文件 data 保留完整内容", function()
+    local body = multipart(B,
+        'Content-Disposition: form-data; name="file"; filename="x.txt"\r\nContent-Type: text/plain',
+        "abcdef")
+    local parts = upload.parse_parts(body, B)
+    t.eq(parts[1].filename, "x.txt")
+    t.eq(parts[1].data, "abcdef")
+    t.eq(parts[1].head, "abcdef")
+end)
+
+-- ============ 图片马 / Webshell 危险函数 ============
+
+local function img_up(over)
+    local cfg = { enabled = true, deny_ext = {}, deny_mime = {}, content_scan = true }
+    if over then
+        for k, v in pairs(over) do cfg[k] = v end
+    end
+    return cfg
+end
+
+t.test("scan_body: 图片头 + 尾部 PHP 代码命中图片马", function()
+    -- 图片马典型形态：合法图片头（GIF89a）+ 尾部嵌入 PHP 一句话
+    local gif = "GIF89a\x01\x00\x01\x00\x80\x00\x00" .. string.rep("\x00", 200)
+        .. "<?php @eval($_POST['x']);?>"
+    local body = multipart(B,
+        'Content-Disposition: form-data; name="file"; filename="logo.gif"\r\nContent-Type: image/gif',
+        gif)
+    local hit = upload.scan_body(body, B, img_up())
+    t.notnil(hit, "图片马应命中")
+    t.ok(hit:find("图片马", 1, true), "描述应含图片马: " .. tostring(hit))
+end)
+
+t.test("scan_body: 尾部 PHP 代码（超 128B head 之外）仍命中图片马", function()
+    -- PHP 代码在文件尾部，超出只读 head 128B 的范围——必须靠 data 全程采样
+    local png = "\x89PNG\r\n\x1a\n" .. string.rep("\x00\x01\x02", 60)
+        .. "<?php system($_GET['c']);?>"
+    t.ok(#png > 128, "测试数据应超出 head 128B 窗口")
+    local body = multipart(B,
+        'Content-Disposition: form-data; name="file"; filename="pic.png"\r\nContent-Type: image/png',
+        png)
+    local hit = upload.scan_body(body, B, img_up())
+    t.notnil(hit, "尾部 PHP 的图片马应命中")
+    t.ok(hit:find("图片马", 1, true) or hit:find("Webshell", 1, true), tostring(hit))
+end)
+
+t.test("scan_body: 图片文件转储危险函数组合命中 Webshell（代码在尾部）", function()
+    -- 200 字节无特征前缀 + 尾部 PHP 危险函数，超出 head 128B 窗口
+    local jpg = "\xff\xd8\xff\xe0" .. string.rep("jpegdata", 25) .. "<?php system($_GET[c]);?>"
+    t.ok(#jpg > 128, "测试数据应超出 head 128B 窗口")
+    local body = multipart(B,
+        'Content-Disposition: form-data; name="file"; filename="photo.jpg"\r\nContent-Type: image/jpeg',
+        jpg)
+    local hit = upload.scan_body(body, B, img_up())
+    t.notnil(hit)
+    t.ok(hit:find("Webshell", 1, true) or hit:find("图片马", 1, true), tostring(hit))
+end)
+
+t.test("scan_body: 非图片文件含危险函数组合命中 Webshell", function()
+    local body = multipart(B,
+        'Content-Disposition: form-data; name="file"; filename="doc.txt"\r\nContent-Type: text/plain',
+        string.rep("ab", 100) .. "<?php system($_GET[c]);?>")
+    local hit = upload.scan_body(body, B, img_up())
+    t.notnil(hit, "文档内嵌 PHP 代码执行应命中")
+    t.ok(hit:find("Webshell", 1, true), tostring(hit))
+end)
+
+t.test("scan_body: 普通文本文件无脚本标签不命中", function()
+    local body = multipart(B,
+        'Content-Disposition: form-data; name="file"; filename="note.txt"\r\nContent-Type: text/plain',
+        "只是普通文本，没有代码")
+    t.isnil(upload.scan_body(body, B, img_up()))
+end)
+
+t.test("scan_body: 正常图片无内嵌代码不命中", function()
+    local body = multipart(B,
+        'Content-Disposition: form-data; name="file"; filename="real.png"\r\nContent-Type: image/png',
+        "\x89PNG\r\n\x1a\n" .. string.rep("data", 50))
+    t.isnil(upload.scan_body(body, B, img_up()))
+end)
+
+t.test("scan_body: webshell_scan=false 关闭危险函数检测", function()
+    local body = multipart(B,
+        'Content-Disposition: form-data; name="file"; filename="a.jpg"\r\nContent-Type: image/jpeg',
+        "jpeg<?php system($_GET[c]);?>")
+    -- 关 webshell 但保留 content_scan：文件头脚本标签仍会命中 CONTENT_FEATURES
+    local hit = upload.scan_body(body, B, img_up({ webshell_scan = false }))
+    t.notnil(hit, "文件头 PHP 标签仍应命中 CONTENT_FEATURES")
+    t.ok(hit:find("PHP 脚本标签", 1, true) or hit:find("图片马", 1, true), tostring(hit))
+end)
