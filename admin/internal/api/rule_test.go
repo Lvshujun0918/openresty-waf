@@ -22,14 +22,17 @@ func TestRules_CRUD(t *testing.T) {
 	token := doLogin(t, r)
 
 	// 空列表
+	var rules struct {
+		Items []map[string]interface{} `json:"items"`
+		Total int64                    `json:"total"`
+	}
 	w := doReq(r, authedReq(http.MethodGet, "/api/rules", token, nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("list: %d", w.Code)
 	}
-	var rules []map[string]interface{}
 	_ = json.Unmarshal(w.Body.Bytes(), &rules)
-	if len(rules) != 0 {
-		t.Errorf("expected 0 rules, got %d", len(rules))
+	if len(rules.Items) != 0 || rules.Total != 0 {
+		t.Errorf("expected 0 rules, got %d total=%d", len(rules.Items), rules.Total)
 	}
 
 	// 创建
@@ -57,25 +60,25 @@ func TestRules_CRUD(t *testing.T) {
 	// 列表含 1 条
 	w = doReq(r, authedReq(http.MethodGet, "/api/rules", token, nil))
 	_ = json.Unmarshal(w.Body.Bytes(), &rules)
-	if len(rules) != 1 {
-		t.Errorf("expected 1 rule, got %d", len(rules))
+	if len(rules.Items) != 1 || rules.Total != 1 {
+		t.Errorf("expected 1 rule, got %d total=%d", len(rules.Items), rules.Total)
 	}
 
 	// 关键词过滤
 	w = doReq(r, authedReq(http.MethodGet, "/api/rules?keyword=测试", token, nil))
 	_ = json.Unmarshal(w.Body.Bytes(), &rules)
-	if len(rules) != 1 {
-		t.Errorf("keyword filter: %d", len(rules))
+	if len(rules.Items) != 1 {
+		t.Errorf("keyword filter: %d", len(rules.Items))
 	}
 	w = doReq(r, authedReq(http.MethodGet, "/api/rules?keyword=不存在", token, nil))
 	_ = json.Unmarshal(w.Body.Bytes(), &rules)
-	if len(rules) != 0 {
-		t.Errorf("keyword miss: %d", len(rules))
+	if len(rules.Items) != 0 {
+		t.Errorf("keyword miss: %d", len(rules.Items))
 	}
 	w = doReq(r, authedReq(http.MethodGet, "/api/rules?group=custom", token, nil))
 	_ = json.Unmarshal(w.Body.Bytes(), &rules)
-	if len(rules) != 1 {
-		t.Errorf("group filter: %d", len(rules))
+	if len(rules.Items) != 1 {
+		t.Errorf("group filter: %d", len(rules.Items))
 	}
 
 	// 更新
@@ -105,11 +108,11 @@ func TestRules_CRUD(t *testing.T) {
 	}
 	w = doReq(r, authedReq(http.MethodGet, "/api/rules", token, nil))
 	_ = json.Unmarshal(w.Body.Bytes(), &rules)
-	if len(rules) != 1 {
-		t.Errorf("after disable list: %d", len(rules))
+	if len(rules.Items) != 1 {
+		t.Errorf("after disable list: %d", len(rules.Items))
 	}
-	if rules[0]["enabled"] != false {
-		t.Errorf("enabled = %v", rules[0]["enabled"])
+	if rules.Items[0]["enabled"] != false {
+		t.Errorf("enabled = %v", rules.Items[0]["enabled"])
 	}
 
 	// 删除
@@ -119,8 +122,8 @@ func TestRules_CRUD(t *testing.T) {
 	}
 	w = doReq(r, authedReq(http.MethodGet, "/api/rules", token, nil))
 	_ = json.Unmarshal(w.Body.Bytes(), &rules)
-	if len(rules) != 0 {
-		t.Errorf("after delete: %d", len(rules))
+	if len(rules.Items) != 0 {
+		t.Errorf("after delete: %d", len(rules.Items))
 	}
 }
 

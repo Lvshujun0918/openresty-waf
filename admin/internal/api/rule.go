@@ -21,14 +21,22 @@ func NewRuleHandler(db *gorm.DB, mgr *service.RedisManager, cfg *config.Config) 
 	return &RuleHandler{svc: service.NewRuleService(db, mgr, cfg)}
 }
 
-// List GET /api/rules?group=&keyword=
+// List GET /api/rules?group=&keyword=&page=&page_size=（分页）
 func (h *RuleHandler) List(c *gin.Context) {
-	rules, err := h.svc.List(c.Query("group"), c.Query("keyword"))
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
+	}
+	rules, total, err := h.svc.List(c.Query("group"), c.Query("keyword"), page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, rules)
+	c.JSON(http.StatusOK, gin.H{"items": rules, "total": total})
 }
 
 // Test POST /api/rules/test  模拟请求测试规则是否命中（保存前验证）

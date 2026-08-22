@@ -356,9 +356,9 @@ func (s *RuleService) ImportRules(rules []model.Rule) (imported, skipped int, er
 	return imported, skipped, nil
 }
 
-// List 规则列表（支持 group / keyword 过滤）
-func (s *RuleService) List(group, keyword string) ([]model.Rule, error) {
-	q := s.db
+// List 规则列表（支持 group / keyword 过滤，分页返回）
+func (s *RuleService) List(group, keyword string, page, pageSize int) ([]model.Rule, int64, error) {
+	q := s.db.Model(&model.Rule{})
 	if group != "" {
 		q = q.Where("`group` = ?", group)
 	}
@@ -366,11 +366,15 @@ func (s *RuleService) List(group, keyword string) ([]model.Rule, error) {
 		like := "%" + keyword + "%"
 		q = q.Where("rule_id LIKE ? OR name LIKE ? OR pattern LIKE ?", like, like, like)
 	}
-	var rules []model.Rule
-	if err := q.Order("sort_order asc, id asc").Find(&rules).Error; err != nil {
-		return nil, err
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
-	return rules, nil
+	var rules []model.Rule
+	if err := q.Order("sort_order asc, id asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&rules).Error; err != nil {
+		return nil, 0, err
+	}
+	return rules, total, nil
 }
 
 // validOperators 引擎支持的运算符白名单（与 waf/rule_engine/operators.lua 保持一致）

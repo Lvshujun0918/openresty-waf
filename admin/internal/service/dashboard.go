@@ -54,8 +54,10 @@ type DashboardStats struct {
 		Intercept24h int64 `json:"intercept_24h"` // 近 24 小时拦截
 	} `json:"today"`
 	Total struct {
-		Events  int64 `json:"events"`
-		Traffic int64 `json:"traffic"`
+		Events       int64 `json:"events"`
+		Traffic      int64 `json:"traffic"`
+		Rules        int64 `json:"rules"`         // 规则总数
+		RulesEnabled int64 `json:"rules_enabled"` // 启用中的规则数
 	} `json:"total"`
 	QPS         float64            `json:"qps"`          // 近 60s 请求+攻击 / 60
 	AttackTrend []AttackTrendPoint `json:"attack_trend"` // 近 days 天攻击趋势（事件表）
@@ -93,6 +95,12 @@ func (s *DashboardService) Stats(days int) (*DashboardStats, error) {
 		return nil, err
 	}
 	if err := tr.Count(&st.Total.Traffic).Error; err != nil {
+		return nil, err
+	}
+	if err := s.db.Model(&model.Rule{}).Count(&st.Total.Rules).Error; err != nil {
+		return nil, err
+	}
+	if err := s.db.Model(&model.Rule{}).Where("enabled = ?", true).Count(&st.Total.RulesEnabled).Error; err != nil {
 		return nil, err
 	}
 

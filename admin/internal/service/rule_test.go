@@ -139,15 +139,15 @@ func TestRuleService_CRUD(t *testing.T) {
 		t.Fatalf("create: %v", err)
 	}
 
-	rules, err := s.List("", "")
-	if err != nil || len(rules) != 1 {
-		t.Fatalf("list = %v, err = %v", len(rules), err)
+	rules, total, err := s.List("", "", 1, 20)
+	if err != nil || len(rules) != 1 || total != 1 {
+		t.Fatalf("list = %v total=%d, err = %v", len(rules), total, err)
 	}
 	// 过滤
-	if rules, _ := s.List("custom", ""); len(rules) != 0 {
+	if rules, _, _ := s.List("custom", "", 1, 20); len(rules) != 0 {
 		t.Fatalf("group filter should return 0, got %d", len(rules))
 	}
-	if rules, _ := s.List("", "100"); len(rules) != 1 {
+	if rules, _, _ := s.List("", "100", 1, 20); len(rules) != 1 {
 		t.Fatalf("keyword filter should return 1, got %d", len(rules))
 	}
 
@@ -183,7 +183,7 @@ func TestRuleService_CRUD(t *testing.T) {
 	if err := s.Delete(r.ID); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
-	if rules, _ := s.List("", ""); len(rules) != 0 {
+	if rules, _, _ := s.List("", "", 1, 20); len(rules) != 0 {
 		t.Fatalf("expected 0 rules after delete, got %d", len(rules))
 	}
 }
