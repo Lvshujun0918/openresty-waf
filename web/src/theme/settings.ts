@@ -7,10 +7,10 @@ export const themeSettings: App.Theme.ThemeSetting = {
   themeColor: '#2563eb',
   themeRadius: 6,
   otherColor: {
-    info: '#2080f0',
-    success: '#52c41a',
-    warning: '#faad14',
-    error: '#f5222d'
+    info: '#3b82f6',
+    success: '#16a34a',
+    warning: '#f59e0b',
+    error: '#ef4444'
   },
   isInfoFollowPrimary: true,
   layout: {
@@ -91,6 +91,21 @@ export const themeSettings: App.Theme.ThemeSetting = {
 /**
  * Override theme settings
  *
- * If publish new version, use `overrideThemeSettings` to override certain theme settings
+ * 主题配置已固化（右上角主题配置入口已移除），此对象用于生产构建时强制覆盖 localStorage 中的历史主题缓存，
+ * 确保所有用户始终使用下方固化的主题色与配置。如需调整主题，请在此处与 themeSettings 同步修改。
  */
-export const overrideThemeSettings: Partial<App.Theme.ThemeSetting> = {};
+export const overrideThemeSettings: Partial<App.Theme.ThemeSetting> = {
+  themeScheme: 'light',
+  grayscale: false,
+  colourWeakness: false,
+  recommendColor: false,
+  themeColor: '#2563eb',
+  themeRadius: 6,
+  otherColor: {
+    info: '#3b82f6',
+    success: '#16a34a',
+    warning: '#f59e0b',
+    error: '#ef4444'
+  },
+  isInfoFollowPrimary: true
+};

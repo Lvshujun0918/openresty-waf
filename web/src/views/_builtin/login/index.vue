@@ -59,12 +59,6 @@ const bgColor = computed(() => {
           <SystemLogo class="size-64px lt-sm:size-48px" />
           <h3 class="text-28px text-primary font-500 lt-sm:text-22px">{{ $t('system.title') }}</h3>
           <div class="i-flex-col">
-            <ThemeSchemaSwitch
-              :theme-schema="themeStore.themeScheme"
-              :show-tooltip="false"
-              class="text-20px lt-sm:text-18px"
-              @switch="themeStore.toggleThemeScheme"
-            />
             <LangSwitch
               v-if="themeStore.header.multilingual.visible"
               :lang="appStore.locale"
