@@ -228,6 +228,7 @@ const local: App.I18n.Schema = {
     home: '首页',
     dashboard: '仪表盘',
     monitoring: '安全监测',
+    'monitoring_stats': '流量统计',
     'monitoring_monitor': '实时监控',
     'monitoring_traffic': '流量日志',
     'monitoring_events': '攻击事件',

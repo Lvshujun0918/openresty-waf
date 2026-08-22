@@ -347,6 +347,42 @@ declare namespace Api {
       warn: number;
     }
 
+    /** 流量统计汇总 */
+    interface TrafficSummary {
+      total: number;
+      blocked: number;
+      block_rate: number;
+      attacks: number;
+      unique_ips: number;
+      avg_response_ms: number;
+    }
+
+    /** 流量时间序列点 */
+    interface TrafficPoint {
+      label: string;
+      total: number;
+      blocked: number;
+      attacks: number;
+    }
+
+    /** 名称-计数对（状态分布/Top 列表） */
+    interface NameCount {
+      name: string;
+      count: number;
+      blocked: number;
+    }
+
+    /** 流量统计报告 */
+    interface TrafficStatReport {
+      hours: number;
+      summary: TrafficSummary;
+      series: TrafficPoint[];
+      status_dist: NameCount[];
+      top_ips: NameCount[];
+      top_uris: NameCount[];
+      top_hosts: NameCount[];
+    }
+
     /** API Token（不含哈希，明文仅创建时返回一次） */
     interface ApiToken {
       id: number;

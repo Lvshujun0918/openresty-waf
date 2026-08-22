@@ -232,6 +232,7 @@ const local: App.I18n.Schema = {
     home: 'Home',
     dashboard: 'Dashboard',
     monitoring: 'Monitoring',
+    'monitoring_stats': 'Traffic Stats',
     'monitoring_monitor': 'Realtime Monitor',
     'monitoring_traffic': 'Traffic Logs',
     'monitoring_events': 'Attack Events',

@@ -1,6 +1,7 @@
 export * from './auth';
 export * from './errorlog';
 export * from './route';
+export * from './stats';
 export * from './ruleperf';
 export * from './rulesub';
 export * from './token';

@@ -18,10 +18,11 @@ const ROUTE_META_MAP: Partial<Record<RouteKey, Partial<RouteMeta>>> = {
   dashboard: { icon: 'mdi:view-dashboard', order: 2 },
   // 安全监测
   monitoring: { icon: 'mdi:radar', order: 3 },
+  monitoring_stats: { icon: 'mdi:chart-areaspline', order: 2 },
   monitoring_monitor: { icon: 'mdi:pulse', order: 1 },
-  monitoring_traffic: { icon: 'mdi:swap-vertical', order: 2 },
-  monitoring_events: { icon: 'mdi:shield-alert', order: 3 },
-  'monitoring_error-logs': { icon: 'mdi:alert-circle-outline', order: 4 },
+  monitoring_traffic: { icon: 'mdi:swap-vertical', order: 3 },
+  monitoring_events: { icon: 'mdi:shield-alert', order: 4 },
+  'monitoring_error-logs': { icon: 'mdi:alert-circle-outline', order: 5 },
   // 防护策略
   protection: { icon: 'mdi:shield-half-full', order: 4 },
   protection_rules: { icon: 'mdi:shield-check-outline', order: 1 },

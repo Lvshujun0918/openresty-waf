@@ -183,7 +183,7 @@ export const generatedRoutes: GeneratedRoute[] = [
           title: 'monitoring_error-logs',
           i18nKey: 'route.monitoring_error-logs',
           icon: 'mdi:alert-circle-outline',
-          order: 4
+          order: 5
         }
       },
       {
@@ -194,7 +194,7 @@ export const generatedRoutes: GeneratedRoute[] = [
           title: 'monitoring_events',
           i18nKey: 'route.monitoring_events',
           icon: 'mdi:shield-alert',
-          order: 3
+          order: 4
         }
       },
       {
@@ -209,6 +209,17 @@ export const generatedRoutes: GeneratedRoute[] = [
         }
       },
       {
+        name: 'monitoring_stats',
+        path: '/monitoring/stats',
+        component: 'view.monitoring_stats',
+        meta: {
+          title: 'monitoring_stats',
+          i18nKey: 'route.monitoring_stats',
+          icon: 'mdi:chart-areaspline',
+          order: 2
+        }
+      },
+      {
         name: 'monitoring_traffic',
         path: '/monitoring/traffic',
         component: 'view.monitoring_traffic',
@@ -216,7 +227,7 @@ export const generatedRoutes: GeneratedRoute[] = [
           title: 'monitoring_traffic',
           i18nKey: 'route.monitoring_traffic',
           icon: 'mdi:swap-vertical',
-          order: 2
+          order: 3
         }
       }
     ]

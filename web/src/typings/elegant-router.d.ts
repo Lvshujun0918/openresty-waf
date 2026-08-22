@@ -35,6 +35,7 @@ declare module "@elegant-router/types" {
     "monitoring_error-logs": "/monitoring/error-logs";
     "monitoring_events": "/monitoring/events";
     "monitoring_monitor": "/monitoring/monitor";
+    "monitoring_stats": "/monitoring/stats";
     "monitoring_traffic": "/monitoring/traffic";
     "protection": "/protection";
     "protection_rule-perf": "/protection/rule-perf";
@@ -124,6 +125,7 @@ declare module "@elegant-router/types" {
     | "monitoring_error-logs"
     | "monitoring_events"
     | "monitoring_monitor"
+    | "monitoring_stats"
     | "monitoring_traffic"
     | "protection_rule-perf"
     | "protection_rule-subs"
